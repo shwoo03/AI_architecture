@@ -1,0 +1,18 @@
+# Build artifacts (canonical에서 변환됨)
+.codex/
+.claude/
+
+# Symlink (생성됨)
+CLAUDE.md
+
+# Secrets
+.env
+*.key
+*.pem
+
+# State (선택 — 팀 공유면 commit, 개인이면 ignore)
+# state/cost-log.jsonl
+
+# OS
+.DS_Store
+Thumbs.db

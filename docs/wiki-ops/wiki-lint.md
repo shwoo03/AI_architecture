@@ -24,6 +24,8 @@ agents.
 - Wikilink broken: a knowledge body contains `[[Kxxx]]` that does not match any
   `entry_id` in `index.md`. Use only for cross-references; the index itself
   must use the ID column, not wikilinks.
+- Graph gaps: accepted knowledge files can be reported as isolated, weakly
+  linked, or bridge candidates. These are review hints, not automatic failures.
 
 ## Output
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -89,6 +90,8 @@ def generate(root: Path, candidate: Path, topic: str | None) -> tuple[Path, str]
     useful_patterns = parse_list_field(text, "what_to_copy_conceptually") or parse_list_field(text, "useful_patterns")
     direct_copy = parse_list_field(text, "what_to_copy_directly")
     not_to_copy = parse_list_field(text, "what_not_to_copy")
+    sources = parse_list_field(text, "sources")
+    reference_task_id = fields.get("reference_task_id", "")
     behavior_change = fields.get("behavior_change") or fields.get("next_action") or "후보 카드의 적용 후보를 검토해 작은 운영 변경으로 번역한다."
     validation_plan = fields.get("validation_plan") or "`python scripts/verify-skeleton.py`, `python scripts/validate-reference-candidates.py`, `python scripts/validate-reference-proposals.py`, `python scripts/list-open-questions.py --count`"
     stop_condition = fields.get("rollback_or_stop_condition") or "특정 외부 도구 도입처럼 읽히거나 승인 범위를 넘어가면 중단한다."
@@ -110,6 +113,7 @@ def generate(root: Path, candidate: Path, topic: str | None) -> tuple[Path, str]
 - `created_at`: {today()}
 - `candidate_card`: `{candidate_rel}`
 - `proposal_type`: reference_adoption_dry_run
+- `reference_task_id`: {reference_task_id or 'not queued'}
 - `approval_required`: yes
 - `decision_source`:
 
@@ -132,6 +136,10 @@ def generate(root: Path, candidate: Path, topic: str | None) -> tuple[Path, str]
 ```text
 {fields.get('expected_value', '후보 카드의 기대 가치를 확인해야 합니다.')}
 ```
+
+Source-backed evidence:
+
+{bullet_lines(sources, 'candidate card did not provide structured sources')}
 
 ## 적용하지 않을 것
 
@@ -225,6 +233,51 @@ python scripts/list-open-questions.py --count
     return output_path, body
 
 
+def enqueue_review(root: Path, proposal: Path, title: str, target_files: list[str]) -> str:
+    script = root / "scripts" / "review-queue.py"
+    if not script.exists():
+        return ""
+    command = [
+        sys.executable,
+        str(script),
+        "--root",
+        str(root),
+        "add",
+        "--type",
+        "reference-adoption",
+        "--title",
+        f"Reference adoption approval: {title}",
+        "--description",
+        "Review the generated reference adoption proposal before any absorption or implementation.",
+        "--source-path",
+        proposal.relative_to(root).as_posix(),
+        "--option",
+        "accepted",
+        "--option",
+        "rejected",
+        "--option",
+        "deferred",
+        "--json",
+    ]
+    command.extend(["--affected-path", proposal.relative_to(root).as_posix()])
+    for item in target_files:
+        command.extend(["--affected-path", item])
+    try:
+        result = subprocess.run(
+            command,
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=20,
+        )
+    except subprocess.SubprocessError:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", required=True, help="Path to a candidate card.")
@@ -265,8 +318,12 @@ def main() -> int:
         if output_path.exists():
             print(f"refusing to overwrite existing proposal: {output_path}", file=sys.stderr)
             return 1
-        output_path.write_text(body, encoding="utf-8", newline="\n")
+        output_path.write_text(body, encoding="utf-8")
         print(f"created {output_path.relative_to(root).as_posix()}")
+        target_files = parse_list_field(candidate.read_text(encoding="utf-8"), "target_files_or_areas")
+        queue_result = enqueue_review(root, output_path, output_path.stem, target_files)
+        if queue_result:
+            print(f"queued reference adoption review: {queue_result}")
     else:
         print(f"# suggested_output: {output_path.relative_to(root).as_posix()}")
         print(body)

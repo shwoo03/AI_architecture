@@ -6,7 +6,7 @@
 
 ## 무엇을 하는가
 
-이 모델은 프로젝트별 스킬을 프로젝트와 함께 관리합니다. 개인 전역 스킬이나 외부 플러그인은 사용할 수 있지만, 이 공용 시스템이 자동으로 설치하거나 승격하지 않습니다. 기본 원칙은 단순합니다. 현재 프로젝트에서 반복적으로 쓰는 절차만 프로젝트 스킬로 둡니다.
+이 모델은 프로젝트별 스킬을 프로젝트와 함께 관리합니다. canonical 위치는 `skills/active/`이며, `.codex/skills/`와 `.claude/skills/`는 변환 산출물입니다. 개인 전역 스킬이나 외부 플러그인은 사용할 수 있지만, 이 공용 시스템이 자동으로 설치하거나 승격하지 않습니다. 기본 원칙은 단순합니다. 현재 프로젝트에서 반복적으로 쓰는 절차만 프로젝트 스킬로 둡니다.
 
 ## 왜 필요한가
 
@@ -19,6 +19,8 @@
 1. 이름과 설명으로 사용할지 판단합니다.
 2. 필요할 때 스킬 본문을 읽습니다.
 3. 본문이 가리키는 세부 자료는 실제로 필요할 때만 읽습니다.
+
+스킬을 수정하거나 추가할 때는 `skills/active/`, `skills/_candidates/`, `skills/_meta/` 중 맞는 canonical 위치를 바꾼 뒤 `scripts/convert.py`와 `scripts/verify-parity.py`로 Codex/Claude 산출물을 갱신합니다.
 
 새 스킬은 반복 작업이 확인될 때만 추가합니다. 한 번만 쓰는 절차나 아직 검증되지 않은 아이디어는 스킬로 만들지 않고 제안이나 작업 로그에 남깁니다.
 
@@ -44,6 +46,8 @@
 ## 운영 규칙
 
 - 프로젝트별 스킬은 프로젝트 내부에 둡니다.
+- active skill은 `skills/active/`에 둡니다.
+- candidate skill은 `skills/_candidates/`에 두고, 20회 이상 사용과 85% 이상 성공률을 기록하면 사용자에게 active 승격을 제안합니다.
 - 개인 전역 스킬은 사용자가 관리합니다.
 - 공용 시스템은 전역 스킬 생명주기를 자동 관리하지 않습니다.
 - 스킬 이름 충돌은 의도적인 프로젝트 오버라이드가 아니라면 피합니다.
@@ -51,7 +55,8 @@
 
 ## 구현 연결 정보
 
-- 스킬 작성 템플릿: `codex/skills/_template/SKILL.md`
-- Codex 스킬 설명: `codex/skills/README.md`
-- 공통 스킬 위치: `.claude/skills/`
+- 스킬 작성 템플릿: `skills/_templates/SKILL.template.md`
+- active 스킬 위치: `skills/active/`
+- 메타 스킬 위치: `skills/_meta/`
+- generated 스킬 위치: `.codex/skills/`, `.claude/skills/`
 - 세 층 모델: `docs/THREE_LAYER_MODEL.md`

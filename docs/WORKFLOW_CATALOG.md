@@ -18,12 +18,16 @@
 
 현재 기본 워크플로는 다음과 같습니다.
 
+운영자는 개별 스크립트 순서를 외우지 않고 `scripts/agent-flow.py`를 먼저 사용합니다. 내부 스크립트는 유지하되, 사용자-facing 흐름은 `start`, `research`, `decide`, `closeout` 네 명령으로 압축합니다. 자연어 요청은 `agent-flow.py start --goal "<goal>"`의 `mode`, `reason`, `next_command`, `next_action_type`, `write_policy`로 번역한 뒤 진행합니다. 라우팅 선언은 `scripts/catalog.yaml`의 `routing.modes`에 두고, `agent-flow.py`는 그 선언을 읽는 실행기로 유지합니다. 쓰기 플래그가 포함된 추천은 confirmation 대상으로 취급하고, `build/maintain`은 구현 없이 closeout으로 직행하지 않습니다. `research --auto`는 `--goal`을 받아 named reference를 후보 선택까지 유지하고, build는 `build_intake`로 범위와 수용 기준을 고정한 뒤 plan을 작성합니다. reference 분석은 `runtime/reference-tasks.jsonl`에 queue record를 남길 수 있고, source-backed 후보 카드/제안서가 다음 승인 단계의 근거가 됩니다.
+
 | 워크플로 | 상태 | 언제 쓰는가 | 결과 |
 | --- | --- | --- | --- |
 | 프로젝트 부트스트랩 | active | 새 프로젝트 주제가 생겼을 때 | 프로젝트 목표와 첫 계획 |
 | 마이크로 검증 | active | 위험한 가정을 싸게 확인해야 할 때 | 검증 결과와 실패 유형 |
 | 스킬 생성 | active | 반복되는 도메인 절차가 확인될 때 | 새 스킬 초안 |
-| 외부 사례 탐색 | active | 인터넷 검색으로 좋은 외부 사례를 찾아 스켈레톤에 흡수할지 판단할 때 | 후보 카드, 평가 결과, dry-run 제안 |
+| 외부 사례 탐색 | active | 인터넷 검색이나 `AI_architecture_references` 분석으로 좋은 외부 사례를 찾아 스켈레톤에 흡수할지 판단할 때 | `agent-flow.py research` 결과, 후보 카드, 평가 결과, dry-run 제안 |
+| 승인/종료 묶음 | active | proposal 결정 또는 작업 종료 검증을 누락 없이 처리해야 할 때 | `agent-flow.py decide/closeout` 결과, review queue 동기화, completion evidence |
+| 코드맵 갱신 | active | 에이전트가 repo 구조를 빠르게 파악해야 하거나 구조가 많이 바뀌었을 때 | `docs/CODEMAPS/` 영역별 파일 지도 |
 | 리서치 브리프 | draft | 내부 또는 외부 선행 조사 필요 시 | 출처가 있는 요약 |
 | 주간 상태 요약 | draft | 정기 프로젝트 리뷰가 필요할 때 | 진행 상황과 막힘 요약 |
 
@@ -71,6 +75,8 @@
 ## 구현 연결 정보
 
 - 워크플로 템플릿: `codex/workflows/_template.md`
+- 단일 진입점: `scripts/agent-flow.py`
+- 스크립트 public/internal 분류: `scripts/catalog.yaml`
 - 외부 사례 탐색 워크플로: `docs/REFERENCE_DISCOVERY_WORKFLOW.md`
 - 에이전트 레지스트리: `docs/AGENT_REGISTRY.md`
 - 권한 기준: `codex/rules/AGENT_PERMISSIONS.md`

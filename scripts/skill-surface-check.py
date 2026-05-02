@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Check that project skills avoid duplicated Codex/Claude maintenance surface."""
+"""Check canonical skill surfaces and generated Codex/Claude parity."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -21,8 +20,6 @@ except (AttributeError, OSError):
 
 
 FRONTMATTER_RE = re.compile(r"^---\r?\n(.*?)\r?\n---", re.DOTALL)
-CODEX_SKILLS = Path(".codex") / "skills"
-CLAUDE_SKILLS = Path(".claude") / "skills"
 
 
 @dataclass
@@ -37,10 +34,12 @@ class Finding:
 class SkillSurfaceResult:
     root: str
     summary: dict[str, int]
+    active_skills: int
+    candidate_skills: int
+    meta_skills: int
     codex_skills: int
     claude_skills: int
-    duplicate_files: int
-    shimmed_claude_skills: int
+    parity_ok: bool
     findings: list[dict[str, object]]
 
 
@@ -55,105 +54,117 @@ def rel(path: Path, root: Path) -> str:
         return str(path)
 
 
-def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def skill_dirs(base: Path) -> list[Path]:
     if not base.is_dir():
         return []
     return sorted(path for path in base.iterdir() if path.is_dir())
 
 
-def is_shim(path: Path, skill_name: str) -> bool:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return False
-    expected = f"../../../.codex/skills/{skill_name}/SKILL.md"
-    return "Compatibility Shim" in text and expected in text
-
-
-def has_frontmatter(path: Path) -> bool:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return False
-    return bool(FRONTMATTER_RE.search(text))
-
-
-def find_duplicate_files(root: Path) -> list[list[Path]]:
-    files: list[Path] = []
-    for base in (root / CODEX_SKILLS, root / CLAUDE_SKILLS):
-        if base.is_dir():
-            files.extend(path for path in base.rglob("*") if path.is_file())
-    by_digest: dict[str, list[Path]] = {}
-    for path in files:
-        by_digest.setdefault(sha256(path), []).append(path)
-    duplicate_groups: list[list[Path]] = []
-    codex_root = root / CODEX_SKILLS
-    claude_root = root / CLAUDE_SKILLS
-    for group in by_digest.values():
-        if len(group) <= 1:
+def parse_frontmatter(path: Path) -> dict[str, object]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    match = FRONTMATTER_RE.match(text)
+    if not match:
+        return {}
+    fields: dict[str, object] = {}
+    current_list: list[str] | None = None
+    current_key: str | None = None
+    for raw in match.group(1).splitlines():
+        if not raw.strip():
             continue
-        has_codex = any(codex_root in path.parents for path in group)
-        has_claude = any(claude_root in path.parents for path in group)
-        if has_codex and has_claude:
-            duplicate_groups.append(group)
-    return duplicate_groups
+        line = raw.rstrip()
+        stripped = line.strip()
+        if stripped.startswith("- ") and current_list is not None:
+            current_list.append(stripped[2:].strip().strip("'\""))
+            continue
+        if ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if not value:
+            current_list = []
+            fields[key] = current_list
+            current_key = key
+            continue
+        fields[key] = value.strip("'\"")
+        current_list = None
+        current_key = None
+    return fields
+
+
+def generated_names(root: Path, rel_path: str) -> set[str]:
+    base = root / rel_path
+    if not base.is_dir():
+        return set()
+    return {path.name for path in base.iterdir() if path.name != ".gitkeep" and not path.name.startswith(".")}
+
+
+def check_skill_dir(root: Path, path: Path, expected_status: str | None, findings: list[Finding]) -> dict[str, object]:
+    skill_file = path / "SKILL.md"
+    if not skill_file.exists():
+        findings.append(Finding("ERROR", "skill_missing", rel(skill_file, root), "skill directory has no SKILL.md"))
+        return {}
+    fields = parse_frontmatter(skill_file)
+    if not fields:
+        findings.append(Finding("ERROR", "frontmatter_missing", rel(skill_file, root), "SKILL.md has no YAML frontmatter"))
+        return {}
+    for field in ("name", "description"):
+        if not fields.get(field):
+            findings.append(Finding("ERROR", "frontmatter_field_missing", rel(skill_file, root), f"missing `{field}`"))
+    if expected_status and fields.get("status") not in {expected_status, None, ""}:
+        findings.append(Finding("ERROR", "skill_status_mismatch", rel(skill_file, root), f"expected status {expected_status}, got {fields.get('status')}"))
+    return fields
 
 
 def run_check(root: Path) -> SkillSurfaceResult:
     findings: list[Finding] = []
-    codex_base = root / CODEX_SKILLS
-    claude_base = root / CLAUDE_SKILLS
-    codex_dirs = skill_dirs(codex_base)
-    claude_dirs = skill_dirs(claude_base)
-    codex_names = {path.name for path in codex_dirs}
-    shimmed = 0
+    active = skill_dirs(root / "skills" / "active")
+    candidates = skill_dirs(root / "skills" / "_candidates")
+    meta = skill_dirs(root / "skills" / "_meta")
 
-    for path in codex_dirs:
-        skill_file = path / "SKILL.md"
-        if not skill_file.exists():
-            findings.append(Finding("ERROR", "canonical_skill_missing", rel(skill_file, root), "canonical skill has no SKILL.md"))
-        elif not has_frontmatter(skill_file):
-            findings.append(Finding("ERROR", "canonical_frontmatter_missing", rel(skill_file, root), "canonical SKILL.md has no frontmatter"))
+    descriptions: dict[str, list[str]] = defaultdict(list)
+    triggers: dict[str, list[str]] = defaultdict(list)
+    declared_names: dict[str, list[str]] = defaultdict(list)
+    for status, dirs in (("active", active), ("candidate", candidates), (None, meta)):
+        for path in dirs:
+            fields = check_skill_dir(root, path, status, findings)
+            if not fields:
+                continue
+            name = str(fields.get("name") or path.name).strip()
+            if name:
+                declared_names[name].append(rel(path, root))
+            description = str(fields.get("description") or "").strip().lower()
+            if description:
+                descriptions[description].append(rel(path, root))
+            trigger_value = fields.get("trigger")
+            if isinstance(trigger_value, list):
+                for trigger in trigger_value:
+                    normalized = str(trigger).strip().lower()
+                    if normalized:
+                        triggers[normalized].append(rel(path, root))
 
-    for path in claude_dirs:
-        skill_file = path / "SKILL.md"
-        if not skill_file.exists():
-            findings.append(Finding("ERROR", "claude_skill_missing", rel(skill_file, root), "Claude skill has no SKILL.md"))
-            continue
-        if path.name in codex_names:
-            extra_files = [item for item in path.rglob("*") if item.is_file() and item.name != "SKILL.md"]
-            if extra_files:
-                findings.append(
-                    Finding(
-                        "ERROR",
-                        "claude_duplicate_payload",
-                        rel(path, root),
-                        f"Claude shim for canonical skill must not keep payload files: {len(extra_files)} found",
-                    )
-                )
-            if is_shim(skill_file, path.name):
-                shimmed += 1
-            else:
-                findings.append(
-                    Finding(
-                        "ERROR",
-                        "claude_shim_missing",
-                        rel(skill_file, root),
-                        "Claude skill shadows a Codex canonical skill without a compatibility shim",
-                    )
-                )
-        elif not has_frontmatter(skill_file):
-            findings.append(Finding("ERROR", "claude_frontmatter_missing", rel(skill_file, root), "Claude-only SKILL.md has no frontmatter"))
+    for description, paths in sorted(descriptions.items()):
+        if len(paths) > 1:
+            findings.append(Finding("INFO", "description_overlap", ", ".join(paths), f"shared description: {description}"))
+    for trigger, paths in sorted(triggers.items()):
+        if len(paths) > 1:
+            findings.append(Finding("INFO", "trigger_overlap", ", ".join(paths), f"shared trigger: {trigger}"))
+    for name, paths in sorted(declared_names.items()):
+        if len(paths) > 1:
+            findings.append(Finding("ERROR", "skill_name_duplicate", ", ".join(paths), f"duplicate skill name: {name}"))
 
-    duplicate_groups = find_duplicate_files(root)
-    duplicate_files = sum(len(group) for group in duplicate_groups)
-    if duplicate_files:
-        examples = ", ".join(rel(path, root) for path in duplicate_groups[0][:3])
-        findings.append(Finding("WARN", "duplicate_skill_files", ".", f"{duplicate_files} duplicate skill files remain; first group: {examples}"))
+    expected = {path.name for path in active}
+    codex = generated_names(root, ".codex/skills")
+    claude = generated_names(root, ".claude/skills")
+    parity_ok = expected == codex == claude
+    if not (root / ".codex" / "skills").is_dir():
+        findings.append(Finding("ERROR", "codex_skill_surface_missing", ".codex/skills", "generated Codex skills directory missing"))
+    elif expected != codex:
+        findings.append(Finding("ERROR", "codex_skill_parity", ".codex/skills", f"expected={sorted(expected)} actual={sorted(codex)}"))
+    if not (root / ".claude" / "skills").is_dir():
+        findings.append(Finding("ERROR", "claude_skill_surface_missing", ".claude/skills", "generated Claude skills directory missing"))
+    elif expected != claude:
+        findings.append(Finding("ERROR", "claude_skill_parity", ".claude/skills", f"expected={sorted(expected)} actual={sorted(claude)}"))
 
     summary = dict(Counter(finding.severity for finding in findings))
     for severity in ("ERROR", "WARN", "INFO"):
@@ -161,10 +172,12 @@ def run_check(root: Path) -> SkillSurfaceResult:
     return SkillSurfaceResult(
         root=str(root),
         summary=summary,
-        codex_skills=len(codex_dirs),
-        claude_skills=len(claude_dirs),
-        duplicate_files=duplicate_files,
-        shimmed_claude_skills=shimmed,
+        active_skills=len(active),
+        candidate_skills=len(candidates),
+        meta_skills=len(meta),
+        codex_skills=len(codex),
+        claude_skills=len(claude),
+        parity_ok=parity_ok,
         findings=[asdict(finding) for finding in findings],
     )
 
@@ -177,15 +190,17 @@ def render_text(result: SkillSurfaceResult) -> str:
         f"error={result.summary.get('ERROR', 0)}, "
         f"warn={result.summary.get('WARN', 0)}, "
         f"info={result.summary.get('INFO', 0)}",
+        f"active_skills: {result.active_skills}",
+        f"candidate_skills: {result.candidate_skills}",
+        f"meta_skills: {result.meta_skills}",
         f"codex_skills: {result.codex_skills}",
         f"claude_skills: {result.claude_skills}",
-        f"shimmed_claude_skills: {result.shimmed_claude_skills}",
-        f"duplicate_files: {result.duplicate_files}",
+        f"parity_ok: {result.parity_ok}",
     ]
     for finding in result.findings:
         lines.append(f"  {finding['severity']:<5} [{finding['check']}] {finding['path']}: {finding['detail']}")
     if not result.findings:
-        lines.append("  OK skill surface is canonicalized")
+        lines.append("  OK canonical skill surface is healthy")
     return "\n".join(lines)
 
 

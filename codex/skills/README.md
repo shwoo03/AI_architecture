@@ -7,22 +7,23 @@ the Claude Code `SKILL.md` schema as the shared skill format.
 
 | Directory | Role |
 | --- | --- |
-| `<project>/.claude/skills/` | **Authoritative location for skill content.** All working skills (including universal seeds like `search-first`, `tdd-workflow`, `verification-loop`, `security-review`) live here. Claude discovers them automatically. |
+| `<project>/skills/active/` | **Canonical location for active skill content.** All working skills live here and are transformed into runtime artifacts by `scripts/convert.py`. |
+| `<project>/.codex/skills/`, `<project>/.claude/skills/` | Generated runtime artifacts. Do not edit directly. Regenerate from `skills/active/`. |
 | `codex/skills/` | **Documentation and templates only.** Explains the skill model for Codex and houses `_template/` for new skills. Does not contain runnable skills. |
 | `~/.claude/skills/` | User-global personal skills, managed outside this skeleton. |
 
-Codex reads the same `.claude/skills/*/SKILL.md` files as Claude when `AGENTS.md`
-or the task points to them. Do not duplicate skill bodies into `codex/skills/`.
+Codex and Claude consume generated skill files that come from the same
+canonical source. Do not duplicate skill bodies into `codex/skills/`.
 
 ## Rules vs Skills (relationship)
 
 Rules (`rules/common/*.md`, `rules/languages/*.md`) define **WHAT must be true**
-— invariants, guardrails, prohibitions. Skills (`.claude/skills/*/SKILL.md`)
+— invariants, guardrails, prohibitions. Skills (`skills/active/*/SKILL.md`)
 define **HOW to do the work** — triggers, step-by-step workflow, data
 references, output shape.
 
 When a topic appears in both (for example "search-first" has `rules/common/search-first.md`
-and `.claude/skills/search-first/SKILL.md`):
+and `skills/active/search-first/SKILL.md`):
 
 - The **rule** states the non-negotiable condition ("search before inventing").
 - The **skill** states the procedure for meeting the rule (when to activate,
@@ -33,7 +34,7 @@ and `.claude/skills/search-first/SKILL.md`):
 ## Language convention
 
 `rules/*.md` is written in the project's primary natural language (Korean in
-this skeleton). `.claude/skills/*/SKILL.md` stays in English because SKILL.md
+this skeleton). `skills/active/*/SKILL.md` stays in English because SKILL.md
 is consumed by agents/tools that rely on English frontmatter and trigger
 descriptions for activation. This split is intentional; do not translate
 SKILL.md bodies into Korean.
@@ -41,7 +42,7 @@ SKILL.md bodies into Korean.
 ## 3-Depth Structure
 
 ```text
-<project>/.claude/skills/<skill-name>/
+<project>/skills/active/<skill-name>/
   SKILL.md
   data/
   external/
@@ -96,7 +97,7 @@ Avoid broad descriptions that cause every task to activate the skill.
 
 ## Template
 
-Use `codex/skills/_template/SKILL.md` as the starting point for new skills, then
-create the skill under `.claude/skills/<skill-name>/`. Do not leave the new
-skill inside `codex/skills/`. Personal global skills are managed outside this
-skeleton.
+Use `skills/_templates/SKILL.template.md` as the starting point for new skills,
+then create the skill under `skills/active/<skill-name>/` or
+`skills/_candidates/<skill-name>/`. Regenerate runtime artifacts with
+`python3 scripts/convert.py` when the canonical skill surface changes.

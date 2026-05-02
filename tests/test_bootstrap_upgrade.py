@@ -39,6 +39,8 @@ class BootstrapIntegrationTests(unittest.TestCase):
                     "python",
                     "--owner",
                     "tester",
+                    "--profile",
+                    "cli",
                 ]
             )
             self.assertEqual(
@@ -50,6 +52,12 @@ class BootstrapIntegrationTests(unittest.TestCase):
             self.assertTrue((target / "docs" / "PROJECT_PROFILE.md").exists())
             self.assertTrue((target / "docs" / "REFERENCE_REVIEW.template.md").exists())
             self.assertTrue((target / "docs" / "RUNTIME_STARTUP.template.md").exists())
+            self.assertTrue((target / ".codex" / "skills").is_dir())
+            self.assertTrue((target / ".claude" / "skills").is_dir())
+            self.assertTrue((target / "runtime" / "install-state.jsonl").exists())
+            self.assertTrue((target / "runtime" / "skill-usage.jsonl").exists())
+            self.assertTrue((target / "runtime" / "skill-lifecycle.jsonl").exists())
+            self.assertTrue((target / "runtime" / "session-snapshot.json").exists())
             self.assertTrue((target / "runtime" / "external-repos" / "README.md").exists())
             self.assertFalse(
                 (target / "runtime" / "external-repos" / "test.invalid").exists(),
@@ -71,6 +79,13 @@ class BootstrapIntegrationTests(unittest.TestCase):
                 f"verify-skeleton on bootstrapped project failed:\n"
                 f"stdout={verify.stdout}\nstderr={verify.stderr}",
             )
+            parity = _run([str(SCRIPTS / "verify-parity.py"), "--root", str(target)])
+            self.assertEqual(parity.returncode, 0, parity.stdout + parity.stderr)
+            install_state = (target / "runtime" / "install-state.jsonl").read_text(encoding="utf-8").strip().splitlines()
+            self.assertGreaterEqual(len(install_state), 2)
+            bootstrap_record = json.loads(install_state[0])
+            self.assertEqual(bootstrap_record["requested_profile"], "cli")
+            self.assertIn("cli", bootstrap_record["selected_components"])
         finally:
             shutil.rmtree(fake_clone.parent, ignore_errors=True)
             shutil.rmtree(tmp, ignore_errors=True)

@@ -34,9 +34,11 @@ ALLOWED_TYPES = {
     "suggestion",
     "risky-update",
     "reference-adoption",
+    "skill-lifecycle",
     "notion-duplicate",
 }
 RESOLVED_STATUSES = {"resolved", "dismissed"}
+NON_BLOCKING_STATUSES = {"resolved", "dismissed", "deferred"}
 
 
 @dataclass
@@ -161,6 +163,10 @@ def reconstruct(events: list[dict[str, Any]]) -> dict[str, ReviewItem]:
             item.status = "resolved"
             item.decision = str(event.get("decision", ""))
             item.note = str(event.get("note", ""))
+        elif action == "defer":
+            item.status = "deferred"
+            item.decision = "deferred"
+            item.note = str(event.get("note", ""))
         elif action == "dismiss":
             item.status = "dismissed"
             item.note = str(event.get("note", ""))
@@ -170,7 +176,7 @@ def reconstruct(events: list[dict[str, Any]]) -> dict[str, ReviewItem]:
 def find_open_duplicate(items: dict[str, ReviewItem], item_type: str, title: str) -> ReviewItem | None:
     key = item_key(item_type, title)
     for item in items.values():
-        if item.status not in RESOLVED_STATUSES and item_key(item.type, item.title) == key:
+        if item.status not in NON_BLOCKING_STATUSES and item_key(item.type, item.title) == key:
             return item
     return None
 
@@ -315,20 +321,155 @@ def cmd_dismiss(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_defer(root: Path, args: argparse.Namespace) -> int:
+    items = reconstruct(read_events(root))
+    item = items.get(args.id)
+    if not item:
+        print(f"review item not found: {args.id}", file=sys.stderr)
+        return 1
+    if item.status in RESOLVED_STATUSES:
+        print(f"review item already {item.status}: {args.id}", file=sys.stderr)
+        return 1
+    if item.status == "deferred":
+        print(f"review item already deferred: {args.id}", file=sys.stderr)
+        return 1
+    append_event(
+        root,
+        {
+            "ts": utc_now(),
+            "action": "defer",
+            "id": args.id,
+            "decision": "deferred",
+            "note": args.note,
+        },
+    )
+    print(f"deferred review item: {args.id}")
+    return 0
+
+
 def cmd_count(root: Path, args: argparse.Namespace) -> int:
     items = reconstruct(read_events(root))
-    open_items = [item for item in items.values() if item.status not in RESOLVED_STATUSES]
+    open_items = [item for item in items.values() if item.status == "open"]
     if args.json:
         counts = {
             "open": len(open_items),
             "resolved": sum(1 for item in items.values() if item.status == "resolved"),
             "dismissed": sum(1 for item in items.values() if item.status == "dismissed"),
+            "deferred": sum(1 for item in items.values() if item.status == "deferred"),
             "total": len(items),
         }
         print(json.dumps(counts, ensure_ascii=False, indent=2))
     else:
         print(len(open_items))
     return 1 if args.strict and open_items else 0
+
+
+def _parse_iso(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _proposal_decision(root: Path, source_path: str) -> str:
+    if not source_path.endswith(".md"):
+        return ""
+    path = root / source_path
+    if not path.is_file():
+        return ""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- `decision`:"):
+            decision = stripped.split(":", 1)[1].strip()
+            return decision if decision in {"accepted", "rejected", "deferred"} else ""
+    return ""
+
+
+def build_sweep_actions(root: Path, items: dict[str, ReviewItem], stale_days: int) -> list[dict[str, str]]:
+    actions: list[dict[str, str]] = []
+    open_items = [item for item in items.values() if item.status == "open"]
+    seen_keys: dict[str, ReviewItem] = {}
+    now = datetime.now(timezone.utc)
+    for item in sorted(open_items, key=lambda value: (value.created_at, value.id)):
+        key = item_key(item.type, item.title)
+        if key in seen_keys:
+            actions.append({
+                "id": item.id,
+                "action": "dismiss",
+                "reason": f"duplicate of open review item {seen_keys[key].id}",
+                "decision": "",
+            })
+            continue
+        seen_keys[key] = item
+
+        if item.source_path:
+            source = root / item.source_path
+            if not source.exists():
+                actions.append({
+                    "id": item.id,
+                    "action": "dismiss",
+                    "reason": f"source_path missing: {item.source_path}",
+                    "decision": "",
+                })
+                continue
+            decision = _proposal_decision(root, item.source_path)
+            if decision:
+                actions.append({
+                    "id": item.id,
+                    "action": "resolve" if decision in {"accepted", "rejected"} else "defer",
+                    "reason": f"proposal already has decision: {decision}",
+                    "decision": decision,
+                })
+                continue
+
+        created = _parse_iso(item.created_at)
+        if stale_days >= 0 and created and (now - created).days >= stale_days:
+            actions.append({
+                "id": item.id,
+                "action": "dismiss",
+                "reason": f"open item is stale for >= {stale_days} day(s)",
+                "decision": "",
+            })
+    return actions
+
+
+def cmd_sweep(root: Path, args: argparse.Namespace) -> int:
+    items = reconstruct(read_events(root))
+    actions = build_sweep_actions(root, items, args.stale_days)
+    applied: list[dict[str, str]] = []
+    if args.apply:
+        for action in actions:
+            event = {
+                "ts": utc_now(),
+                "action": action["action"],
+                "id": action["id"],
+                "note": f"sweep: {action['reason']}",
+            }
+            if action["action"] == "resolve":
+                event["decision"] = action["decision"] or "resolved_by_sweep"
+            if action["action"] == "defer":
+                event["decision"] = "deferred"
+            append_event(root, event)
+            applied.append(action)
+    payload = {
+        "status": "applied" if args.apply else "dry_run",
+        "stale_days": args.stale_days,
+        "actions": actions,
+        "applied": applied,
+    }
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        if not actions:
+            print("review queue sweep: no stale items")
+        else:
+            for action in actions:
+                prefix = "APPLY" if args.apply else "DRY-RUN"
+                print(f"{prefix} {action['action']} {action['id']}: {action['reason']}")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -369,10 +510,22 @@ def build_parser() -> argparse.ArgumentParser:
     dismiss_parser.add_argument("--note", default="")
     dismiss_parser.set_defaults(func=cmd_dismiss)
 
+    defer_parser = sub.add_parser("defer", help="Mark one review item as deferred without hiding it as dismissed.")
+    defer_parser.add_argument("id")
+    defer_parser.add_argument("--note", default="")
+    defer_parser.set_defaults(func=cmd_defer)
+
     count_parser = sub.add_parser("count", help="Print the number of unresolved review items.")
     count_parser.add_argument("--strict", action="store_true", help="Exit 1 when unresolved items exist.")
     count_parser.add_argument("--json", action="store_true")
     count_parser.set_defaults(func=cmd_count)
+
+    sweep_parser = sub.add_parser("sweep", help="Find stale or already-decided review items.")
+    sweep_parser.add_argument("--dry-run", action="store_true", help="Preview sweep actions without writing events.")
+    sweep_parser.add_argument("--apply", action="store_true", help="Append resolve/dismiss events for proposed sweep actions.")
+    sweep_parser.add_argument("--stale-days", type=int, default=30)
+    sweep_parser.add_argument("--json", action="store_true")
+    sweep_parser.set_defaults(func=cmd_sweep)
 
     return parser
 

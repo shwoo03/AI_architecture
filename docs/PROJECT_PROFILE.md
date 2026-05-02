@@ -12,7 +12,7 @@
 
 - `primary_goal`: 좋은 외부 사례를 찾아 검증하고, 승인된 패턴만 문서·규칙·스킬·스크립트로 흡수할 수 있는 공용 AI 운영 스켈레톤을 만든다.
 - `target_users`: AI 프로젝트를 시작하거나 이어받는 사용자, Codex/Claude 같은 코딩 에이전트, 반복 운영 절차를 정리하는 프로젝트 관리자.
-- `success_criteria`: `python scripts/verify-skeleton.py`가 통과하고, 새 프로젝트가 프로필 기반으로 시작되며, 주요 운영 변경이 활동 로그와 세션 인수인계에 남고, 외부 사례는 후보 카드와 dry-run 제안 없이 바로 장기 규칙으로 승격되지 않는다.
+- `success_criteria`: `python3 scripts/verify-skeleton.py`가 통과하고, 새 프로젝트가 프로필 기반으로 시작되며, 주요 운영 변경이 활동 로그와 세션 인수인계에 남고, 외부 사례는 후보 카드와 dry-run 제안 없이 바로 장기 규칙으로 승격되지 않는다.
 - `failure_definition`: 목표·성공 기준 없이 에이전트가 임의로 구현하거나, 출처와 검증 없이 외부 구조를 복사하거나, 검증/로그/인수인계 없이 스켈레톤 운영 규칙이 바뀌면 실패로 본다.
 - `non_goals`: 특정 앱 하나의 기능 구현, 외부 프레임워크 전체 복제, 사용자 승인 없는 자동 문서 수정, 장기 지식의 무근거 자동 생성은 범위 밖이다.
 
@@ -31,7 +31,7 @@
 - `active_workflows`: 프로젝트 부트스트랩, 마이크로 검증, 스킬 생성, 외부 사례 탐색.
 - `active_skills`: brainstorming, code-review-expert, web-design-guidelines, writing-skills 등 프로젝트 로컬 스킬과 필요 시 전역 스킬.
 - `active_rules`: 공통 코드 스타일, 디렉터리 레이아웃, 임시 파일 수명, MCP discipline, Notion 중복 방지.
-- `validation_summary`: 기본 구조 검증은 `python scripts/verify-skeleton.py`로 수행한다. 미해결 질문은 `python scripts/list-open-questions.py --count`로 확인한다.
+- `validation_summary`: 기본 구조 검증은 `python3 scripts/verify-skeleton.py`로 수행한다. 미해결 질문은 `python3 scripts/list-open-questions.py --count`로 확인한다.
 - `pivot_summary`: 외부 후보가 후보 카드 없이 장기 규칙으로 승격되거나, 검증 없이 자동화가 쓰기 작업을 하려 하면 중단하고 dry-run 제안으로 되돌린다.
 
 ## 첫 반복 체크리스트

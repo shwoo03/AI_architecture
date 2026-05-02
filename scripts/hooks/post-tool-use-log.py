@@ -7,9 +7,13 @@ import argparse
 import json
 import os
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from redact import redact_json, redact_text
 
 # Cross-platform advisory file locking. Concurrent post-tool-use hooks (e.g.
 # parallel tool calls) could otherwise interleave partial writes into the
@@ -77,6 +81,48 @@ def parse_goal_lineage(value: str | None) -> list[str]:
     return [part.strip() for part in value.split(">") if part.strip()]
 
 
+def normalize_status(status: str, summary: str, payload: dict[str, Any]) -> tuple[str, str, bool]:
+    raw = (status or "").strip().lower()
+    summary_text = (summary or "").strip()
+    if raw in {"ok", "success", "succeeded", "completed", "pass", "passed"}:
+        normalized = "success"
+    elif raw in {"fail", "failed", "failure", "error", "errored"}:
+        normalized = "failure"
+    elif raw in {"timeout", "timed_out", "timed-out"}:
+        normalized = "timeout"
+    elif raw in {"skip", "skipped"}:
+        normalized = "skipped"
+    else:
+        normalized = "unknown"
+    empty_output = not summary_text and not payload.get("data")
+    if empty_output and normalized == "success":
+        normalized = "empty"
+    failure_type = ""
+    if normalized in {"failure", "timeout"}:
+        failure_type = normalized
+    elif normalized == "unknown":
+        failure_type = "unknown_status"
+    return normalized, failure_type, empty_output
+
+
+def sidecar_for_summary(root: Path, summary: str, max_chars: int) -> tuple[str, dict[str, Any]]:
+    summary = redact_text(summary)
+    if len(summary) <= max_chars:
+        return summary, {}
+    directory = root / "runtime" / "tool-output-sidecars"
+    directory.mkdir(parents=True, exist_ok=True)
+    name = f"{utc_now().replace(':', '').replace('-', '')}-{uuid.uuid4().hex[:8]}.txt"
+    path = directory / name
+    path.write_text(summary, encoding="utf-8")
+    preview = summary[: max_chars - 3].rstrip() + "..."
+    return preview, {
+        "sidecar_path": path.relative_to(root).as_posix(),
+        "preview_chars": len(preview),
+        "full_chars": len(summary),
+        "truncated": True,
+    }
+
+
 def _warn_if_ts_regression(log_path: Path, new_ts: str) -> None:
     """Emit a non-fatal warning when the new entry's ts is earlier than the
     last entry's ts in the same file. Per docs/RUNTIME_EVENT_SCHEMA.md, line
@@ -125,12 +171,14 @@ def main() -> int:
     parser.add_argument("--action", default="post_tool_use")
     parser.add_argument("--goal-lineage", default=None, help="Use 'task > project > primary goal'.")
     parser.add_argument("--log", default=None, help="Override log path.")
+    parser.add_argument("--max-summary-chars", type=int, default=2000)
     args = parser.parse_args()
 
     try:
         payload = read_stdin_json()
         tool = args.tool or payload.get("tool") or payload.get("tool_name") or "unknown"
         status = args.status or payload.get("status") or "completed"
+        payload = redact_json(payload)
         summary = args.summary or payload.get("summary") or payload.get("message") or ""
         project = args.project or payload.get("project") or "unknown"
         # Accept goal_lineage from CLI ("a > b > c") or stdin JSON (list or string).
@@ -148,22 +196,6 @@ def main() -> int:
             raise ValueError(
                 "goal_lineage must be a list, an 'a > b > c' string, or absent"
             )
-
-        event = {
-            "ts": utc_now(),
-            "phase": args.phase,
-            "action": args.action,
-            "project": project,
-            "goal_lineage": goal_lineage,
-            "tool_call": {
-                "tool": tool,
-                "status": status,
-                "summary": summary,
-            },
-            # Coerce `data` to a dict even when the payload sets it to null so
-            # the emitted event shape stays stable for downstream consumers.
-            "data": payload.get("data") if isinstance(payload.get("data"), dict) else {},
-        }
 
         root = repo_root().resolve()
         # Resolve the default path too, not just the --log override. Otherwise
@@ -191,6 +223,32 @@ def main() -> int:
                 f"got {log_path}"
             )
         log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        summary, sidecar = sidecar_for_summary(root, str(summary), args.max_summary_chars)
+        normalized_status, failure_type, empty_output = normalize_status(str(status), str(summary), payload)
+        duration_ms = payload.get("duration_ms")
+        if not isinstance(duration_ms, (int, float)) or duration_ms < 0:
+            duration_ms = None
+        event = {
+            "ts": utc_now(),
+            "phase": args.phase,
+            "action": args.action,
+            "project": project,
+            "goal_lineage": goal_lineage,
+            "tool_call": {
+                "tool": tool,
+                "status": status,
+                "normalized_status": normalized_status,
+                "failure_type": failure_type,
+                "empty_output": empty_output,
+                "duration_ms": duration_ms,
+                "summary": summary,
+                **sidecar,
+            },
+            # Coerce `data` to a dict even when the payload sets it to null so
+            # the emitted event shape stays stable for downstream consumers.
+            "data": payload.get("data") if isinstance(payload.get("data"), dict) else {},
+        }
         _warn_if_ts_regression(log_path, event["ts"])
         # allow_nan=False refuses to emit non-standard JSON (`NaN`, `Infinity`,
         # `-Infinity`) that could otherwise enter via `payload["data"]` and

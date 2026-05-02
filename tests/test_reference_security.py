@@ -158,6 +158,118 @@ python scripts/validate-reference-proposals.py
         finally:
             scratch.unlink(missing_ok=True)
 
+    def test_reference_refresh_proposal_is_valid(self) -> None:
+        scratch = (
+            REPO_ROOT
+            / "runtime"
+            / "proposals"
+            / "reference-adoption"
+            / "_tmp_reference_refresh_valid.md"
+        )
+        scratch.write_text(
+            """# Reference Refresh Smoke
+
+## 상태
+
+- `status`: proposed
+- `created_at`: 2026-05-02T00:00:00Z
+- `candidate_card`: `references.yaml`
+- `proposal_type`: reference_refresh
+- `approval_required`: yes
+- `decision_source`:
+- `decision`: pending
+- `decided_at`:
+- `decided_by`:
+- `applied_in`:
+- `validation_result`:
+
+## 한 문장 정의
+
+Refresh tracked reference commit.
+
+## 근거
+
+- Latest commit changed.
+
+## 제안 변경
+
+- Review before applying.
+
+## 검증 계획
+
+```powershell
+python scripts/verify-skeleton.py
+python scripts/validate-reference-proposals.py
+```
+
+## 최종 결정 기록
+
+- Pending user approval.
+""",
+            encoding="utf-8",
+        )
+        try:
+            result = _run([str(self.SCRIPT), "--root", str(REPO_ROOT)])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        finally:
+            scratch.unlink(missing_ok=True)
+
+    def test_reference_refresh_missing_required_field_is_rejected(self) -> None:
+        scratch = (
+            REPO_ROOT
+            / "runtime"
+            / "proposals"
+            / "reference-adoption"
+            / "_tmp_reference_refresh_missing.md"
+        )
+        scratch.write_text(
+            """# Reference Refresh Smoke
+
+## 상태
+
+- `status`: proposed
+- `created_at`: 2026-05-02T00:00:00Z
+- `candidate_card`: `references.yaml`
+- `proposal_type`: reference_refresh
+- `approval_required`: yes
+- `decision`: pending
+- `decided_at`:
+- `decided_by`:
+- `applied_in`:
+- `validation_result`:
+
+## 한 문장 정의
+
+Refresh tracked reference commit.
+
+## 근거
+
+- Latest commit changed.
+
+## 제안 변경
+
+- Review before applying.
+
+## 검증 계획
+
+```powershell
+python scripts/verify-skeleton.py
+python scripts/validate-reference-proposals.py
+```
+
+## 최종 결정 기록
+
+- Pending user approval.
+""",
+            encoding="utf-8",
+        )
+        try:
+            result = _run([str(self.SCRIPT), "--root", str(REPO_ROOT)])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("missing field `decision_source`", result.stdout)
+        finally:
+            scratch.unlink(missing_ok=True)
+
 class SecurityScanTests(unittest.TestCase):
     """`security-scan.py` is a read-only local hygiene scanner."""
 
@@ -188,6 +300,54 @@ class SecurityScanTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["MEDIUM"], 0)
         self.assertGreater(payload["suppressed_findings"], 0)
 
+    def test_allowlist_requires_line_or_fingerprint(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"security-allowlist-{uuid.uuid4().hex}"
+        try:
+            (tmp / "rules").mkdir(parents=True)
+            (tmp / "scripts").mkdir()
+            (tmp / "scripts" / "probe.sh").write_text("echo ok 2>" + "/dev/null\n", encoding="utf-8")
+            (tmp / "rules" / "security-scan-allowlist.json").write_text(
+                json.dumps([
+                    {
+                        "rule": "silent_error_suppression",
+                        "path": "scripts/probe.sh",
+                        "reason": "too broad",
+                    }
+                ]),
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--strict"])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("allowlist_invalid", result.stdout)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_allowlist_line_does_not_suppress_other_lines(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"security-allowlist-line-{uuid.uuid4().hex}"
+        try:
+            (tmp / "rules").mkdir(parents=True)
+            (tmp / "scripts").mkdir()
+            (tmp / "scripts" / "probe.sh").write_text("echo one 2>" + "/dev/null\necho two 2>" + "/dev/null\n", encoding="utf-8")
+            (tmp / "rules" / "security-scan-allowlist.json").write_text(
+                json.dumps([
+                    {
+                        "rule": "silent_error_suppression",
+                        "path": "scripts/probe.sh",
+                        "line": 1,
+                        "reason": "line-specific suppression",
+                    }
+                ]),
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["suppressed_findings"], 1)
+            active_lines = [finding["line"] for finding in payload["findings"] if finding["rule"] == "silent_error_suppression"]
+            self.assertEqual(active_lines, [2])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_security_scan_bad_root_exits_two(self) -> None:
         result = _run(
             [str(self.SCRIPT), "--root", str(REPO_ROOT / "does-not-exist")],
@@ -201,7 +361,7 @@ class SecurityScanTests(unittest.TestCase):
         try:
             tmp.mkdir(parents=True)
             (tmp / "leak.py").write_text(
-                "OPENAI_API_KEY = 'sk-abcdefghijklmnopqrstuvwxyz1234567890'\n",
+                "OPENAI_API_KEY = '" + "sk-" + "abcdefghijklmnopqrstuvwxyz1234567890'\n",
                 encoding="utf-8",
             )
             result = _run([str(SecurityScanTests.SCRIPT), "--root", str(tmp), "--format", "json"])
@@ -212,6 +372,24 @@ class SecurityScanTests(unittest.TestCase):
             strict = _run([str(self.SCRIPT), "--root", str(tmp), "--strict"])
             self.assertEqual(strict.returncode, 1)
             self.assertIn("openai_token", strict.stdout)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_modern_and_commented_secrets_are_detected(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"security-scan-modern-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            (tmp / "leak.env").write_text(
+                "# OPENAI_API_KEY=" + "sk-proj-" + "abcdefghijklmnopqrstuvwxyz1234567890\n"
+                "ANTHROPIC_API_KEY=" + "sk-ant-" + "abcdefghijklmnopqrstuvwxyz1234567890\n",
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            rules = {finding["rule"] for finding in payload["findings"]}
+            self.assertIn("openai_token", rules)
+            self.assertIn("anthropic_token", rules)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

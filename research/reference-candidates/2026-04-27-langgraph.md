@@ -44,6 +44,8 @@
 - `maintenance_signal`: GitHub 페이지 기준 약 30.5k stars, 5.2k forks, 505 releases, MIT license가 표시된다.
 - `documentation_signal`: 공식 Python/JavaScript 문서가 durable execution, persistence, human-in-the-loop 등 핵심 개념을 별도 페이지로 설명한다.
 - `validation_signal`: 운영 개념은 공식 문서로 확인 가능하지만, 이 스켈레톤에 바로 도입할 코드나 의존성은 없다. 적용 전 dry-run 설계가 필요하다.
+- `sources`:
+  - {"path":"https://github.com/langchain-ai/langgraph","kind":"repository","evidence":"Durable execution and checkpointing concept source for the dry-run example.","hash_or_line_ref":"external-reference"}
 
 ## 리스크
 

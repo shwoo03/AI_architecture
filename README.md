@@ -12,6 +12,7 @@
 
 - 프로젝트 목표, 성공 기준, 제약 조건을 먼저 고정합니다.
 - Codex와 Claude가 같은 운영 원칙을 읽도록 합니다.
+- `skills/`, `agents/`, `rules/`, `mcp/servers.yaml`, `references.yaml`을 canonical source로 두고 `.codex/`, `.claude/`, `.mcp.json`은 변환 산출물로 관리합니다.
 - 반복되는 업무를 워크플로와 에이전트 역할로 분리합니다.
 - 작업 결과를 검증 가능한 증거로 남깁니다.
 - 장기 지식은 출처가 있는 항목으로만 축적합니다.
@@ -77,6 +78,7 @@ python scripts/bootstrap/new-project.py --name <name> --target <path> --domain <
 2. `python scripts/verify-skeleton.py`로 복사 상태를 검증합니다. 종료 코드 0이면 준비 완료입니다.
 3. Claude Code는 `CLAUDE.md`를, Codex는 `AGENTS.md`를 진입 문서로 씁니다. 에이전트가 한두 가지씩 질문해 `docs/PROJECT_PROFILE.md`를 함께 채웁니다.
 4. 첫 프롬프트 예시: "이 프로젝트는 <목표> 해. PROJECT_PROFILE 같이 채워줘."
+5. canonical source를 런타임 산출물로 갱신할 때는 에이전트가 `python scripts/convert.py`와 `python scripts/verify-parity.py`를 실행합니다.
 
 모르는 사실은 추측하지 않고 `[NEEDS CLARIFICATION: <질문>]` 또는 `TBD`로 명시적으로 보류합니다. 표시 규칙의 canonical 정의는 `rules/common/README.md`의 "모르는 사실 표시 규칙" 섹션입니다.
 
@@ -107,5 +109,10 @@ python scripts/bootstrap/new-project.py --name <name> --target <path> --domain <
 - 기능 결정 기준: `docs/FEATURE_DECISION_GUIDE.md`
 - 문서화 스타일 기준: `docs/DOCUMENTATION_STYLE_GUIDE.md`
 - Notion 문서화 기준: `docs/NOTION_DOCUMENTATION_RULES.md`
+- 새 프로젝트 체크리스트: `docs/NEW_PROJECT_CHECKLIST.md`
+- 골든 케이스 작성: `docs/GOLDEN_CASES_GUIDE.md`
+- 역할 전환 가이드: `docs/ROLE_MIGRATION.md`
 - 검증 스크립트: `scripts/verify-skeleton.py`
+- canonical 변환: `scripts/convert.py`
+- Codex/Claude parity 확인: `scripts/verify-parity.py`
 - 지식 위키 린트: `scripts/wiki-lint.py`

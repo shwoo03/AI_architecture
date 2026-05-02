@@ -1,18 +1,26 @@
 # Hook Scripts
 
-This directory contains executable hook adapters. The first v1 hook is
-`post-tool-use-log.py`, a cross-platform logger that appends normalized activity
-records to `runtime/activity-log.jsonl`.
+This directory contains executable hook adapters. The v1 lifecycle is light:
+hooks may call internal guard/report scripts, but `scripts/agent-flow.py` stays
+the only public command that agents should choose directly.
 
-## When to invoke
+## Lifecycle Points
 
-This script has no automatic trigger. Agents invoke it (or append equivalent
-JSONL directly to `runtime/activity-log.jsonl`) at the boundaries listed in
-`AGENTS.md` "운영 규칙": after major tool calls, decisions, validations, and
-session handoffs. Session-handoff saves should additionally emit the
-`{"phase":"session","action":"handoff_saved",...}` event documented in
-`docs/SESSION_CONTINUITY.md`. A harness-level hook in `.claude/settings.json`
-may also call this script; no such hook ships with the skeleton.
+- Session start: run `python scripts/agent-flow.py start --format json` to
+  summarize mode, pending decisions, reference task state, and next action.
+- Before shell/tool calls: run `scripts/hooks/pre-tool-use-guard.py.example`
+  or a project-local enabled copy. Timeout or parser failure should deny by
+  default.
+- After shell/edit/write calls: run `scripts/hooks/post-tool-use-log.py` to
+  append normalized activity records to `runtime/activity-log.jsonl`.
+- After MCP/tool responses: normalize previews and sidecar references so long
+  outputs are searchable without bloating the main log.
+- Session end: run `python scripts/session-snapshot.py write` after handoff
+  updates so the machine-readable snapshot matches append-only ledgers.
+
+`hooks/hooks.json` documents this lifecycle for Claude Code-style hook systems.
+Codex ignores that file, so Codex agents follow the same lifecycle by invoking
+the internal scripts directly when appropriate.
 
 ## Contract
 
@@ -35,6 +43,8 @@ Safety:
 - Do not log secrets.
 - Do not mutate project files other than runtime logs.
 - Fail closed if path containment fails.
+- Record permission decisions as audit events with project/session scope.
+- Treat typed permission policy as a harness-level helper, not as a sandbox.
 
 Example:
 
@@ -61,6 +71,9 @@ python scripts/hooks/post-tool-use-log.py --tool shell_command --status complete
 - 허용: `exit 0`.
 - 차단: `exit 2` + stderr에 차단 이유.
 - 입력 오류: `exit 1`.
+- timeout 또는 정책 파일 파싱 실패는 deny-by-default로 취급합니다.
+- 승인 결과는 `runtime/activity-log.jsonl`에 audit event로 남기는 것을
+  권장합니다. session 범위 승인과 project 범위 승인은 구분해야 합니다.
 
 확인:
 

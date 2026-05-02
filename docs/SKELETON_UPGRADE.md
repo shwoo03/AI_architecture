@@ -155,13 +155,13 @@
 - **활동 로그 스키마 변경 시**: `docs/RUNTIME_EVENT_SCHEMA.md`가 canonical 정의입니다. 필드가 추가되기만 하고 기존 필드 의미는 유지된다는 것이 현재 규약입니다. 기존 로그 라인은 읽을 때 누락 필드를 `null`로 취급합니다. 기존 필드의 의미가 바뀌면 새 `action` 이름을 도입하고 옛 필드는 유지합니다. 읽는 쪽은 `ts`/`action`/`phase` 기반으로 필터해서 혼용을 처리합니다.
 - **스킬/에이전트 frontmatter 스키마**: 필드는 추가만, 제거 금지. `verify-skeleton.py`의 `AGENT_REQUIRED_FIELDS`가 현재 필수 집합입니다. 이 집합이 늘면 기존 프로젝트의 에이전트 파일에 수동 병합이 필요하므로, 확장 시 이 문서와 `AGENT_REGISTRY.md`에 동시 기재합니다.
 
-이 정책의 한계는 명시적입니다: **자동 호환성 검사기가 없습니다.** 대신 `verify-skeleton.py`가 구조 수준에서 잡고, 이 문서의 절차가 의미 수준에서 잡습니다.
+이 정책의 한계는 명시적입니다: 자동화가 모든 의미 충돌을 해결하지는 않습니다. 대신 `verify-skeleton.py`와 `quality-gate.py`가 구조·검증 수준에서 잡고, upgrade runbook이 의미 수준의 사용자 승인 지점을 고정합니다.
 
 ## 자동화 현황
 
-현재 `scripts/upgrade-from-skeleton.py`는 **존재하지 않습니다.** 업그레이드는 수동 diff 기반 절차입니다. `scripts/bootstrap/new-project.py`에는 `--upgrade` 모드가 없고, `--force`는 "비어 있지 않은 디렉터리에도 복사"를 허용하는 greenfield 재실행일 뿐 기존 `PROJECT_PROFILE.md`, `knowledge/*`, `runtime/*`를 **그대로 덮어쓰기 때문에 업그레이드 용도로 써서는 안 됩니다.**
+`scripts/upgrade-from-skeleton.py`는 기존 프로젝트를 dry-run으로 점검하고, 승인된 안전 파일만 적용하는 자동화 경로입니다. `scripts/bootstrap/new-project.py --force`는 greenfield 재시드용이므로 기존 프로젝트 업그레이드에는 쓰지 않습니다.
 
-향후 자동화를 추가한다면 이 문서의 "기능 추가/수정 판단 기준" 규약(먼저 dry-run diff, 승인 후 복사)을 따라야 합니다. 그때까지는 이 문서가 runbook 자체입니다.
+업그레이드 원칙은 변하지 않습니다: 먼저 dry-run diff를 보고, risky 변경은 proposal/review queue로 남기며, 승인 후에만 파일을 반영합니다. 적용 뒤에는 `python3 scripts/verify.py`와 `python3 scripts/quality-gate.py --format json`을 실행합니다.
 
 ## 기능 추가/수정 판단 기준
 
@@ -182,11 +182,11 @@
 Recommended flow:
 
 1. Inspect existing projects without changing files:
-   `python scripts/upgrade-from-skeleton.py --projects-root C:\Users\dntmd\Desktop\Projects`
+   `python3 scripts/upgrade-from-skeleton.py --projects-root C:\Users\dntmd\Desktop\Projects`
 2. Apply only safe missing files:
-   `python scripts/upgrade-from-skeleton.py --projects-root C:\Users\dntmd\Desktop\Projects --apply --safe-only`
+   `python3 scripts/upgrade-from-skeleton.py --projects-root C:\Users\dntmd\Desktop\Projects --apply --safe-only`
 3. Review risky changed files manually. Do not overwrite project-specific files unless the user explicitly approves:
-   `python scripts/upgrade-from-skeleton.py --target <project> --apply --include-risky`
+   `python3 scripts/upgrade-from-skeleton.py --target <project> --apply --include-risky`
 
 Safe-only mode copies missing templates and README-style support files. It does not overwrite changed `AGENTS.md`, project profiles, runtime logs, handoff files, knowledge logs, local settings, generated artifacts, or cloned external repositories.
 

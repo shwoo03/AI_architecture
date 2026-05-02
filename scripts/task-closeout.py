@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -43,10 +44,16 @@ class CloseoutResult:
     checks: list[dict[str, Any]]
     recorded: bool
     evidence_path: str
+    skills: list[str]
 
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+def utc_run_id() -> str:
+    stamp = datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y%m%dT%H%M%SZ")
+    return f"closeout-{stamp}"
 
 
 def command_env() -> dict[str, str]:
@@ -82,6 +89,15 @@ def normalize_paths(root: Path, values: list[str]) -> list[str]:
     return result or ["."]
 
 
+def unique_values(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if normalized and normalized not in result:
+            result.append(normalized)
+    return result
+
+
 def infer_profile(paths: list[str]) -> str:
     if not paths or paths == ["."]:
         return "all"
@@ -112,20 +128,20 @@ def profile_commands(root: Path, profile: str) -> list[tuple[str, list[str]]]:
         add("verify-skeleton", [py, str(root / "scripts" / "verify-skeleton.py"), "--root", str(root)])
         add("agent-autonomy-check", [py, str(root / "scripts" / "agent-autonomy-check.py"), "--root", str(root), "--strict"])
         add("python-unittest", [py, "-m", "unittest", "discover", "-s", "tests", "-v"])
-        add("security-scan", [py, str(root / "scripts" / "security-scan.py"), "--root", str(root), "--strict"])
+        add("security-scan", [py, str(root / "scripts" / "security-scan.py"), "--root", str(root), "--include-runtime", "--strict"])
     if profile in {"reference", "copy", "all"}:
         add("validate-reference-candidates", [py, str(root / "scripts" / "validate-reference-candidates.py"), "--root", str(root)])
         add("validate-reference-proposals", [py, str(root / "scripts" / "validate-reference-proposals.py"), "--root", str(root)])
     if profile in {"copy", "all"}:
         add("reference-copy-ledger", [py, str(root / "scripts" / "reference-copy-ledger.py"), "--root", str(root), "check"])
-        add("security-scan", [py, str(root / "scripts" / "security-scan.py"), "--root", str(root), "--strict"])
+        add("security-scan", [py, str(root / "scripts" / "security-scan.py"), "--root", str(root), "--include-runtime", "--strict"])
     if profile in {"runtime", "all"}:
         add("verify-skeleton", [py, str(root / "scripts" / "verify-skeleton.py"), "--root", str(root)])
         add("completion-evidence", [py, str(root / "scripts" / "completion-evidence.py"), "--root", str(root), "check"])
         add("resume-readiness", [py, str(root / "scripts" / "resume-readiness.py"), "--root", str(root), "--strict"])
         add("skill-surface", [py, str(root / "scripts" / "skill-surface-check.py"), "--root", str(root), "--strict"])
     if profile == "all":
-        add("quality-gate", [py, str(root / "scripts" / "quality-gate.py"), "--root", str(root), "--skip-tests", "--format", "json"])
+        add("quality-gate", [py, str(root / "scripts" / "quality-gate.py"), "--root", str(root), "--format", "json"])
     return list(commands.items())
 
 
@@ -148,8 +164,60 @@ def run_command(root: Path, name: str, command: list[str], timeout: int) -> Clos
     return CloseoutCheck(name, status, command, result.returncode, output or f"exit {result.returncode}", round(time.monotonic() - started, 3))
 
 
-def record_evidence(root: Path, goal: str, changed_paths: list[str], checks: list[CloseoutCheck], residual_risk: str) -> tuple[bool, str]:
+def parse_prevalidated_check(value: str) -> CloseoutCheck:
+    payload = json.loads(value)
+    if not isinstance(payload, dict):
+        raise ValueError("--prevalidated-check must be a JSON object")
+    name = str(payload.get("name", "")).strip()
+    status = str(payload.get("status", "")).strip().upper()
+    if not name:
+        raise ValueError("--prevalidated-check missing name")
+    if status not in {"OK", "PASS", "WARN", "SKIP", "FAIL", "ERROR"}:
+        raise ValueError(f"--prevalidated-check invalid status: {status}")
+    command_value = payload.get("command", [])
+    command = [str(item) for item in command_value] if isinstance(command_value, list) else [str(command_value)]
+    exit_code = int(payload.get("exit_code", 0 if status in {"OK", "PASS"} else 1))
+    detail = str(payload.get("detail", "")).strip() or "prevalidated"
+    duration = float(payload.get("duration_s", 0.0) or 0.0)
+    normalized_status = "OK" if status == "PASS" else "FAIL" if status == "ERROR" else status
+    return CloseoutCheck(name, normalized_status, command, exit_code, detail, round(duration, 3))
+
+
+def record_skill_use(root: Path, skill: str, run_id: str, outcome: str, goal: str, evidence_ref: str) -> bool:
+    script = root / "scripts" / "skill-lifecycle.py"
+    command = [
+        sys.executable,
+        str(script),
+        "--root",
+        str(root),
+        "record-use",
+        "--skill",
+        skill,
+        "--run-id",
+        run_id,
+        "--outcome",
+        outcome,
+        "--goal-lineage",
+        goal,
+        "--evidence-ref",
+        evidence_ref,
+    ]
+    result = subprocess.run(
+        command,
+        cwd=str(root),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=command_env(),
+        timeout=60,
+    )
+    return result.returncode == 0
+
+
+def record_evidence(root: Path, goal: str, changed_paths: list[str], checks: list[CloseoutCheck], residual_risk: str, skills: list[str]) -> tuple[bool, str]:
     script = root / "scripts" / "completion-evidence.py"
+    run_id = utc_run_id()
+    checks_ok = all(check.status == "OK" for check in checks)
     validations = [
         json.dumps(
             {
@@ -168,7 +236,7 @@ def record_evidence(root: Path, goal: str, changed_paths: list[str], checks: lis
         command.extend(["--changed-path", path])
     for validation in validations:
         command.extend(["--validation", validation])
-    command.extend(["--outcome", "genuine_success" if all(check.status == "OK" for check in checks) else "partial_progress"])
+    command.extend(["--outcome", "genuine_success" if checks_ok else "partial_progress"])
     command.extend(["--residual-risk", residual_risk])
     result = subprocess.run(
         command,
@@ -179,7 +247,27 @@ def record_evidence(root: Path, goal: str, changed_paths: list[str], checks: lis
         env=command_env(),
         timeout=60,
     )
-    return result.returncode == 0, (root / "runtime" / "completion-evidence.jsonl").relative_to(root).as_posix()
+    if result.returncode != 0:
+        return False, (root / "runtime" / "completion-evidence.jsonl").relative_to(root).as_posix()
+    evidence_ref = (root / "runtime" / "completion-evidence.jsonl").relative_to(root).as_posix()
+    skill_outcome = "success" if checks_ok else "failure"
+    for skill in skills:
+        if not record_skill_use(root, skill, run_id, skill_outcome, goal, evidence_ref):
+            return False, (root / "runtime" / "skill-usage.jsonl").relative_to(root).as_posix()
+    snapshot = root / "scripts" / "session-snapshot.py"
+    if snapshot.exists():
+        snapshot_result = subprocess.run(
+            [sys.executable, str(snapshot), "--root", str(root), "write"],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=command_env(),
+            timeout=60,
+        )
+        if snapshot_result.returncode != 0:
+            return False, (root / "runtime" / "session-snapshot.json").relative_to(root).as_posix()
+    return True, evidence_ref
 
 
 def render_text(result: CloseoutResult) -> str:
@@ -189,6 +277,7 @@ def render_text(result: CloseoutResult) -> str:
         f"goal: {result.goal}",
         f"profile: {result.profile}",
         f"changed_paths: {', '.join(result.changed_paths)}",
+        f"skills: {', '.join(result.skills) if result.skills else '(none)'}",
     ]
     for check in result.checks:
         lines.append(f"  {check['status']:<4} {check['name']}: {check['detail']}")
@@ -209,6 +298,8 @@ def main() -> int:
     parser.add_argument("--record", dest="record", action="store_true", help="Append completion evidence.")
     parser.add_argument("--no-record", dest="record", action="store_false", help="Do not append completion evidence.")
     parser.add_argument("--residual-risk", default="")
+    parser.add_argument("--skill", action="append", default=[], help="Skill used by this task, repeatable. Only recorded with --record.")
+    parser.add_argument("--prevalidated-check", action="append", default=[], help="Validation JSON from an upstream gate; skips local profile checks when present.")
     parser.set_defaults(record=False)
     args = parser.parse_args()
 
@@ -223,11 +314,20 @@ def main() -> int:
         return 2
 
     profile = infer_profile(changed_paths) if args.profile == "auto" else args.profile
-    checks = [run_command(root, name, command, args.timeout) for name, command in profile_commands(root, profile)]
+    try:
+        checks = [parse_prevalidated_check(value) for value in args.prevalidated_check]
+    except (ValueError, json.JSONDecodeError) as exc:
+        print(f"invalid prevalidated check: {exc}", file=sys.stderr)
+        return 2
+    if checks:
+        profile = "prevalidated"
+    else:
+        checks = [run_command(root, name, command, args.timeout) for name, command in profile_commands(root, profile)]
+    skills = unique_values(args.skill)
     recorded = False
     evidence = ""
     if args.record:
-        recorded, evidence = record_evidence(root, args.goal, changed_paths, checks, args.residual_risk)
+        recorded, evidence = record_evidence(root, args.goal, changed_paths, checks, args.residual_risk, skills)
     result = CloseoutResult(
         root=str(root),
         goal=args.goal,
@@ -236,6 +336,7 @@ def main() -> int:
         checks=[asdict(check) for check in checks],
         recorded=recorded,
         evidence_path=evidence,
+        skills=skills,
     )
     if args.format == "json":
         print(json.dumps(asdict(result), ensure_ascii=False, indent=2))

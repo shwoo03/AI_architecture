@@ -42,6 +42,15 @@ SKIP_DIR_NAMES = {
     ".mypy_cache",
     ".ruff_cache",
 }
+FAILURE_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("timeout", ("timed out", "timeout", "deadline exceeded")),
+    ("auth", ("unauthorized", "authentication", "forbidden", "invalid api key", "permission denied")),
+    ("quota", ("rate limit", "quota", "too many requests", "429", "insufficient credits")),
+    ("format", ("jsondecode", "invalid json", "parse error", "schema", "frontmatter", "yaml")),
+    ("payload", ("payload too large", "request entity too large", "maximum context", "context length", "too many tokens")),
+    ("policy", ("blocked by policy", "confirmation required", "outside repo", "not allowed", "denied by policy")),
+    ("infra", ("connection refused", "dns", "network", "no such file", "not found", "exit 127", "broken pipe")),
+]
 
 
 @dataclass
@@ -77,6 +86,14 @@ def first_lines(text: str, *, max_lines: int = 4) -> str:
     return " | ".join(lines[:max_lines])
 
 
+def classify_failure(text: str) -> str:
+    haystack = text.lower()
+    for category, needles in FAILURE_RULES:
+        if any(needle in haystack for needle in needles):
+            return category
+    return "unknown"
+
+
 def run_command(root: Path, command: list[str], timeout: int) -> GateCheck:
     started = time.monotonic()
     try:
@@ -102,6 +119,8 @@ def run_command(root: Path, command: list[str], timeout: int) -> GateCheck:
     output = first_lines((result.stdout or "") + "\n" + (result.stderr or ""))
     status = "OK" if result.returncode == 0 else "FAIL"
     detail = output or f"exit {result.returncode}"
+    if status == "FAIL":
+        detail = f"{detail} [failure_type={classify_failure((result.stdout or '') + chr(10) + (result.stderr or ''))}]"
     return GateCheck(
         name=command_name(command),
         status=status,
@@ -127,8 +146,50 @@ def command_name(command: list[str]) -> str:
         return "resume-readiness"
     if "skill-surface-check.py" in joined:
         return "skill-surface"
+    if "install-state.py" in joined:
+        return "install-state"
+    if "skill-lifecycle.py" in joined:
+        return "skill-lifecycle"
+    if "eval-all.py" in joined:
+        return "eval-all"
+    if "cost-log.py" in joined:
+        return "cost-log"
+    if "session-snapshot.py" in joined:
+        return "session-snapshot"
+    if "reference-task-queue.py" in joined:
+        return "reference-task-queue"
+    if "session-recall.py" in joined:
+        return "session-recall"
     if "review-queue.py" in joined:
         return "review-queue"
+    if "portability-scan.py" in joined:
+        return "portability-scan"
+    if "checkpoint.py" in joined:
+        return "checkpoint"
+    if "tool-health.py" in joined:
+        return "tool-health"
+    if "tool-guardrail.py" in joined:
+        return "tool-guardrail"
+    if "path-safety.py" in joined:
+        return "path-safety"
+    if "install-profiles.py" in joined:
+        return "install-profiles"
+    if "skill-stocktake.py" in joined:
+        return "skill-stocktake"
+    if "mcp-audit.py" in joined:
+        return "mcp-audit"
+    if "permission-evaluate.py" in joined:
+        return "permission-evaluate"
+    if "plugin-manifest-check.py" in joined:
+        return "plugin-manifest"
+    if "schema-check.py" in joined:
+        return "schema-check"
+    if "markdown-sanitize.py" in joined:
+        return "markdown-sanitize"
+    if "failure-classify.py" in joined:
+        return "failure-classify"
+    if "change-drift-check.py" in joined:
+        return "change-drift-check"
     if "unittest" in joined:
         return "python-unittest"
     if len(command) >= 2 and command[0] == "npm":
@@ -173,16 +234,26 @@ def check_review_queue(root: Path, timeout: int) -> GateCheck:
     script = root / "scripts" / "review-queue.py"
     if not script.exists():
         return GateCheck("review-queue", "SKIP", "scripts/review-queue.py not found", [], 0.0)
-    check = run_command(root, [sys.executable, str(script), "--root", str(root), "count"], timeout)
-    if check.status != "OK":
-        return check
+    command = [sys.executable, str(script), "--root", str(root), "count", "--json"]
+    started = time.monotonic()
     try:
-        count = int(check.detail.strip())
-    except ValueError:
-        return GateCheck("review-queue", "WARN", f"unexpected count output: {check.detail}", check.command, check.duration_s)
-    if count:
-        return GateCheck("review-queue", "WARN", f"{count} unresolved review item(s)", check.command, check.duration_s)
-    return GateCheck("review-queue", "OK", "0 unresolved review items", check.command, check.duration_s)
+        completed = subprocess.run(command, cwd=str(root), capture_output=True, text=True, encoding="utf-8", env=command_env(), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return GateCheck("review-queue", "FAIL", f"timed out after {timeout}s", command, round(time.monotonic() - started, 3))
+    duration = round(time.monotonic() - started, 3)
+    if completed.returncode != 0:
+        return GateCheck("review-queue", "FAIL", first_lines((completed.stdout or "") + "\n" + (completed.stderr or "")), command, duration)
+    try:
+        payload = json.loads(completed.stdout)
+        open_count = int(payload.get("open", 0))
+        deferred_count = int(payload.get("deferred", 0))
+    except (ValueError, json.JSONDecodeError, AttributeError):
+        return GateCheck("review-queue", "WARN", f"unexpected count output: {first_lines(completed.stdout)}", command, duration)
+    if open_count:
+        return GateCheck("review-queue", "WARN", f"{open_count} open review item(s), {deferred_count} deferred", command, duration)
+    if deferred_count:
+        return GateCheck("review-queue", "OK", f"0 open review items, {deferred_count} deferred", command, duration)
+    return GateCheck("review-queue", "OK", "0 open review items, 0 deferred", command, duration)
 
 
 def check_script_command(root: Path, script_name: str, args: list[str], timeout: int) -> GateCheck:
@@ -190,6 +261,123 @@ def check_script_command(root: Path, script_name: str, args: list[str], timeout:
     if not script.exists():
         return GateCheck(Path(script_name).stem, "SKIP", f"scripts/{script_name} not found", [], 0.0)
     return run_command(root, [sys.executable, str(script), "--root", str(root), *args], timeout)
+
+
+def check_json_findings_tool(root: Path, script_name: str, args: list[str], timeout: int, *, strict: bool, name: str) -> GateCheck:
+    script = root / "scripts" / script_name
+    if not script.exists():
+        return GateCheck(name, "SKIP", f"scripts/{script_name} not found", [], 0.0)
+    command = [sys.executable, str(script), "--root", str(root), "--format", "json", *args]
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(command, cwd=str(root), capture_output=True, text=True, encoding="utf-8", env=command_env(), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return GateCheck(name, "FAIL", f"timed out after {timeout}s", command, round(time.monotonic() - started, 3))
+    duration = round(time.monotonic() - started, 3)
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        status = "FAIL" if completed.returncode else "WARN"
+        return GateCheck(name, status, first_lines((completed.stdout or "") + "\n" + (completed.stderr or "")), command, duration)
+    findings = payload.get("findings") if isinstance(payload, dict) else []
+    count = len(findings) if isinstance(findings, list) else 0
+    if completed.returncode != 0 and not count:
+        return GateCheck(name, "FAIL", first_lines((completed.stdout or "") + "\n" + (completed.stderr or "")), command, duration)
+    if count:
+        return GateCheck(name, "FAIL" if strict else "WARN", f"{count} finding(s)", command, duration)
+    return GateCheck(name, "OK", "no findings", command, duration)
+
+
+def check_tool_guardrail(root: Path, timeout: int, *, strict: bool) -> GateCheck:
+    script = root / "scripts" / "tool-guardrail.py"
+    if not script.exists():
+        return GateCheck("tool-guardrail", "SKIP", "scripts/tool-guardrail.py not found", [], 0.0)
+    command = [sys.executable, str(script), "--root", str(root), "--format", "json"]
+    if strict:
+        command.append("--strict")
+    command.append("check")
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(command, cwd=str(root), capture_output=True, text=True, encoding="utf-8", env=command_env(), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return GateCheck("tool-guardrail", "FAIL", f"timed out after {timeout}s", command, round(time.monotonic() - started, 3))
+    duration = round(time.monotonic() - started, 3)
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return GateCheck("tool-guardrail", "FAIL" if completed.returncode else "WARN", first_lines((completed.stdout or "") + "\n" + (completed.stderr or "")), command, duration)
+    findings = payload.get("findings") if isinstance(payload, dict) else []
+    repeated = payload.get("repeated_failures") if isinstance(payload, dict) else []
+    if findings:
+        return GateCheck("tool-guardrail", "FAIL", f"{len(findings)} parse finding(s)", command, duration)
+    severe = [item for item in repeated if isinstance(item, dict) and item.get("action") in {"block", "halt"}]
+    if severe:
+        return GateCheck("tool-guardrail", "FAIL" if strict else "WARN", f"{len(severe)} repeated failure group(s)", command, duration)
+    warned = [item for item in repeated if isinstance(item, dict) and item.get("action") == "warn"]
+    if warned:
+        return GateCheck("tool-guardrail", "WARN", f"{len(warned)} warning group(s)", command, duration)
+    return GateCheck("tool-guardrail", "OK", "no repeated tool failures", command, duration)
+
+
+def check_eval_all(root: Path, timeout: int) -> GateCheck:
+    script = root / "scripts" / "eval-all.py"
+    if not script.exists():
+        return GateCheck("eval-all", "SKIP", "scripts/eval-all.py not found", [], 0.0)
+    command = [sys.executable, str(script), "--root", str(root), "--format", "json"]
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=command_env(),
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return GateCheck("eval-all", "FAIL", f"timed out after {timeout}s", command, round(time.monotonic() - started, 3))
+    duration = round(time.monotonic() - started, 3)
+    output = first_lines((completed.stdout or "") + "\n" + (completed.stderr or ""))
+    if completed.returncode != 0:
+        return GateCheck("eval-all", "FAIL", output or f"exit {completed.returncode}", command, duration)
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return GateCheck("eval-all", "OK", output or "eval-all completed", command, duration)
+    results = payload.get("results") if isinstance(payload, dict) else []
+    if isinstance(results, list):
+        warn_count = sum(1 for item in results if isinstance(item, dict) and item.get("status") == "WARN")
+        fail_count = sum(1 for item in results if isinstance(item, dict) and item.get("status") == "FAIL")
+        if fail_count:
+            return GateCheck("eval-all", "FAIL", f"{fail_count} fail, {warn_count} warn", command, duration)
+        if warn_count:
+            return GateCheck("eval-all", "WARN", f"{fail_count} fail, {warn_count} warn", command, duration)
+        return GateCheck("eval-all", "OK", f"{fail_count} fail, {warn_count} warn", command, duration)
+    return GateCheck("eval-all", "OK", output or "eval-all completed", command, duration)
+
+
+def check_portability(root: Path, timeout: int) -> GateCheck:
+    script = root / "scripts" / "portability-scan.py"
+    if not script.exists():
+        return GateCheck("portability-scan", "SKIP", "scripts/portability-scan.py not found", [], 0.0)
+    command = [sys.executable, str(script), "--root", str(root), "--format", "json"]
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(command, cwd=str(root), capture_output=True, text=True, encoding="utf-8", env=command_env(), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return GateCheck("portability-scan", "FAIL", f"timed out after {timeout}s", command, round(time.monotonic() - started, 3))
+    duration = round(time.monotonic() - started, 3)
+    if completed.returncode != 0:
+        return GateCheck("portability-scan", "FAIL", first_lines((completed.stdout or "") + "\n" + (completed.stderr or "")), command, duration)
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return GateCheck("portability-scan", "WARN", f"unexpected output: {first_lines(completed.stdout)}", command, duration)
+    count = int(payload.get("count", 0)) if isinstance(payload, dict) else 0
+    if count:
+        return GateCheck("portability-scan", "WARN", f"{count} machine-specific path finding(s)", command, duration)
+    return GateCheck("portability-scan", "OK", "no machine-specific paths found", command, duration)
 
 
 def check_unittest(root: Path, timeout: int) -> GateCheck:
@@ -225,6 +413,39 @@ def check_node_scripts(root: Path, timeout: int) -> list[GateCheck]:
     return checks
 
 
+def check_codemap_freshness(root: Path) -> GateCheck:
+    index = root / "docs" / "CODEMAPS" / "INDEX.md"
+    if not index.exists():
+        return GateCheck("codemap-freshness", "WARN", "docs/CODEMAPS/INDEX.md not found; run scripts/generate-codemaps.py --write", [], 0.0)
+    try:
+        index_mtime = index.stat().st_mtime
+    except OSError as exc:
+        return GateCheck("codemap-freshness", "WARN", f"could not stat codemap index: {exc}", [], 0.0)
+    newer: list[str] = []
+    watched_roots = ["scripts", "skills", "agents", "rules", "docs", "tests"]
+    for rel in watched_roots:
+        base = root / rel
+        if not base.exists():
+            continue
+        for path in base.rglob("*"):
+            if path.is_dir() or should_skip_path(path, root):
+                continue
+            if "docs/CODEMAPS" in path.as_posix():
+                continue
+            try:
+                if path.stat().st_mtime > index_mtime:
+                    newer.append(path.relative_to(root).as_posix())
+            except OSError:
+                continue
+            if len(newer) >= 5:
+                break
+        if len(newer) >= 5:
+            break
+    if newer:
+        return GateCheck("codemap-freshness", "WARN", "codemaps may be stale; newer files: " + ", ".join(newer), [], 0.0)
+    return GateCheck("codemap-freshness", "OK", "docs/CODEMAPS appears current by mtime", [], 0.0)
+
+
 def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     root = Path(args.root).resolve() if args.root else repo_root().resolve()
     if not root.is_dir():
@@ -235,9 +456,32 @@ def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     checks.append(check_script_command(root, "agent-autonomy-check.py", ["--strict"], args.timeout))
     checks.append(check_review_queue(root, args.timeout))
     checks.append(check_script_command(root, "completion-evidence.py", ["check"], args.timeout))
-    checks.append(check_script_command(root, "security-scan.py", ["--strict"], args.timeout))
+    checks.append(check_script_command(root, "security-scan.py", ["--include-runtime", "--strict"], args.timeout))
     checks.append(check_script_command(root, "resume-readiness.py", ["--strict"], args.timeout))
     checks.append(check_script_command(root, "skill-surface-check.py", ["--strict"], args.timeout))
+    install_args = ["check", "--strict"] if args.strict else ["check"]
+    checks.append(check_script_command(root, "install-state.py", install_args, args.timeout))
+    checks.append(check_script_command(root, "reference-task-queue.py", ["check"], args.timeout))
+    checks.append(check_script_command(root, "skill-lifecycle.py", ["report"], args.timeout))
+    checks.append(check_eval_all(root, args.timeout))
+    checks.append(check_script_command(root, "cost-log.py", ["check"], args.timeout))
+    checks.append(check_script_command(root, "session-snapshot.py", ["check"], args.timeout))
+    checks.append(check_script_command(root, "session-recall.py", ["check"], args.timeout))
+    checks.append(check_script_command(root, "checkpoint.py", ["check"], args.timeout))
+    checks.append(check_json_findings_tool(root, "tool-health.py", ["check"], args.timeout, strict=args.strict, name="tool-health"))
+    checks.append(check_tool_guardrail(root, args.timeout, strict=args.strict))
+    checks.append(check_json_findings_tool(root, "mcp-audit.py", ["check"], args.timeout, strict=args.strict, name="mcp-audit"))
+    checks.append(check_script_command(root, "permission-evaluate.py", ["evaluate", "--action", "shell", "--resource", "*"], args.timeout))
+    checks.append(check_script_command(root, "path-safety.py", ["check", "--path", "scripts/agent-flow.py", "--operation", "write"], args.timeout))
+    checks.append(check_script_command(root, "install-profiles.py", ["check"], args.timeout))
+    checks.append(check_script_command(root, "skill-stocktake.py", ["report"], args.timeout))
+    checks.append(check_script_command(root, "plugin-manifest-check.py", ["check"], args.timeout))
+    checks.append(check_script_command(root, "schema-check.py", ["check"], args.timeout))
+    checks.append(check_json_findings_tool(root, "markdown-sanitize.py", ["--check"], args.timeout, strict=args.strict, name="markdown-sanitize"))
+    checks.append(run_command(root, [sys.executable, str(root / "scripts" / "failure-classify.py"), "--text", "timeout while running validation", "--format", "json"], args.timeout))
+    checks.append(check_json_findings_tool(root, "change-drift-check.py", [], args.timeout, strict=args.strict, name="change-drift-check"))
+    checks.append(check_portability(root, args.timeout))
+    checks.append(check_codemap_freshness(root))
     checks.append(check_python_syntax(root))
     if not args.skip_tests:
         checks.append(check_unittest(root, args.timeout))

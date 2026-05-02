@@ -72,10 +72,10 @@ accepted
 이 결정과 관련된 변경 후에는 다음을 실행합니다.
 
 ```powershell
-python scripts/verify-skeleton.py
-python scripts/validate-reference-candidates.py
-python scripts/validate-reference-proposals.py
-python scripts/list-open-questions.py --count
+python3 scripts/verify-skeleton.py
+python3 scripts/validate-reference-candidates.py
+python3 scripts/validate-reference-proposals.py
+python3 scripts/list-open-questions.py --count
 ```
 
 ## 추가 결정: 장부 기록 주체

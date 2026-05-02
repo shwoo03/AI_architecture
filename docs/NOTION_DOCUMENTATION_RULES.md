@@ -126,7 +126,7 @@ Notion 문서화는 자유 작문이 아니라 반복 가능한 운영 절차로
 3. 새 페이지가 아니라 기존 페이지 업데이트가 맞는지 먼저 판단합니다.
 4. 기능별 Markdown 초안을 위 골격으로 작성합니다.
 5. 초안에서 경로와 테스트 명령이 앞부분을 차지하면 `구현 연결 정보`로 옮깁니다.
-6. 가능한 경우 `python scripts/notion-doc-quality-check.py <draft.md>`를 실행합니다.
+6. 가능한 경우 `python3 scripts/notion-doc-quality-check.py <draft.md>`를 실행합니다.
 7. Notion에 작성 또는 교체한 뒤 fetch로 제목, 속성, 본문이 실제 반영됐는지 확인합니다.
 8. 활동 로그에 `notion_sync` 또는 문서 업데이트 이벤트를 남깁니다.
 
@@ -290,7 +290,7 @@ Notion 문서 자체를 바꿀 때는 다음 기준을 사용합니다.
 - 경로와 파일명이 본문 설명을 압도하지 않는가?
 - 기능 영역이 여러 개라면 본문도 기능별로 나뉘어 있는가?
 - 관련 문서가 데이터베이스 관계로 연결되어 있는가?
-- 초안 파일이 있으면 `python scripts/notion-doc-quality-check.py <draft.md>`를 통과했는가?
+- 초안 파일이 있으면 `python3 scripts/notion-doc-quality-check.py <draft.md>`를 통과했는가?
 - 새 페이지를 만들기 전에 DB를 검색해 유사 페이지가 없음을 확인했는가? (중복 방지 프로토콜 1단계)
 - 같은 주제의 기존 페이지를 대체한다면 `Superseded By`·`Superseded At`·`Status=superseded` 세 필드가 모두 설정됐는가?
 

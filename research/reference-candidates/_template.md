@@ -10,6 +10,9 @@
 - `created_at`:
 - `reviewed_at`:
 - `reviewer`:
+- `query_provenance`:
+- `candidate_rank`:
+- `candidate_count`:
 
 ## 왜 보는가
 
@@ -28,6 +31,13 @@
 - `what_not_to_copy`:
   - 
 
+## 구조 분석
+
+- `module_inventory`:
+  - 
+- `reusable_units`:
+  - 
+
 ## 증거
 
 - `evidence_summary`:
@@ -37,6 +47,8 @@
 - `maintenance_signal`:
 - `documentation_signal`:
 - `validation_signal`:
+- `sources`:
+  - {"path":"<source path or URL>","kind":"readme|source_file|docs|test|manifest","evidence":"<what this source proves>","hash_or_line_ref":"<hash or line reference>"}
 
 ## 리스크
 
@@ -52,7 +64,9 @@
 - `applies_to`: docs | rules | skills | scripts | tests | runtime | notion | other
 - `target_files_or_areas`:
   - 
-- `adoption_decision`: adopt | adapt | copy | defer | reject
+- `adoption_decision`: adopt | adapt | copy | direct_implementation | defer | reject
+- `absorption_mode`: dependency | wrapper | partial_copy | concept_only | direct_implementation | mixed
+- `direct_implementation_reason`: not applicable | <왜 dependency/wrapper/partial_copy/concept_only가 부적합한지>
 - `decision_reason`:
 - `next_action`:
 

@@ -20,7 +20,7 @@ except (AttributeError, OSError):
     pass
 
 
-REQUIRED_FIELDS = [
+ADOPTION_REQUIRED_FIELDS = [
     "status",
     "created_at",
     "candidate_card",
@@ -37,10 +37,26 @@ REQUIRED_FIELDS = [
     "applied_in",
     "validation_result",
 ]
-ALLOWED_VALUES = {
+REFRESH_REQUIRED_FIELDS = [
+    "status",
+    "created_at",
+    "candidate_card",
+    "proposal_type",
+    "approval_required",
+    "decision_source",
+    "decision",
+    "decided_at",
+    "decided_by",
+    "applied_in",
+    "validation_result",
+]
+COMMON_ALLOWED_VALUES = {
     "status": {"proposed", "accepted", "rejected", "applied", "deferred"},
-    "proposal_type": {"reference_adoption_dry_run"},
+    "proposal_type": {"reference_adoption_dry_run", "reference_refresh"},
     "approval_required": {"yes", "no"},
+    "decision": {"pending", "accepted", "rejected", "applied", "deferred"},
+}
+ADOPTION_ALLOWED_VALUES = {
     "absorption_mode": {
         "dependency",
         "wrapper",
@@ -49,9 +65,8 @@ ALLOWED_VALUES = {
         "direct_implementation",
         "mixed",
     },
-    "decision": {"pending", "accepted", "rejected", "applied", "deferred"},
 }
-REQUIRED_HEADINGS = [
+ADOPTION_REQUIRED_HEADINGS = [
     "## 상태",
     "## 한 문장 정의",
     "## 근거",
@@ -65,9 +80,21 @@ REQUIRED_HEADINGS = [
     "## 승인 후 실제 변경 범위",
     "## 최종 결정 기록",
 ]
-REQUIRED_PHRASES = [
+REFRESH_REQUIRED_HEADINGS = [
+    "## 상태",
+    "## 한 문장 정의",
+    "## 근거",
+    "## 제안 변경",
+    "## 검증 계획",
+    "## 최종 결정 기록",
+]
+ADOPTION_REQUIRED_PHRASES = [
     "python scripts/verify-skeleton.py",
     "python scripts/validate-reference-candidates.py",
+    "python scripts/validate-reference-proposals.py",
+]
+REFRESH_REQUIRED_PHRASES = [
+    "python scripts/verify-skeleton.py",
     "python scripts/validate-reference-proposals.py",
 ]
 SKIP_FILES = {"README.md", "_template.md"}
@@ -118,16 +145,17 @@ def proposal_files(root: Path) -> list[Path]:
     )
 
 
-def validate_headings(path: Path, text: str, findings: list[Finding]) -> None:
-    for heading in REQUIRED_HEADINGS:
+def validate_headings(path: Path, text: str, headings: list[str], findings: list[Finding]) -> None:
+    for heading in headings:
         if heading not in text:
             findings.append(Finding(path, f"missing heading `{heading}`"))
 
 
-def validate_fields(root: Path, path: Path, fields: dict[str, str], findings: list[Finding]) -> None:
+def validate_fields(root: Path, path: Path, fields: dict[str, str], proposal_type: str, findings: list[Finding]) -> None:
     decision = clean_value(fields.get("decision", ""))
     absorption_mode = clean_value(fields.get("absorption_mode", ""))
-    for field in REQUIRED_FIELDS:
+    required_fields = REFRESH_REQUIRED_FIELDS if proposal_type == "reference_refresh" else ADOPTION_REQUIRED_FIELDS
+    for field in required_fields:
         if field not in fields:
             findings.append(Finding(path, f"missing field `{field}`"))
             continue
@@ -137,7 +165,10 @@ def validate_fields(root: Path, path: Path, fields: dict[str, str], findings: li
                 continue
         if is_blank(fields[field]):
             findings.append(Finding(path, f"field `{field}` is blank"))
-    for field, allowed in ALLOWED_VALUES.items():
+    allowed_values = dict(COMMON_ALLOWED_VALUES)
+    if proposal_type == "reference_adoption_dry_run":
+        allowed_values.update(ADOPTION_ALLOWED_VALUES)
+    for field, allowed in allowed_values.items():
         value = clean_value(fields.get(field, ""))
         if value and value not in allowed:
             findings.append(
@@ -147,15 +178,24 @@ def validate_fields(root: Path, path: Path, fields: dict[str, str], findings: li
                 )
             )
     candidate = clean_value(fields.get("candidate_card", ""))
-    if candidate and not is_blank(candidate) and not (root / candidate).is_file():
+    if candidate and not is_blank(candidate) and not (root / candidate).exists():
         findings.append(Finding(path, f"candidate_card target does not exist: `{candidate}`"))
-    if absorption_mode == "partial_copy":
+    if proposal_type == "reference_adoption_dry_run" and absorption_mode == "partial_copy":
         copy_boundary = clean_value(fields.get("copy_boundary", ""))
         if is_blank(copy_boundary):
             findings.append(
                 Finding(
                     path,
                     "partial_copy proposal requires non-blank field `copy_boundary`",
+                )
+            )
+    if proposal_type == "reference_adoption_dry_run" and absorption_mode == "direct_implementation":
+        reason = clean_value(fields.get("direct_implementation_reason", ""))
+        if is_blank(reason) or reason.lower() in {"not applicable", "n/a"}:
+            findings.append(
+                Finding(
+                    path,
+                    "direct_implementation proposal requires a concrete `direct_implementation_reason`",
                 )
             )
 
@@ -171,7 +211,12 @@ def validate_list_section(path: Path, text: str, heading: str, findings: list[Fi
         findings.append(Finding(path, f"section `{heading}` has no bullet items"))
 
 
-def validate_content(path: Path, text: str, findings: list[Finding]) -> None:
+def validate_content(path: Path, text: str, proposal_type: str, findings: list[Finding]) -> None:
+    if proposal_type == "reference_refresh":
+        for phrase in REFRESH_REQUIRED_PHRASES:
+            if phrase not in text:
+                findings.append(Finding(path, f"missing validation command `{phrase}`"))
+        return
     for heading in (
         "## 적용하지 않을 것",
         "## 모듈형 흡수 판단",
@@ -181,9 +226,18 @@ def validate_content(path: Path, text: str, findings: list[Finding]) -> None:
         "## 승인 후 실제 변경 범위",
     ):
         validate_list_section(path, text, heading, findings)
-    for phrase in REQUIRED_PHRASES:
+    for phrase in ADOPTION_REQUIRED_PHRASES:
         if phrase not in text:
             findings.append(Finding(path, f"missing validation command `{phrase}`"))
+    marker = "Source-backed evidence:"
+    if marker not in text:
+        findings.append(Finding(path, "missing source-backed evidence section"))
+    else:
+        tail = text[text.find(marker) + len(marker) :]
+        next_heading = tail.find("\n## ")
+        block = tail if next_heading == -1 else tail[:next_heading]
+        if not re.search(r"^\s*-\s+\S", block, re.MULTILINE):
+            findings.append(Finding(path, "source-backed evidence section has no bullet items"))
 
 
 def validate(root: Path) -> tuple[list[Finding], int]:
@@ -192,9 +246,14 @@ def validate(root: Path) -> tuple[list[Finding], int]:
     for path in files:
         text = path.read_text(encoding="utf-8")
         fields = parse_fields(text)
-        validate_headings(path, text, findings)
-        validate_fields(root, path, fields, findings)
-        validate_content(path, text, findings)
+        proposal_type = clean_value(fields.get("proposal_type", ""))
+        if proposal_type not in COMMON_ALLOWED_VALUES["proposal_type"]:
+            findings.append(Finding(path, f"field `proposal_type` has invalid value `{proposal_type}`; expected one of {sorted(COMMON_ALLOWED_VALUES['proposal_type'])}"))
+            proposal_type = "reference_adoption_dry_run"
+        headings = REFRESH_REQUIRED_HEADINGS if proposal_type == "reference_refresh" else ADOPTION_REQUIRED_HEADINGS
+        validate_headings(path, text, headings, findings)
+        validate_fields(root, path, fields, proposal_type, findings)
+        validate_content(path, text, proposal_type, findings)
     return findings, len(files)
 
 

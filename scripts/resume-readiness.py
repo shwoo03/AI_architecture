@@ -143,6 +143,25 @@ def latest_timestamp(records: list[dict[str, Any]]) -> Optional[datetime]:
     return None
 
 
+def latest_record(records: list[dict[str, Any]]) -> dict[str, Any] | None:
+    return records[-1] if records else None
+
+
+def check_latest_completion_outcome(records: list[dict[str, Any]], findings: list[Finding]) -> None:
+    latest = latest_record(records)
+    if latest is None:
+        return
+    outcome = str(latest.get("outcome") or "").strip()
+    if outcome and outcome != "genuine_success":
+        findings.append(
+            Finding(
+                "WARN",
+                "completion_evidence_not_genuine_success",
+                f"latest completion evidence outcome is {outcome}; resume with residual risk review",
+            )
+        )
+
+
 def compare_not_newer(
     handoff_ts: Optional[datetime],
     other_ts: Optional[datetime],
@@ -195,6 +214,7 @@ def run_check(root: Path) -> ReadinessResult:
 
     activity_ts = latest_timestamp(activity_records)
     evidence_ts = latest_timestamp(evidence_records)
+    check_latest_completion_outcome(evidence_records, findings)
     handoff_event_ts = check_handoff_event_alignment(handoff_ts, activity_records, findings)
     compare_not_newer(handoff_ts, activity_ts, "activity_log", findings)
     compare_not_newer(handoff_ts, evidence_ts, "completion_evidence", findings)
@@ -203,7 +223,11 @@ def run_check(root: Path) -> ReadinessResult:
         "handoff": handoff_latest,
         "activity_log": {"records": len(activity_records), "latest_ts": format_ts(activity_ts)},
         "handoff_saved_event": {"latest_ts": format_ts(handoff_event_ts)},
-        "completion_evidence": {"records": len(evidence_records), "latest_ts": format_ts(evidence_ts)},
+        "completion_evidence": {
+            "records": len(evidence_records),
+            "latest_ts": format_ts(evidence_ts),
+            "latest_outcome": latest_record(evidence_records).get("outcome") if latest_record(evidence_records) else None,
+        },
     }
     summary = dict(Counter(finding.severity for finding in findings))
     for severity in ("ERROR", "WARN", "INFO"):

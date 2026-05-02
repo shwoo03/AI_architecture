@@ -10,6 +10,7 @@ external code.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -29,6 +30,7 @@ TEXT_EXTENSIONS = {
     "",
     ".cfg",
     ".conf",
+    ".env",
     ".ini",
     ".json",
     ".jsonl",
@@ -54,7 +56,6 @@ SKIP_DIR_NAMES = {
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
-    "tests",
 }
 SKIP_RUNTIME_DIRS = {
     ("runtime", "archive"),
@@ -88,6 +89,9 @@ class ScanResult:
     suppressed_findings: int = 0
 
 
+ALLOWLIST_FINGERPRINT_LEN = 16
+
+
 @dataclass(frozen=True)
 class PatternRule:
     severity: str
@@ -100,12 +104,13 @@ class PatternRule:
 SECRET_RULES = [
     PatternRule("CRITICAL", "secret", "aws_access_key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"), "AWS access key-like token"),
     PatternRule("CRITICAL", "secret", "github_token", re.compile(r"\b(?:ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,})\b"), "GitHub token-like value"),
-    PatternRule("CRITICAL", "secret", "openai_token", re.compile(r"\bsk-[A-Za-z0-9]{32,}\b"), "OpenAI-style token-like value"),
+    PatternRule("CRITICAL", "secret", "openai_token", re.compile(r"\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b"), "OpenAI-style token-like value"),
+    PatternRule("CRITICAL", "secret", "anthropic_token", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b"), "Anthropic-style token-like value"),
     PatternRule("CRITICAL", "secret", "slack_token", re.compile(r"\bxox[bpoas]-[A-Za-z0-9-]{10,}\b"), "Slack token-like value"),
     PatternRule("CRITICAL", "secret", "private_key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"), "private key block"),
 ]
 GENERIC_SECRET_RE = re.compile(
-    r"(?i)\b(?:api[_-]?key|token|secret|password)\b\s*[:=]\s*['\"]?([A-Za-z0-9_./+=:-]{20,})['\"]?"
+    r"(?i)(?:^|[^A-Za-z0-9])(?:[A-Z0-9_]*_)?(?:api[_-]?key|token|secret|password)\s*[:=]\s*['\"]?([A-Za-z0-9_./+=:-]{20,})['\"]?"
 )
 DANGEROUS_COMMAND_RULES = [
     PatternRule("CRITICAL", "command", "rm_root", re.compile(r"\brm\s+-rf\s+/(?:\s|$)"), "destructive root deletion command"),
@@ -165,10 +170,12 @@ def should_skip_path(path: Path, root: Path, include_runtime: bool, max_file_siz
     parts = path_parts(path, root)
     if not parts:
         return True
+    if parts[:2] in SKIP_RUNTIME_FILES:
+        return True
     if any(part in SKIP_DIR_NAMES for part in parts):
         return True
     if not include_runtime:
-        if parts[:2] in SKIP_RUNTIME_DIRS or parts[:2] in SKIP_RUNTIME_FILES:
+        if parts[:2] in SKIP_RUNTIME_DIRS:
             return True
         if parts and parts[0] == "runtime" and parts[:2] != ("runtime", "proposals"):
             return True
@@ -200,12 +207,15 @@ def read_lines(path: Path) -> list[str]:
         return []
 
 
-def line_is_rule_definition(line: str) -> bool:
+def line_is_rule_definition(path: Path, root: Path, line: str) -> bool:
     stripped = line.strip()
+    in_scanner = rel(path, root) == "scripts/security-scan.py"
     return (
-        "re.compile(" in stripped
-        or stripped.startswith("PatternRule(")
-        or stripped.startswith("#")
+        in_scanner
+        and (
+            "re.compile(" in stripped
+            or stripped.startswith("PatternRule(")
+        )
     )
 
 
@@ -271,7 +281,7 @@ def add_pattern_findings(
     line: str,
     rules: Iterable[PatternRule],
 ) -> None:
-    if line_is_rule_definition(line):
+    if line_is_rule_definition(path, root, line):
         return
     for rule in rules:
         if rule.pattern.search(line):
@@ -288,7 +298,7 @@ def add_pattern_findings(
 
 
 def scan_generic_secret(findings: list[Finding], root: Path, path: Path, line_no: int, line: str) -> None:
-    if line_is_rule_definition(line):
+    if line_is_rule_definition(path, root, line):
         return
     match = GENERIC_SECRET_RE.search(line)
     if not match:
@@ -309,6 +319,12 @@ def scan_generic_secret(findings: list[Finding], root: Path, path: Path, line_no
 
 
 def scan_reference_copy_governance(findings: list[Finding], root: Path, path: Path, lines: list[str]) -> None:
+    parts = path_parts(path, root)
+    if not (
+        parts[:2] == ("research", "reference-candidates")
+        or parts[:3] == ("runtime", "proposals", "reference-adoption")
+    ):
+        return
     text = "\n".join(lines)
     fields = parse_markdown_fields(text)
     has_copy_candidate = fields.get("adoption_decision") == "copy"
@@ -367,18 +383,94 @@ def read_allowlist(root: Path) -> list[dict[str, object]]:
     return [item for item in payload if isinstance(item, dict)]
 
 
-def finding_is_allowed(finding: Finding, allowlist: list[dict[str, object]]) -> bool:
-    for item in allowlist:
-        if str(item.get("rule", "")).strip() != finding.rule:
-            continue
-        if str(item.get("path", "")).strip() != finding.path:
-            continue
+def finding_fingerprint(root: Path, finding: Finding) -> str:
+    path = root / finding.path
+    line_text = ""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        if 1 <= finding.line <= len(lines):
+            line_text = lines[finding.line - 1].strip()
+    except OSError:
+        line_text = ""
+    value = f"{finding.rule}\n{finding.path}\n{line_text}\n{finding.message}"
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:ALLOWLIST_FINGERPRINT_LEN]
+
+
+def allowlist_entry_matches(root: Path, item: dict[str, object], finding: Finding) -> bool:
+    if str(item.get("rule", "")).strip() != finding.rule:
+        return False
+    if str(item.get("path", "")).strip() != finding.path:
+        return False
+    line = item.get("line")
+    fingerprint = str(item.get("fingerprint", "")).strip()
+    if line is None and not fingerprint:
+        return False
+    if line is not None:
+        try:
+            if int(line) != finding.line:
+                return False
+        except (TypeError, ValueError):
+            return False
+    if fingerprint and fingerprint != finding_fingerprint(root, finding):
+        return False
+    return bool(str(item.get("reason", "")).strip())
+
+
+def validate_allowlist(root: Path, findings: list[Finding], allowlist: list[dict[str, object]]) -> list[Finding]:
+    validation_findings: list[Finding] = []
+    for index, item in enumerate(allowlist, start=1):
+        rule = str(item.get("rule", "")).strip()
+        path = str(item.get("path", "")).strip()
+        reason = str(item.get("reason", "")).strip()
         line = item.get("line")
-        if line is not None and int(line) != finding.line:
+        fingerprint = str(item.get("fingerprint", "")).strip()
+        if not rule or not path:
+            validation_findings.append(
+                Finding("HIGH", "allowlist", "allowlist_invalid", "rules/security-scan-allowlist.json", index, "allowlist entry requires rule and path")
+            )
             continue
-        if not str(item.get("reason", "")).strip():
+        if not reason:
+            validation_findings.append(
+                Finding("HIGH", "allowlist", "allowlist_invalid", "rules/security-scan-allowlist.json", index, "allowlist entry requires reason")
+            )
+        if line is None and not fingerprint:
+            validation_findings.append(
+                Finding(
+                    "HIGH",
+                    "allowlist",
+                    "allowlist_invalid",
+                    "rules/security-scan-allowlist.json",
+                    index,
+                    "allowlist entry requires line or fingerprint",
+                )
+            )
             continue
-        return True
+        if line is not None:
+            try:
+                int(line)
+            except (TypeError, ValueError):
+                validation_findings.append(
+                    Finding("HIGH", "allowlist", "allowlist_invalid", "rules/security-scan-allowlist.json", index, "allowlist line must be an integer")
+                )
+                continue
+        if not any(allowlist_entry_matches(root, item, finding) for finding in findings):
+            validation_findings.append(
+                Finding(
+                    "HIGH",
+                    "allowlist",
+                    "allowlist_stale",
+                    "rules/security-scan-allowlist.json",
+                    index,
+                    f"allowlist entry no longer matches an active finding: {rule} {path}",
+                )
+            )
+    return validation_findings
+
+
+def finding_is_allowed(root: Path, finding: Finding, allowlist: list[dict[str, object]]) -> bool:
+    for item in allowlist:
+        if allowlist_entry_matches(root, item, finding):
+            return True
     return False
 
 
@@ -388,8 +480,9 @@ def run_scan(root: Path, include_runtime: bool, max_file_size: int) -> ScanResul
     for path in files:
         findings.extend(scan_file(root, path))
     allowlist = read_allowlist(root)
-    active_findings = [finding for finding in findings if not finding_is_allowed(finding, allowlist)]
+    active_findings = [finding for finding in findings if not finding_is_allowed(root, finding, allowlist)]
     suppressed = len(findings) - len(active_findings)
+    active_findings.extend(validate_allowlist(root, findings, allowlist))
     counter = Counter(finding.severity for finding in active_findings)
     summary = {severity: counter.get(severity, 0) for severity in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")}
     return ScanResult(

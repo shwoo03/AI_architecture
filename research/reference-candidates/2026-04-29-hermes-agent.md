@@ -42,6 +42,9 @@
 - `maintenance_signal`: 공개 저장소이며 Nous Research가 관리하고, README에 문서 사이트, Docker, skills hub, 설치 경로가 유지되어 있다.
 - `documentation_signal`: README가 기능 표, 설치 방법, CLI 사용법, docs 링크, import 경로를 제공한다.
 - `validation_signal`: clone revision과 MIT license를 확인했다. 이번 P0에서는 개념 후보 카드만 만들고 런타임 코드는 도입하지 않는다.
+- `sources`:
+  - {"path":"../AI_architecture_references/hermes-agent/README.md","kind":"readme","evidence":"Agent runtime and persistence concepts were reviewed.","hash_or_line_ref":"local-reference"}
+  - {"path":"../AI_architecture_references/hermes-agent/tools/session_search_tool.py","kind":"source_file","evidence":"Session search pattern was inspected conceptually.","hash_or_line_ref":"local-reference"}
 
 ## 리스크
 

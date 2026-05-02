@@ -36,6 +36,16 @@ AI 프로젝트는 대화가 길어질수록 “목표”, “검증 기준”, 
 - 도메인 스킬: 특정 반복 업무가 있을 때만 활성화되는 절차와 체크리스트입니다.
 - 프로젝트 오버레이: 현재 프로젝트의 목표, 사용자, 성공 기준, 제약 조건입니다.
 
+Codex와 Claude 런타임이 읽는 파일은 직접 관리하지 않습니다. 먼저 canonical source를 수정하고, `scripts/convert.py`가 런타임 산출물을 재생성합니다.
+
+```text
+skills/active, agents, rules, mcp/servers.yaml, references.yaml
+    ↓ scripts/convert.py
+.codex/skills, .claude/skills, .codex/agents, .claude/agents, .mcp.json
+    ↓ scripts/verify-parity.py
+Codex / Claude runtime
+```
+
 실행 흐름은 단순합니다.
 
 1. 프로젝트 목표와 성공 기준을 확인합니다.
@@ -45,6 +55,7 @@ AI 프로젝트는 대화가 길어질수록 “목표”, “검증 기준”, 
 5. 실행 결과를 로그로 남깁니다.
 6. 가장 작은 검증부터 수행합니다.
 7. 검증된 내용만 지식이나 문서 개선으로 제안합니다.
+8. canonical source를 바꿨다면 변환과 parity 검증을 실행합니다.
 
 ## 결과는 무엇인가
 
@@ -73,6 +84,7 @@ AI 프로젝트는 대화가 길어질수록 “목표”, “검증 기준”, 
 - 자동 생성 내용은 먼저 제안 영역에 둡니다.
 - 활동 로그와 에이전트 실행 로그는 append-only로 다룹니다.
 - 지식 문서는 에이전트가 직접 수정하지 않습니다.
+- `.codex/`와 `.claude/`는 generated artifact입니다. 직접 고치지 말고 canonical source를 고칩니다.
 - 프로젝트가 중단되면 실패 이유와 재사용 가능한 교훈을 먼저 남깁니다.
 
 ## 구현 연결 정보
@@ -84,3 +96,5 @@ AI 프로젝트는 대화가 길어질수록 “목표”, “검증 기준”, 
 - 워크플로 카탈로그: `docs/WORKFLOW_CATALOG.md`
 - 에이전트 레지스트리: `docs/AGENT_REGISTRY.md`
 - 기능 결정 기준: `docs/FEATURE_DECISION_GUIDE.md`
+- canonical 변환: `scripts/convert.py`
+- parity 검증: `scripts/verify-parity.py`

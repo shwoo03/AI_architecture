@@ -17,6 +17,9 @@ import tokenize
 from dataclasses import dataclass
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib_catalog import load_catalog_modes_with_status, validate_catalog, validate_command_docs
+
 
 # Ensure non-ASCII output (em-dash, Korean, etc.) prints cleanly on Windows
 # consoles that default to cp949 / cp1252.
@@ -29,6 +32,38 @@ except (AttributeError, OSError):
 
 CLAUDE_MD_LINE_LIMIT = 60
 REQUIRED_TOP_LEVEL = ["AGENTS.md", "CLAUDE.md", "README.md"]
+REQUIRED_CANONICAL_TOP_LEVEL = [
+    ".gitignore",
+    ".skeleton-version",
+    "manifest.yaml",
+    "references.yaml",
+    "config/roles.yaml",
+    "config/policy.yaml",
+    "config/agent-team.yaml",
+    "config/install-profiles.yaml",
+    "mcp/servers.yaml",
+    "plans/INDEX.md",
+    "state/progress.md",
+    "state/decisions.md",
+    "state/blockers.md",
+    "state/failures.jsonl",
+    "state/cost-log.jsonl",
+    "hooks/hooks.json",
+    "skills/_templates/SKILL.template.md",
+    "skills/_templates/AGENT.template.md",
+    "skills/_templates/GOLDEN.template.yaml",
+    "skills/_meta/project-scaffolder/SKILL.md",
+    "skills/_meta/skill-creator/SKILL.md",
+    "skills/_meta/research-evaluator/SKILL.md",
+    "skills/_meta/replan-on-blocker/SKILL.md",
+    "skills/_meta/reference-refresher/SKILL.md",
+    ".github/workflows/ci.yml",
+    "schemas/install-state.schema.json",
+    "schemas/plugin-manifest.schema.json",
+    "schemas/session-snapshot.schema.json",
+    "schemas/catalog.schema.json",
+    "schemas/runtime-event.schema.json",
+]
 # Required paths are grouped by why they are mandatory. This keeps the
 # verifier from turning into an undifferentiated list and makes future slimming
 # decisions safer: move paths between groups intentionally instead of deleting
@@ -45,12 +80,17 @@ REQUIRED_CORE_DOCS = [
     "docs/ARCHITECTURE.md",
     "docs/GOVERNANCE.md",
     "docs/AGENT_REGISTRY.md",
+    "docs/AGENT_QUICKSTART.md",
     "docs/WORKFLOW_CATALOG.md",
+    "docs/NEW_PROJECT_CHECKLIST.md",
+    "docs/GOLDEN_CASES_GUIDE.md",
+    "docs/ROLE_MIGRATION.md",
     "docs/decisions/README.md",
     "docs/PIVOT_TRIGGERS.md",
     "docs/THREE_LAYER_MODEL.md",
     "docs/SKILL_DISTRIBUTION_MODEL.md",
     "docs/RUNTIME_EVENT_SCHEMA.md",
+    "docs/plugin-manifest-notes.md",
     "docs/FEATURE_DECISION_GUIDE.md",
     "docs/DOCUMENTATION_STYLE_GUIDE.md",
     "docs/NOTION_DOCUMENTATION_RULES.md",
@@ -69,7 +109,13 @@ REQUIRED_RUNTIME_DOCS = [
     "docs/RUNTIME_STARTUP.template.md",
     "runtime/state/session-handoff.md",
     "runtime/activity-log.jsonl",
+    "runtime/install-state.jsonl",
+    "runtime/skill-usage.jsonl",
+    "runtime/skill-lifecycle.jsonl",
+    "runtime/session-snapshot.json",
     "runtime/review-queue.jsonl",
+    "runtime/reference-tasks.jsonl",
+    "runtime/checkpoints.jsonl",
 ]
 REQUIRED_WIKI_DOCS = [
     "docs/wiki-ops/wiki-query.md",
@@ -91,12 +137,45 @@ REQUIRED_RULE_DOCS = [
     "rules/languages/typescript/README.md",
     "examples/README.md",
 ]
+REQUIRED_SCRIPT_PATHS = [
+    "scripts/catalog.yaml",
+    "scripts/lib_catalog.py",
+    "scripts/lib_runtime_lock.py",
+    "scripts/redact.py",
+    "scripts/subdir-hints.py",
+    "scripts/change-drift-check.py",
+    "scripts/agent-flow.py",
+    "scripts/install-state.py",
+    "scripts/skill-lifecycle.py",
+    "scripts/eval-all.py",
+    "scripts/cost-log.py",
+    "scripts/session-snapshot.py",
+    "scripts/reference-intake.py",
+    "scripts/reference-task-queue.py",
+    "scripts/session-recall.py",
+    "scripts/portability-scan.py",
+    "scripts/knowledge-search.py",
+    "scripts/agent-brief.py",
+    "scripts/checkpoint.py",
+    "scripts/tool-health.py",
+    "scripts/tool-guardrail.py",
+    "scripts/mcp-audit.py",
+    "scripts/permission-evaluate.py",
+    "scripts/path-safety.py",
+    "scripts/install-profiles.py",
+    "scripts/skill-stocktake.py",
+    "scripts/plugin-manifest-check.py",
+    "scripts/schema-check.py",
+    "scripts/markdown-sanitize.py",
+    "scripts/failure-classify.py",
+]
 REQUIRED_DOCS = (
     REQUIRED_CORE_DOCS
     + REQUIRED_REFERENCE_DOCS
     + REQUIRED_RUNTIME_DOCS
     + REQUIRED_WIKI_DOCS
     + REQUIRED_RULE_DOCS
+    + REQUIRED_SCRIPT_PATHS
 )
 REQUIRED_RUNTIME_DIRS = [
     "runtime/state",
@@ -104,6 +183,13 @@ REQUIRED_RUNTIME_DIRS = [
     "runtime/proposals",
     "runtime/validation",
     "runtime/schedules",
+    "skills/active",
+    "skills/_candidates",
+    "skills/_deprecated",
+    "agents",
+    "plans/active",
+    "plans/done",
+    "plans/failed",
 ]
 REMOVED_PATHS = [
     "runtime/memory",
@@ -175,6 +261,12 @@ def check_claude_md_size(root: Path, findings: list[Finding]) -> None:
     if not path.exists():
         findings.append(Finding("error", "claude_md_size", "CLAUDE.md missing"))
         return
+    if path.is_symlink():
+        try:
+            if path.resolve() == (root / "AGENTS.md").resolve():
+                return
+        except OSError:
+            pass
     lines = path.read_text(encoding="utf-8").splitlines()
     if len(lines) > CLAUDE_MD_LINE_LIMIT:
         findings.append(
@@ -196,7 +288,7 @@ def _with_hint(rel: str, base_msg: str) -> str:
 
 
 def check_required_paths(root: Path, findings: list[Finding]) -> None:
-    for rel in REQUIRED_TOP_LEVEL + REQUIRED_DOCS:
+    for rel in REQUIRED_TOP_LEVEL + REQUIRED_CANONICAL_TOP_LEVEL + REQUIRED_DOCS:
         if not (root / rel).exists():
             findings.append(
                 Finding(
@@ -281,11 +373,9 @@ def check_removed_paths(root: Path, findings: list[Finding]) -> None:
 
 
 def check_agent_frontmatter(root: Path, findings: list[Finding]) -> None:
-    agents_dir = root / "codex" / "agents"
+    agents_dir = root / "agents"
     if not agents_dir.is_dir():
-        findings.append(
-            Finding("error", "agents_dir_missing", "codex/agents/ missing")
-        )
+        findings.append(Finding("error", "agents_dir_missing", "agents/ missing"))
         return
     for agent_file in sorted(agents_dir.glob("*.md")):
         if agent_file.name == "README.md":
@@ -390,6 +480,311 @@ def check_review_queue_parses(root: Path, findings: list[Finding]) -> None:
                     f"runtime/review-queue.jsonl:{line_no} JSONL event must be an object",
                 )
             )
+
+
+def check_runtime_jsonl_parses(root: Path, rel: str, check_name: str, findings: list[Finding]) -> None:
+    path = root / rel
+    if not path.exists():
+        return
+    for line_no, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            value = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            findings.append(Finding("error", check_name, f"{rel}:{line_no} invalid JSON: {exc}"))
+            continue
+        if not isinstance(value, dict):
+            findings.append(Finding("error", check_name, f"{rel}:{line_no} JSONL event must be an object"))
+
+
+def check_session_snapshot_parses(root: Path, findings: list[Finding]) -> None:
+    path = root / "runtime" / "session-snapshot.json"
+    if not path.exists():
+        return
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as exc:
+        findings.append(Finding("error", "session_snapshot_parse", f"runtime/session-snapshot.json invalid JSON: {exc}"))
+        return
+    if not isinstance(value, dict):
+        findings.append(Finding("error", "session_snapshot_parse", "runtime/session-snapshot.json must contain an object"))
+
+
+CATALOG_PATH_RE = re.compile(r"^\s*-?\s*path:\s*(scripts/[A-Za-z0-9_./-]+)\s*$", re.MULTILINE)
+TOP_LEVEL_YAML_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*:\s*$", re.MULTILINE)
+CATALOG_REQUIRED_ROUTING_MODES = ("decide", "research", "closeout", "maintain", "build")
+CATALOG_REQUIRED_MODE_FIELDS = ("reason", "confidence", "requires_confirmation", "write_policy", "signal", "next_command", "suggested_questions")
+CATALOG_WRITE_POLICIES = {"read_only", "manual_work_required", "write_with_confirmation"}
+PERMISSION_ACTIONS = {"ask", "allow", "deny"}
+PERMISSION_DECISIONS = {"allow_once", "allow_session", "deny"}
+
+
+def _catalog_public_block(text: str) -> str:
+    match = re.search(r"^public:\s*$", text, re.MULTILINE)
+    if not match:
+        return ""
+    tail = text[match.end() :]
+    next_key = TOP_LEVEL_YAML_KEY_RE.search(tail)
+    return tail[: next_key.start()] if next_key else tail
+
+
+def _catalog_routing_block(text: str) -> str:
+    match = re.search(r"^routing:\s*$", text, re.MULTILINE)
+    if not match:
+        return ""
+    tail = text[match.end() :]
+    next_key = TOP_LEVEL_YAML_KEY_RE.search(tail)
+    return tail[: next_key.start()] if next_key else tail
+
+
+def _catalog_mode_block(routing_text: str, mode: str) -> str:
+    match = re.search(rf"^\s{{4}}{re.escape(mode)}:\s*$", routing_text, re.MULTILINE)
+    if not match:
+        return ""
+    tail = routing_text[match.end() :]
+    next_mode = re.search(r"^\s{4}[A-Za-z_][A-Za-z0-9_-]*:\s*$", tail, re.MULTILINE)
+    return tail[: next_mode.start()] if next_mode else tail
+
+
+def check_catalog_routing(text: str, findings: list[Finding]) -> None:
+    routing = _catalog_routing_block(text)
+    if not routing:
+        findings.append(
+            Finding(
+                "error",
+                "script_catalog_invalid",
+                "scripts/catalog.yaml must define routing.modes for agent-flow start",
+            )
+        )
+        return
+    for mode in CATALOG_REQUIRED_ROUTING_MODES:
+        block = _catalog_mode_block(routing, mode)
+        if not block:
+            findings.append(
+                Finding(
+                    "error",
+                    "script_catalog_invalid",
+                    f"scripts/catalog.yaml routing.modes missing `{mode}`",
+                )
+            )
+            continue
+        missing = [field for field in CATALOG_REQUIRED_MODE_FIELDS if not re.search(rf"^\s{{6}}{field}:\s*", block, re.MULTILINE)]
+        if mode != "build" and not re.search(r"^\s{6}goal_pattern:\s*", block, re.MULTILINE) and mode != "decide":
+            missing.append("goal_pattern")
+        if missing:
+            findings.append(
+                Finding(
+                    "error",
+                    "script_catalog_invalid",
+                    f"scripts/catalog.yaml routing.modes.{mode} missing: {', '.join(missing)}",
+                )
+            )
+        match = re.search(r"^\s{6}write_policy:\s*(\S+)\s*$", block, re.MULTILINE)
+        if match and match.group(1).strip() not in CATALOG_WRITE_POLICIES:
+            findings.append(
+                Finding(
+                    "error",
+                    "script_catalog_invalid",
+                    f"scripts/catalog.yaml routing.modes.{mode} has invalid write_policy: {match.group(1).strip()}",
+                )
+            )
+        requires_match = re.search(r"^\s{6}requires_confirmation:\s*(\S+)\s*$", block, re.MULTILINE)
+        if match and match.group(1).strip() == "write_with_confirmation":
+            requires_value = requires_match.group(1).strip().lower() if requires_match else ""
+            if requires_value != "true":
+                findings.append(
+                    Finding(
+                        "error",
+                        "script_catalog_invalid",
+                        f"scripts/catalog.yaml routing.modes.{mode} write_with_confirmation requires requires_confirmation: true",
+                    )
+                )
+        next_command_match = re.search(r"^\s{6}next_command:\s*(.+)$", block, re.MULTILINE)
+        if next_command_match:
+            command = next_command_match.group(1)
+            policy = match.group(1).strip() if match else ""
+            writes = any(marker in command for marker in ("--write-card", "--record", "--apply"))
+            writes = writes or ("agent-flow.py research" in command and "--proposal" in command)
+            if writes and policy != "write_with_confirmation":
+                findings.append(
+                    Finding(
+                        "error",
+                        "script_catalog_invalid",
+                        f"scripts/catalog.yaml routing.modes.{mode} write command requires write_policy write_with_confirmation",
+                    )
+                )
+
+
+def check_script_catalog(root: Path, findings: list[Finding]) -> None:
+    for detail in validate_catalog(root):
+        findings.append(Finding("error", "script_catalog_invalid", detail))
+    modes, _status = load_catalog_modes_with_status(root, {}, CATALOG_REQUIRED_ROUTING_MODES)
+    for detail in validate_command_docs(root, modes=modes):
+        findings.append(Finding("warn", "command_metadata_invalid", detail))
+
+
+def check_portability_scan(root: Path, findings: list[Finding]) -> None:
+    script = root / "scripts" / "portability-scan.py"
+    if not script.exists():
+        return
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script), "--root", str(root), "--format", "json"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        findings.append(Finding("warn", "portability_scan_run", f"portability-scan failed to run: {exc}"))
+        return
+    if result.returncode != 0:
+        findings.append(Finding("warn", "portability_scan_run", result.stderr.strip() or result.stdout.strip()))
+        return
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        findings.append(Finding("warn", "portability_scan_output", "portability-scan did not return JSON"))
+        return
+    count = int(payload.get("count", 0)) if isinstance(payload, dict) else 0
+    if count:
+        findings.append(Finding("warn", "portability_scan", f"{count} machine-specific path finding(s); run scripts/portability-scan.py"))
+
+
+def _yaml_section(text: str, section: str) -> str:
+    match = re.search(rf"^{re.escape(section)}:\s*$", text, re.MULTILINE)
+    if not match:
+        return ""
+    tail = text[match.end() :]
+    next_key = TOP_LEVEL_YAML_KEY_RE.search(tail)
+    return tail[: next_key.start()] if next_key else tail
+
+
+def _section_scalar(section: str, key: str) -> str:
+    match = re.search(rf"^\s{{2}}{re.escape(key)}:\s*([^\n#]+)", section, re.MULTILINE)
+    return match.group(1).strip().strip('"').strip("'") if match else ""
+
+
+def _inline_list(value: str) -> list[str]:
+    stripped = value.strip()
+    if not (stripped.startswith("[") and stripped.endswith("]")):
+        return []
+    return [item.strip().strip('"').strip("'") for item in stripped[1:-1].split(",") if item.strip()]
+
+
+def check_permission_policy(root: Path, findings: list[Finding]) -> None:
+    path = root / "config" / "policy.yaml"
+    if not path.exists():
+        return
+    text = path.read_text(encoding="utf-8", errors="replace")
+    section = _yaml_section(text, "permissions")
+    if not section:
+        findings.append(Finding("error", "permission_policy_invalid", "config/policy.yaml missing permissions section"))
+        return
+    default_action = _section_scalar(section, "default_action")
+    timeout_action = _section_scalar(section, "timeout_action")
+    if default_action not in PERMISSION_ACTIONS:
+        findings.append(Finding("error", "permission_policy_invalid", "permissions.default_action must be ask, allow, or deny"))
+    if timeout_action != "deny":
+        findings.append(Finding("error", "permission_policy_invalid", "permissions.timeout_action must be deny"))
+    decisions = _inline_list(_section_scalar(section, "decision_values"))
+    if not decisions:
+        findings.append(Finding("error", "permission_policy_invalid", "permissions.decision_values must be an inline list"))
+    else:
+        invalid = [item for item in decisions if item not in PERMISSION_DECISIONS]
+        missing = sorted(PERMISSION_DECISIONS.difference(decisions))
+        if invalid:
+            findings.append(Finding("error", "permission_policy_invalid", "invalid permission decision value(s): " + ", ".join(invalid)))
+        if missing:
+            findings.append(Finding("error", "permission_policy_invalid", "missing permission decision value(s): " + ", ".join(missing)))
+    rule_blocks = re.finditer(r"^\s{4}-\s+id:\s*([^\n#]+)(.*?)(?=^\s{4}-\s+id:|\Z)", section, re.MULTILINE | re.DOTALL)
+    for match in rule_blocks:
+        rule_id = match.group(1).strip().strip('"').strip("'")
+        block = match.group(2)
+        action_match = re.search(r"^\s{6}action:\s*([^\n#]+)", block, re.MULTILINE)
+        target_match = re.search(r"^\s{6}match:\s*([^\n#]+)", block, re.MULTILINE)
+        action = action_match.group(1).strip().strip('"').strip("'") if action_match else ""
+        target = target_match.group(1).strip().strip('"').strip("'") if target_match else ""
+        if action not in PERMISSION_ACTIONS:
+            findings.append(Finding("error", "permission_policy_invalid", f"permissions.rules.{rule_id} action must be ask, allow, or deny"))
+        if target.lower() in {"shell:*", "bash:*"} and action == "allow":
+            findings.append(Finding("error", "permission_policy_invalid", f"permissions.rules.{rule_id} must not allow wildcard shell execution"))
+    evaluator = root / "scripts" / "permission-evaluate.py"
+    if evaluator.exists():
+        try:
+            result = subprocess.run(
+                [sys.executable, str(evaluator), "--root", str(root), "--format", "json", "evaluate", "--action", "shell", "--resource", "*"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=30,
+            )
+        except subprocess.SubprocessError as exc:
+            findings.append(Finding("error", "permission_evaluator_run", f"permission-evaluate failed to run: {exc}"))
+            return
+        if result.returncode != 0:
+            findings.append(Finding("error", "permission_evaluator_run", result.stderr.strip() or result.stdout.strip()))
+            return
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            findings.append(Finding("error", "permission_evaluator_output", "permission-evaluate did not return JSON"))
+            return
+        if payload.get("decision") != "deny":
+            findings.append(Finding("error", "permission_evaluator_output", "shell wildcard permission must evaluate to deny"))
+
+
+def check_external_validators(root: Path, findings: list[Finding]) -> None:
+    commands = [
+        ("plugin_manifest", "plugin-manifest-check.py", ["check"]),
+        ("schema_check", "schema-check.py", ["check"]),
+        ("markdown_sanitize", "markdown-sanitize.py", ["--check"]),
+        ("mcp_audit", "mcp-audit.py", ["check"]),
+        ("tool_health", "tool-health.py", ["check"]),
+        ("tool_guardrail", "tool-guardrail.py", ["check"]),
+        ("path_safety", "path-safety.py", ["check", "--path", "scripts/agent-flow.py", "--operation", "write"]),
+        ("install_profiles", "install-profiles.py", ["check"]),
+        ("skill_stocktake", "skill-stocktake.py", ["report"]),
+    ]
+    for check_name, script_name, args in commands:
+        script = root / "scripts" / script_name
+        if not script.exists():
+            continue
+        try:
+            result = subprocess.run(
+                [sys.executable, str(script), "--root", str(root), "--format", "json", *args],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=30,
+            )
+        except subprocess.SubprocessError as exc:
+            findings.append(Finding("warn", f"{check_name}_run", f"{script_name} failed to run: {exc}"))
+            continue
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()
+            findings.append(Finding("error", f"{check_name}_invalid", detail or f"{script_name} exited {result.returncode}"))
+            continue
+        if check_name == "markdown_sanitize":
+            try:
+                payload = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                findings.append(Finding("warn", "markdown_sanitize_output", "markdown-sanitize did not return JSON"))
+                continue
+            count = len(payload.get("findings") or []) if isinstance(payload, dict) else 0
+            if count:
+                findings.append(
+                    Finding(
+                        "warn",
+                        "markdown_sanitize_needed",
+                        f"{count} Markdown file(s) need conservative sanitizer cleanup",
+                    )
+                )
 
 
 def _marker_inside_backticks(line: str, marker_start: int) -> bool:
@@ -690,6 +1085,15 @@ def main() -> int:
     check_activity_log_parses(root, findings)
     check_agent_runs_parses(root, findings)
     check_review_queue_parses(root, findings)
+    check_runtime_jsonl_parses(root, "runtime/install-state.jsonl", "install_state_parse", findings)
+    check_runtime_jsonl_parses(root, "runtime/skill-usage.jsonl", "skill_usage_parse", findings)
+    check_runtime_jsonl_parses(root, "runtime/skill-lifecycle.jsonl", "skill_lifecycle_parse", findings)
+    check_runtime_jsonl_parses(root, "state/cost-log.jsonl", "cost_log_parse", findings)
+    check_session_snapshot_parses(root, findings)
+    check_script_catalog(root, findings)
+    check_portability_scan(root, findings)
+    check_permission_policy(root, findings)
+    check_external_validators(root, findings)
     check_scripts_compile(root, findings)
     check_clarifications(root, findings)
     check_reference_candidates(root, findings)

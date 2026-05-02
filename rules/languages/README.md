@@ -8,7 +8,10 @@
 
 - `python/README.md`
 - `typescript/README.md`
+- `go/README.md`
+- `rust/README.md`
+- `web/README.md`
 
-프로젝트가 실제로 해당 스택을 사용할 때만 새 언어 디렉터리(예: `go/`, `rust/`)를 추가합니다. 각 새 디렉터리에는 `rules/common/`을 확장하는 언어별 가이드를 담은 `README.md`가 최소한 필요합니다.
+프로젝트가 실제로 해당 스택을 사용할 때만 언어별 규칙을 활성 운영에 반영합니다. 각 디렉터리는 `rules/common/`을 확장하는 opt-in 가이드입니다.
 
 프로젝트별 스택 메모는 `docs/PROJECT_PROFILE.md`에 두고, 재사용 가능한 언어 규칙은 이 디렉터리에 둡니다.

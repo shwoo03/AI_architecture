@@ -39,6 +39,7 @@ REQUIRED_FIELDS = [
     "maintenance_signal",
     "documentation_signal",
     "validation_signal",
+    "sources",
     "license",
     "security_or_privacy_risk",
     "maintenance_risk",
@@ -62,7 +63,7 @@ REQUIRED_FIELDS = [
 ALLOWED_VALUES = {
     "source_type": {"repository", "official_docs", "article", "paper", "existing_reference"},
     "status": {"new", "reviewing", "proposed", "adopted", "deferred", "rejected"},
-    "adoption_decision": {"adopt", "adapt", "copy", "defer", "reject"},
+    "adoption_decision": {"adopt", "adapt", "copy", "direct_implementation", "defer", "reject"},
     "proposal_needed": {"yes", "no"},
     "approval_required": {"yes", "no"},
 }
@@ -127,6 +128,7 @@ def validate_lists(path: Path, text: str, findings: list[Finding]) -> None:
         "what_not_to_copy",
         "target_files_or_areas",
         "files_to_change",
+        "sources",
     ):
         marker = f"- `{heading}`:"
         index = text.find(marker)
@@ -158,7 +160,35 @@ def validate_copy_decision(path: Path, text: str, fields: dict[str, str], findin
         findings.append(Finding(path, "copy decision requires list field `what_to_copy_directly` with items"))
     copy_boundary = fields.get("copy_boundary", "")
     if is_blank(copy_boundary):
-        findings.append(Finding(path, "copy decision requires non-blank field `copy_boundary`"))
+            findings.append(Finding(path, "copy decision requires non-blank field `copy_boundary`"))
+
+
+def validate_direct_implementation(path: Path, fields: dict[str, str], findings: list[Finding]) -> None:
+    if fields.get("adoption_decision") != "direct_implementation":
+        return
+    reason = fields.get("direct_implementation_reason", "")
+    if is_blank(reason) or reason.lower() in {"not applicable", "n/a"}:
+        findings.append(Finding(path, "direct_implementation decision requires non-blank field `direct_implementation_reason`"))
+
+
+def validate_sources(path: Path, text: str, findings: list[Finding]) -> None:
+    marker = "- `sources`:"
+    index = text.find(marker)
+    if index == -1:
+        findings.append(Finding(path, "missing list field `sources`"))
+        return
+    tail = text[index + len(marker) :]
+    next_field = tail.find("\n- `")
+    block = tail if next_field == -1 else tail[:next_field]
+    source_lines = [line.strip()[2:].strip() for line in block.splitlines() if line.strip().startswith("- ")]
+    if not source_lines:
+        findings.append(Finding(path, "list field `sources` has no items"))
+        return
+    required = ("path", "kind", "evidence", "hash_or_line_ref")
+    for offset, line in enumerate(source_lines, start=1):
+        missing = [field for field in required if f'"{field}"' not in line and f"'{field}'" not in line]
+        if missing:
+            findings.append(Finding(path, f"sources item {offset} missing: {', '.join(missing)}"))
 
 
 def validate_scores(path: Path, text: str, findings: list[Finding]) -> None:
@@ -220,6 +250,8 @@ def validate(root: Path) -> tuple[list[Finding], int]:
         validate_fields(path, fields, findings)
         validate_lists(path, text, findings)
         validate_copy_decision(path, text, fields, findings)
+        validate_direct_implementation(path, fields, findings)
+        validate_sources(path, text, findings)
         validate_scores(path, text, findings)
     return findings, len(files)
 

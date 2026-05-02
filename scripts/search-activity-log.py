@@ -65,6 +65,23 @@ def matches(entry: dict[str, Any], args: argparse.Namespace) -> bool:
             summary = str(tool_call.get("summary") or "")
         if args.contains.lower() not in summary.lower():
             return False
+    if args.sidecar_contains:
+        tool_call = entry.get("tool_call") or {}
+        sidecar = tool_call.get("sidecar_path") if isinstance(tool_call, dict) else None
+        if not isinstance(sidecar, str) or not sidecar:
+            return False
+        log_root = repo_root()
+        sidecar_path = (log_root / sidecar).resolve(strict=False)
+        try:
+            sidecar_path.relative_to(log_root.resolve(strict=False))
+        except ValueError:
+            return False
+        try:
+            text = sidecar_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return False
+        if args.sidecar_contains.lower() not in text.lower():
+            return False
     if args.since or args.until:
         ts = entry_ts(entry)
         if ts is None:
@@ -84,7 +101,8 @@ def render_row(entry: dict[str, Any]) -> str:
     tool_call = entry.get("tool_call") or {}
     summary = str(tool_call.get("summary") or "")
     summary_short = (summary[:77] + "...") if len(summary) > 80 else summary
-    return f"{ts:20}  {phase:14}  {action:32}  {project:24}  {summary_short}"
+    sidecar = f" sidecar={tool_call.get('sidecar_path')}" if tool_call.get("sidecar_path") else ""
+    return f"{ts:20}  {phase:14}  {action:32}  {project:24}  {summary_short}{sidecar}"
 
 
 def main() -> int:
@@ -100,6 +118,7 @@ def main() -> int:
     parser.add_argument("--project", default=None, help="Exact-match filter on project field.")
     parser.add_argument("--tool", default=None, help="Exact-match filter on tool_call.tool.")
     parser.add_argument("--contains", default=None, help="Case-insensitive substring match against tool_call.summary.")
+    parser.add_argument("--sidecar-contains", default=None, help="Case-insensitive substring match against a tool output sidecar.")
     parser.add_argument("--last", type=int, default=None, help="Trim to the last N matches (default 20 when no filter is set).")
     parser.add_argument("--jsonl", action="store_true", help="Emit raw JSONL for matched entries instead of the table.")
     args = parser.parse_args()
@@ -130,7 +149,7 @@ def main() -> int:
 
     # Default: last 20 if no filter and no --last specified
     any_filter = any(
-        [args.since, args.until, args.phase, args.action, args.project, args.tool, args.contains]
+        [args.since, args.until, args.phase, args.action, args.project, args.tool, args.contains, args.sidecar_contains]
     )
     limit = args.last if args.last is not None else (None if any_filter else 20)
     if limit is not None and limit > 0:

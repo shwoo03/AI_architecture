@@ -11,6 +11,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from lib_runtime_lock import runtime_lock
+except ImportError:  # pragma: no cover - compatibility for copied script smoke roots
+    from contextlib import contextmanager
+
+    @contextmanager
+    def runtime_lock(root: Path, name: str, **_: object):
+        yield root / "runtime" / "locks" / f"{name}.lock"
+
+try:
+    from redact import redact_json, redact_text
+except ImportError:  # pragma: no cover - compatibility for copied script smoke roots
+    def redact_text(value: str) -> str:
+        return value
+
+    def redact_json(value: Any) -> Any:
+        return value
+
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -20,7 +38,10 @@ except (AttributeError, OSError):
 
 
 REQUIRED_FIELDS = ("ts", "goal", "changed_paths", "validations", "outcome")
-ALLOWED_OUTCOMES = {"genuine_success", "partial_progress", "blocked", "failed"}
+ALLOWED_OUTCOMES = {"genuine_success", "partial_progress", "timeout", "infra_error", "blocked_by_policy"}
+ALLOWED_VALIDATION_STATUSES = {"OK", "PASS", "WARN", "SKIP", "FAIL", "ERROR"}
+PASSING_VALIDATION_STATUSES = {"OK", "PASS"}
+RISK_VALIDATION_STATUSES = {"WARN", "SKIP"}
 
 
 @dataclass
@@ -76,10 +97,14 @@ def parse_validation(value: str) -> dict[str, Any]:
     try:
         payload = json.loads(value)
     except json.JSONDecodeError:
-        return {"command": value, "status": "recorded"}
+        return {"name": value, "command": value, "status": "OK"}
     if not isinstance(payload, dict):
         raise ValueError("--validation JSON must be an object")
     return payload
+
+
+def validation_status(validation: dict[str, Any]) -> str:
+    return str(validation.get("status", "")).strip().upper()
 
 
 def read_records(root: Path) -> tuple[list[dict[str, Any]], list[str]]:
@@ -131,6 +156,31 @@ def validate_record(root: Path, record: dict[str, Any], index: int) -> list[str]
         findings.append(f"{label} field `validations` must be a non-empty list")
     elif not all(isinstance(item, dict) for item in validations):
         findings.append(f"{label} field `validations` must contain objects")
+    else:
+        for offset, validation in enumerate(validations, start=1):
+            if not str(validation.get("name", "")).strip():
+                findings.append(f"{label} validation {offset} missing field `name`")
+            status = validation_status(validation)
+            if not status:
+                findings.append(f"{label} validation {offset} missing field `status`")
+            elif status not in ALLOWED_VALIDATION_STATUSES:
+                findings.append(f"{label} validation {offset} status invalid: {status}")
+        if outcome == "genuine_success":
+            failing = [
+                validation_status(validation)
+                for validation in validations
+                if isinstance(validation, dict) and validation_status(validation) not in PASSING_VALIDATION_STATUSES
+            ]
+            if failing:
+                findings.append(f"{label} outcome `genuine_success` requires all validations passing (OK/PASS); got {failing}")
+        if outcome == "partial_progress":
+            risk_statuses = [
+                validation_status(validation)
+                for validation in validations
+                if isinstance(validation, dict) and validation_status(validation) in RISK_VALIDATION_STATUSES
+            ]
+            if risk_statuses and not (str(record.get("residual_risk", "")).strip() or str(record.get("next_action", "")).strip()):
+                findings.append(f"{label} outcome `partial_progress` with WARN/SKIP requires residual_risk or next_action")
     return findings
 
 
@@ -145,9 +195,10 @@ def append_record(root: Path, record: EvidenceRecord) -> None:
     path = evidence_path(root)
     path.resolve(strict=False).relative_to(root.resolve())
     path.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(asdict(record), ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n"
-    with path.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(line)
+    line = json.dumps(redact_json(asdict(record)), ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n"
+    with runtime_lock(root, "completion-evidence"):
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(line)
 
 
 def cmd_add(root: Path, args: argparse.Namespace) -> int:
@@ -160,13 +211,13 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         return 2
     record = EvidenceRecord(
         ts=args.ts or utc_now(),
-        goal=args.goal.strip(),
+        goal=redact_text(args.goal.strip()),
         changed_paths=changed_paths,
-        validations=validations,
+        validations=redact_json(validations),
         outcome=args.outcome,
-        residual_risk=args.residual_risk.strip(),
-        next_action=args.next_action.strip(),
-        notes=args.notes.strip(),
+        residual_risk=redact_text(args.residual_risk.strip()),
+        next_action=redact_text(args.next_action.strip()),
+        notes=redact_text(args.notes.strip()),
         agent=args.agent.strip() or "codex",
         artifacts=artifacts,
     )

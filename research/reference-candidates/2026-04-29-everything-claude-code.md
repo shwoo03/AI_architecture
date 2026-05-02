@@ -42,6 +42,9 @@
 - `maintenance_signal`: README가 release notes, Codex support, Claude plugin, hooks, skills, security, FAQ, cross-harness sections를 폭넓게 유지한다.
 - `documentation_signal`: README가 설치, 아키텍처, skills, hooks, security, Codex support, compatibility caveats를 매우 상세히 제공한다.
 - `validation_signal`: clone revision과 MIT license를 확인했다. 이번 P0에서는 운영 계약과 후보 카드 기준선만 반영한다.
+- `sources`:
+  - {"path":"../AI_architecture_references/everything-claude-code/README.md","kind":"readme","evidence":"Agent catalog, command, and workflow examples were reviewed.","hash_or_line_ref":"local-reference"}
+  - {"path":"../AI_architecture_references/everything-claude-code/.claude/commands","kind":"command_dir","evidence":"Reusable command pack structure was inspected conceptually.","hash_or_line_ref":"local-reference"}
 
 ## 리스크
 

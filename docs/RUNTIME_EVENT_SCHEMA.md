@@ -8,6 +8,8 @@
 
 이 문서는 실행 중 생긴 사건을 어떤 필드로 기록할지 정합니다. 로그는 append-only로 다루며, Codex, Claude, 훅, 검증기, Notion 문서가 같은 증거를 읽을 수 있게 합니다.
 
+핵심 계약은 `schemas/`에도 JSON schema 스타일 문서로 고정합니다. v1 검증은 외부 패키지 없이 `scripts/schema-check.py`가 수행하며, 문서와 실제 runtime/plugin/config 파일의 필수 필드 드리프트를 빠르게 잡는 보조 게이트입니다.
+
 ## 왜 필요한가
 
 대화 기록만으로는 프로젝트 상태를 안정적으로 이어받기 어렵습니다. 어떤 작업을 했는지, 어떤 검증을 했는지, 어떤 에이전트가 어떤 목표 때문에 실행됐는지 구조화된 로그가 있어야 다음 세션이 추측하지 않고 이어갈 수 있습니다.
@@ -23,6 +25,15 @@
 | `runtime/activity-log.jsonl` | `action`, `phase`, `goal_lineage`, `tool_call`, `data` | `event`, `agent`, `workflow`, `artifacts` |
 | `runtime/agent-runs.jsonl` | `event`, `agent`, `workflow`, `status`, `goal_lineage`, `artifacts` | `action`, `phase`, `tool_call` |
 | `runtime/completion-evidence.jsonl` | `goal`, `changed_paths`, `validations`, `outcome` | `action`, `phase`, `tool_call` |
+| `runtime/install-state.jsonl` | `event`, `skeleton_version`, `generated_paths`, `preserved_paths`, `validation_status` | `action`, `phase`, `tool_call` |
+| `runtime/skill-usage.jsonl` | `skill`, `event`, `outcome`, `run_id`, `evidence_ref` | `action`, `phase`, `tool_call` |
+| `runtime/skill-lifecycle.jsonl` | `skill`, `event`, `status`, `score`, `goldens` | `action`, `phase`, `tool_call` |
+| `runtime/reference-tasks.jsonl` | `id`, `action`, `target`, `status`, `candidate_card`, `proposal`, `source_hash`, `hash_algorithm`, `retry_count`, `max_retries` | `phase`, `tool_call`, `skip_reason` |
+| `runtime/checkpoints.jsonl` | `id`, `name`, `goal`, `git_sha`, `changed_paths`, `verify_status` | `action`, `phase`, `tool_call` |
+| `runtime/reference-intake-cache.jsonl` | `local_path`, `source_hash`, `analysis` | `action`, `phase`, `tool_call` |
+| `runtime/session-recall.sqlite` | FTS cache of activity, decisions, completion evidence, skill usage | 원본 로그 아님 |
+| `runtime/tool-output-sidecars/*.txt` | 긴 tool output 원문 | JSONL 아님 |
+| `state/cost-log.jsonl` | `run_id`, `agent`, `skill`, `provider`, `model`, `cost_usd` | `action`, `phase`, `tool_call` |
 
 `ts`, `project`, `goal_lineage`는 양쪽 공통입니다. 한 엔트리가 두 필드를 동시에 담지 않습니다.
 
@@ -36,6 +47,26 @@
   "project": "common-ai-architecture",
   "goal_lineage": ["task", "project", "primary_goal"],
   "data": {}
+}
+```
+
+긴 tool output은 activity log 안에 전부 넣지 않는다. `tool_call.summary`에는 preview만 남기고, 원문은 `runtime/tool-output-sidecars/*.txt`에 둔다.
+
+```json
+{
+  "tool_call": {
+    "tool": "Bash",
+    "status": "completed",
+    "normalized_status": "success",
+    "failure_type": "",
+    "empty_output": false,
+    "duration_ms": null,
+    "summary": "first 2000 chars...",
+    "sidecar_path": "runtime/tool-output-sidecars/20260502T000000-abcd1234.txt",
+    "preview_chars": 2000,
+    "full_chars": 12000,
+    "truncated": true
+  }
 }
 ```
 
@@ -53,6 +84,92 @@
   "artifacts": []
 }
 ```
+
+설치 상태 로그는 skeleton 복사와 canonical 변환 결과를 기록합니다.
+
+```json
+{
+  "ts": "2026-05-02T00:00:00Z",
+  "event": "convert_completed",
+  "project": "common-ai-architecture",
+  "skeleton_version": "v1.2.0",
+  "source_commit": null,
+  "requested_profile": "full-canonical",
+  "selected_components": ["canonical"],
+  "generated_paths": [".codex/skills", ".claude/skills"],
+  "preserved_paths": [".claude/settings.local.json"],
+  "validation_status": "verified"
+}
+```
+
+`validation_status`는 `unverified`, `verified`, `failed` 중 하나입니다. `convert.py`는 generated artifact 생성 후 parity 검증 결과를 install-state에 기록합니다.
+
+skill 사용/생명주기 로그는 `SKILL.md` frontmatter를 직접 수정하지 않고 사용량과 평가를 append-only로 남깁니다.
+
+```json
+{
+  "ts": "2026-05-02T00:00:00Z",
+  "skill": "research-evaluator",
+  "event": "use",
+  "outcome": "success",
+  "run_id": "run-001",
+  "goal_lineage": ["reference adoption"],
+  "evidence_ref": "runtime/completion-evidence.jsonl:12"
+}
+```
+
+비용 로그는 추정/실측 여부를 분리해서 남깁니다.
+
+```json
+{
+  "ts": "2026-05-02T00:00:00Z",
+  "run_id": "run-001",
+  "agent": "researcher",
+  "skill": "research-evaluator",
+  "provider": "openai",
+  "model": "gpt-5.5",
+  "input_tokens": 12000,
+  "cached_input_tokens": 0,
+  "output_tokens": 1800,
+  "cost_usd": 0.42,
+  "cost_status": "estimated",
+  "cost_source": "manual"
+}
+```
+
+reference intake cache는 같은 레퍼런스를 반복 분석할 때 토큰과 시간을 아끼기 위한 append-only 캐시입니다. preview 분석은 이 파일을 쓰지 않고, `reference-intake.py --cache` 또는 후보 카드 `--write` 때만 갱신합니다.
+
+```json
+{
+  "ts": "2026-05-02T00:00:00Z",
+  "local_path": "/abs/path/to/reference",
+  "source_hash": "sha256...",
+  "analysis": {
+    "name": "reference",
+    "checked_revision": "abc123",
+    "license": "MIT",
+    "reusable_units": ["scripts", "docs"]
+  }
+}
+```
+
+reference task queue는 긴 reference 분석을 중단/재개할 수 있게 하는 append-only 장부입니다. 자동 실행 scheduler가 아니라 작업 상태 기록입니다.
+
+```json
+{
+  "ts": "2026-05-02T00:00:00Z",
+  "action": "add",
+  "id": "ref-task-20260502T000000-abcd1234",
+  "target": "runtime/external-repos/local/example",
+  "goal": "local reference analysis",
+  "candidate_card": "",
+  "proposal": ""
+}
+```
+
+session recall은 `runtime/session-recall.sqlite`에 생성되는 재생성 가능한 검색 캐시입니다. 원본은 항상 JSONL과 `state/decisions.md`이며, 캐시가 사라지면 `python3 scripts/session-recall.py index`로 다시 만듭니다.
+
+`runtime/session-snapshot.json`은 사람이 읽는 `runtime/state/session-handoff.md`를 대체하지 않습니다. 다음 세션과 검증기가 빠르게 읽는 machine-readable 현재 상태입니다.
 
 ## 결과는 무엇인가
 
@@ -77,6 +194,8 @@
 | blocked_by_policy | 정책이나 권한 때문에 진행하지 못했습니다. |
 
 인프라 오류와 정책 차단은 기록에는 남기지만 품질 점수에서는 제외합니다.
+
+`runtime/checkpoints.jsonl`은 긴 작업 중간 상태를 저장하는 append-only ledger입니다. checkpoint는 재개 위치와 검증 상태를 남기지만, 작업 완료 증거는 반드시 `runtime/completion-evidence.jsonl`에 별도로 기록합니다.
 
 프로젝트 도메인이 추가 outcome을 필요로 하면(예: CTF의 "crashed_with_info_leak", 데이터 파이프라인의 "schema_drift") `docs/PROJECT_OPERATING_PLAN.md`의 `outcome_classification`에서 확장합니다. 표준 5개는 모든 프로젝트에 공통으로 남는 품질 메트릭 집계용 기본 분모이므로 유지하되, 프로젝트 전용 outcome은 그 위에 추가합니다.
 
@@ -135,6 +254,12 @@
 
 - 활동 로그: `runtime/activity-log.jsonl`
 - 에이전트 실행 로그: `runtime/agent-runs.jsonl`
+- 설치 상태 로그: `runtime/install-state.jsonl`
+- skill 사용 로그: `runtime/skill-usage.jsonl`
+- skill 생명주기 로그: `runtime/skill-lifecycle.jsonl`
+- reference intake cache: `runtime/reference-intake-cache.jsonl`
+- 비용 로그: `state/cost-log.jsonl`
+- 세션 스냅샷: `runtime/session-snapshot.json`
 - 도구 사용 로그 스크립트: `scripts/hooks/post-tool-use-log.py`
 - 활동 로그 검색: `scripts/search-activity-log.py`
 - 운영 루프: `docs/OPERATING_LOOP.md`

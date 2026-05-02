@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +30,7 @@ except (AttributeError, OSError):
 SKIP_DIRS = {
     ".git",
     ".codex",
+    ".claude",
     "__pycache__",
     ".pytest_cache",
     ".mypy_cache",
@@ -39,7 +42,6 @@ SKIP_DIRS = {
     ".env",
     "dist",
     "build",
-    "_meta",
 }
 
 # Individual files skipped by their path relative to the skeleton root.
@@ -47,7 +49,13 @@ SKIP_DIRS = {
 SKIP_FILES = {
     "runtime/activity-log.jsonl",
     "runtime/agent-runs.jsonl",
+    "runtime/install-state.jsonl",
+    "runtime/skill-usage.jsonl",
+    "runtime/skill-lifecycle.jsonl",
+    "runtime/session-snapshot.json",
     "runtime/review-queue.jsonl",
+    "runtime/reference-tasks.jsonl",
+    "runtime/checkpoints.jsonl",
     "runtime/state/session-handoff.md",
     "knowledge/index.md",
     "knowledge/log.md",
@@ -73,7 +81,6 @@ SKIP_NAME_CONTAINS = (
     "-smoke-",
 )
 PRESERVE_IN_EXTERNAL_REPOS = {"README.md", ".gitkeep"}
-
 # Directories copied as empty shells (preserve structure, drop accumulated content).
 # README.md and .gitkeep inside these are preserved.
 EMPTY_EXCEPT_DOCS = {
@@ -96,6 +103,29 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _inline_list(value: str) -> list[str]:
+    return [item.strip().strip('"').strip("'") for item in value.split(",") if item.strip()]
+
+
+def load_install_profiles(root: Path) -> tuple[str, dict[str, list[str]]]:
+    path = root / "config" / "install-profiles.yaml"
+    text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+    default_match = re.search(r"^default_profile:\s*([^\n#]+)", text, re.MULTILINE)
+    default = default_match.group(1).strip().strip('"').strip("'") if default_match else "full-canonical"
+    profiles: dict[str, list[str]] = {}
+    profile_block = re.search(r"^profiles:\s*$", text, re.MULTILINE)
+    if profile_block:
+        tail = text[profile_block.end() :]
+        for match in re.finditer(r"^\s{2}([A-Za-z0-9_-]+):\s*\n(.*?)(?=^\s{2}[A-Za-z0-9_-]+:\s*$|\Z)", tail, re.MULTILINE | re.DOTALL):
+            components_match = re.search(r"components:\s*\[([^\]]*)\]", match.group(2))
+            profiles[match.group(1)] = _inline_list(components_match.group(1)) if components_match else []
+    if not profiles:
+        profiles = {"full-canonical": ["core", "validation", "runtime", "reference", "wiki", "skills", "agents", "docs", "bootstrap"]}
+    if default not in profiles:
+        default = "full-canonical" if "full-canonical" in profiles else sorted(profiles)[0]
+    return default, profiles
+
+
 def is_relative_to(path: Path, parent: Path) -> bool:
     # Python 3.9+ has Path.is_relative_to. We keep this wrapper because the
     # rest of this script treats "inside target" as a boolean check rather
@@ -114,6 +144,8 @@ def should_skip(path: Path, source: Path, target: Path) -> bool:
             Path(rel).parent.as_posix() == "runtime/external-repos"
             and path.name in PRESERVE_IN_EXTERNAL_REPOS
         )
+    if rel == "docs/_meta" or rel.startswith("docs/_meta/"):
+        return True
     if path.name in SKIP_DIRS:
         return True
     if path.name in SKIP_FILE_NAMES:
@@ -314,7 +346,7 @@ def seed_project_profile(
     )
     output = target / "docs" / "PROJECT_PROFILE.md"
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(header + schema_body + "\n", encoding="utf-8", newline="\n")
+    output.write_text(header + schema_body + "\n", encoding="utf-8")
 
 
 def seed_knowledge(target: Path, name: str) -> None:
@@ -343,7 +375,7 @@ def seed_knowledge(target: Path, name: str) -> None:
         "- 본문에 긴 참고자료를 붙여넣지 않습니다.\n"
         "- 상세 출처는 링크로만 연결합니다.\n"
     )
-    (knowledge / "index.md").write_text(index_body, encoding="utf-8", newline="\n")
+    (knowledge / "index.md").write_text(index_body, encoding="utf-8")
 
     log_body = (
         "# 지식 로그\n\n"
@@ -355,25 +387,21 @@ def seed_knowledge(target: Path, name: str) -> None:
         "- 기존 항목은 삭제하지 않고 정정 메모를 덧붙입니다.\n"
         "- 가능하면 근거 링크나 runtime 로그 참조를 함께 남깁니다.\n"
     )
-    (knowledge / "log.md").write_text(log_body, encoding="utf-8", newline="\n")
+    (knowledge / "log.md").write_text(log_body, encoding="utf-8")
 
     registry_body = (
         "# 프로젝트 레지스트리\n\n"
         "이 프로젝트의 재사용 가능한 결과와 회수 기록을 추적합니다.\n"
         "각 항목은 프로젝트 이름, 결과, 교훈, 참조 위치를 포함합니다.\n"
     )
-    (knowledge / "project-registry.md").write_text(
-        registry_body, encoding="utf-8", newline="\n"
-    )
+    (knowledge / "project-registry.md").write_text(registry_body, encoding="utf-8")
 
     # lint-report.md는 scripts/wiki-lint.py가 재생성합니다.
     lint_placeholder = (
         "# 지식 위키 린트 리포트\n\n"
         "`python scripts/wiki-lint.py --write-report`를 실행하면 이 파일이 채워집니다.\n"
     )
-    (knowledge / "lint-report.md").write_text(
-        lint_placeholder, encoding="utf-8", newline="\n"
-    )
+    (knowledge / "lint-report.md").write_text(lint_placeholder, encoding="utf-8")
 
 
 def seed_claude_settings(target: Path) -> None:
@@ -384,7 +412,67 @@ def seed_claude_settings(target: Path) -> None:
     dst.write_text(
         '{\n  "permissions": {\n    "allow": []\n  }\n}\n',
         encoding="utf-8",
-        newline="\n",
+    )
+
+
+def seed_claude_entrypoint(target: Path) -> None:
+    """Create Claude's entrypoint from AGENTS.md after generated artifacts are
+    stripped from the copied tree."""
+    dst = target / "CLAUDE.md"
+    if dst.exists() or dst.is_symlink():
+        dst.unlink()
+    try:
+        dst.symlink_to("AGENTS.md")
+    except OSError:
+        shutil.copy2(target / "AGENTS.md", dst)
+
+
+def seed_canonical_state(target: Path, name: str, domain: str, stack: str) -> None:
+    """Initialize the canonical state/plan layer for a fresh project."""
+    state = target / "state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / "progress.md").write_text(
+        "# Progress\n\n"
+        "## 현재 마일스톤\n"
+        "프로젝트 부트스트랩 완료 후 첫 plan 준비\n\n"
+        "## 완료된 작업\n"
+        "- 골격 부트스트랩\n\n"
+        "## 다음 작업\n"
+        "- 프로젝트 목표와 성공 기준 확정\n"
+        "- 외부 레퍼런스 후보 검토 여부 결정\n",
+        encoding="utf-8",
+    )
+    (state / "decisions.md").write_text(
+        "# Decisions (append-only)\n\n"
+        "> 형식: `## YYYY-MM-DD HH:MM — <결정 요약>` 다음 줄에 근거.\n"
+        "> 절대 이전 결정을 수정/삭제하지 말 것. 번복은 새 항목으로 추가.\n\n"
+        f"## {utc_now()} — 골격 부트스트랩\n"
+        "- 사용 골격: AI_architecture canonical layer\n"
+        "- 모드: codex-primary (v1)\n"
+        f"- 프로젝트: {name}\n"
+        f"- 도메인: {domain}\n"
+        f"- 스택: {stack}\n",
+        encoding="utf-8",
+    )
+    (state / "blockers.md").write_text("# Blockers\n\n(현재 없음)\n", encoding="utf-8")
+    (state / "failures.jsonl").touch()
+    (state / "cost-log.jsonl").touch()
+
+    plans = target / "plans"
+    for rel in ("active", "done", "failed"):
+        directory = plans / rel
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / ".gitkeep").touch()
+    (plans / "INDEX.md").write_text(
+        "# Plans Index\n\n"
+        "| seq | slug | status | created | replan | depends_on | parent | children |\n"
+        "|-----|------|--------|---------|--------|------------|--------|----------|\n"
+        "| (비어있음 — project-scaffolder 실행 후 첫 plan 등록) |\n\n"
+        "## 라이프사이클\n"
+        "- active/  : 진행 중\n"
+        "- done/    : 완료\n"
+        "- failed/  : 3회 재계획 실패 (회생 가능성 검토 대상)\n",
+        encoding="utf-8",
     )
 
 
@@ -420,7 +508,7 @@ def seed_session_handoff(target: Path, _source: Path) -> None:
         "있으면 1-2문장으로 요약한 뒤 \"Next step\" 1번을 다음 행동으로 제안한다.\n"
         "파일을 수정하기 전에는 사용자 의도와 현재 상태가 맞는지 먼저 확인한다.\n"
     )
-    dst.write_text(blank, encoding="utf-8", newline="\n")
+    dst.write_text(blank, encoding="utf-8")
 
 
 def append_initial_log(target: Path, name: str, domain: str, stack: str) -> None:
@@ -453,7 +541,56 @@ def append_initial_log(target: Path, name: str, domain: str, stack: str) -> None
             json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
         )
     (runtime / "agent-runs.jsonl").touch(exist_ok=True)
+    (runtime / "install-state.jsonl").touch(exist_ok=True)
+    (runtime / "skill-usage.jsonl").touch(exist_ok=True)
+    (runtime / "skill-lifecycle.jsonl").touch(exist_ok=True)
     (runtime / "review-queue.jsonl").touch(exist_ok=True)
+    (runtime / "reference-tasks.jsonl").touch(exist_ok=True)
+    (runtime / "checkpoints.jsonl").touch(exist_ok=True)
+
+
+def run_project_script(target: Path, rel_script: str, args: list[str]) -> None:
+    script = target / rel_script
+    if not script.exists():
+        raise SystemExit(f"new-project failed: missing seeded script {rel_script}")
+    result = subprocess.run(
+        [sys.executable, str(script), "--root", str(target), *args],
+        cwd=str(target),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=60,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise SystemExit(f"new-project failed while running {rel_script}: {detail}")
+
+
+def record_bootstrap_install_state(target: Path, profile: str) -> None:
+    _, profiles = load_install_profiles(target)
+    components = profiles.get(profile) or profiles.get("full-canonical") or []
+    run_project_script(
+        target,
+        "scripts/install-state.py",
+        [
+            "add",
+            "--event",
+            "bootstrap_created",
+            "--requested-profile",
+            profile,
+            "--validation-status",
+            "unverified",
+            *[arg for component in components for arg in ("--selected-component", component)],
+        ],
+    )
+
+
+def build_generated_artifacts(target: Path) -> None:
+    run_project_script(target, "scripts/convert.py", [])
+
+
+def write_initial_session_snapshot(target: Path) -> None:
+    run_project_script(target, "scripts/session-snapshot.py", ["write"])
 
 
 NAME_MAX_LEN = 200
@@ -500,12 +637,15 @@ def _validate_field(label: str, value: str) -> None:
 
 
 def main() -> int:
+    source = repo_root()
+    default_profile, install_profiles = load_install_profiles(source)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--name", required=True)
     parser.add_argument("--target", required=True)
     parser.add_argument("--domain", default="general")
     parser.add_argument("--stack", default="unspecified")
     parser.add_argument("--owner", default="project owner")
+    parser.add_argument("--profile", choices=sorted(install_profiles), default=default_profile)
     parser.add_argument(
         "--force",
         action="store_true",
@@ -521,7 +661,6 @@ def main() -> int:
     ):
         _validate_field(label, value)
 
-    source = repo_root()
     # Reject the Windows "\\?\" long-path prefix up front. Path.resolve() on
     # such inputs returns a malformed drive-relative string like "C:Users\..."
     # which Python then anchors against the current working directory. In this
@@ -570,7 +709,11 @@ def main() -> int:
             target / "knowledge" / "project-registry.md",
             target / "knowledge" / "lint-report.md",
             target / "runtime" / "state" / "session-handoff.md",
+            target / "runtime" / "session-snapshot.json",
             target / ".claude" / "settings.local.json",
+            target / "state" / "progress.md",
+            target / "state" / "decisions.md",
+            target / "plans" / "INDEX.md",
         ]
         collisions = [p for p in seeded_paths if p.is_file()]
         if collisions:
@@ -592,9 +735,14 @@ def main() -> int:
         empty_accumulated_dirs(target)
         seed_project_profile(target, source, args.name, args.domain, args.stack, args.owner)
         seed_knowledge(target, args.name)
+        seed_canonical_state(target, args.name, args.domain, args.stack)
         seed_session_handoff(target, source)
+        seed_claude_entrypoint(target)
         seed_claude_settings(target)
         append_initial_log(target, args.name, args.domain, args.stack)
+        record_bootstrap_install_state(target, args.profile)
+        build_generated_artifacts(target)
+        write_initial_session_snapshot(target)
     except FileNotFoundError as exc:
         bad = exc.filename or target
         raise SystemExit(
@@ -615,6 +763,7 @@ def main() -> int:
             f"Check --target ({target}) and its parent."
         )
     print(f"created {args.name} at {target}")
+    print(f"profile: {args.profile}")
     print("")
     print("next steps:")
     print(f"  1. cd {target}")

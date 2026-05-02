@@ -24,6 +24,10 @@
 
 이 제안은 LangGraph 후보 카드에서 확인한 durable execution 개념을 사용해 **외부 후보 카드 -> dry-run 제안** 변환 절차를 보여주는 예시입니다. LangGraph 패키지, 그래프 런타임, LangChain/LangSmith 의존성을 추가하지 않습니다.
 
+Source-backed evidence:
+
+- {"path":"research/reference-candidates/2026-04-27-langgraph.md","kind":"candidate_card","evidence":"Example candidate card anchors this dry-run proposal.","hash_or_line_ref":"candidate-card"}
+
 ## 적용하지 않을 것
 
 - LangGraph 설치 또는 런타임 의존성 추가
