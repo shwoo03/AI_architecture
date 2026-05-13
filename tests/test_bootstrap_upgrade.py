@@ -125,6 +125,46 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_brief_json_is_dry_run_ai_summary(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-brief")
+        try:
+            target = tmp / "proj"
+            target.mkdir(parents=True)
+            (target / "AGENTS.md").write_text("# project custom agent rules\n", encoding="utf-8")
+            before = sorted(path.relative_to(target).as_posix() for path in target.rglob("*"))
+            result = _run(
+                [str(self.SCRIPT), "--target", str(target), "--brief", "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            after = sorted(path.relative_to(target).as_posix() for path in target.rglob("*"))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(before, after)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["dry_run"])
+            brief = payload["brief"]
+            self.assertIn("docs/REFERENCE_REVIEW.template.md", {item["path"] for item in brief["safe_additions"]})
+            self.assertIn("AGENTS.md", {item["path"] for item in brief["risky_reviews"]})
+            self.assertTrue(brief["approval_required"])
+            self.assertIn("not approval", brief["approval_note"])
+            self.assertIn("python3 scripts/quality-gate.py --format json", brief["validation_commands"])
+            self.assertIn("AGENTS.md", brief["manual_merge_order"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_brief_rejects_apply(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-brief-apply")
+        try:
+            target = tmp / "proj"
+            target.mkdir(parents=True)
+            result = _run(
+                [str(self.SCRIPT), "--target", str(target), "--brief", "--apply", "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("dry-run only", result.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_safe_only_apply_copies_missing_templates_without_overwrite(self) -> None:
         tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-safe-apply")
         try:

@@ -27,6 +27,11 @@ SPECIALISTS = {
     "closeout-validator": "Independently inspect verify, quality-gate, and completion evidence.",
 }
 WRITE_POLICIES = {"read_only", "manual_work_required", "write_with_confirmation"}
+WRITE_POLICY_RANK = {
+    "read_only": 0,
+    "manual_work_required": 1,
+    "write_with_confirmation": 2,
+}
 
 
 @dataclass
@@ -35,6 +40,10 @@ class Brief:
     goal: str
     scope: list[str]
     write_policy: str
+    parent_role: str
+    inherited_write_policy: str
+    effective_write_policy: str
+    effective_scope: list[str]
     mission: str
     allowed_files: list[str]
     forbidden_actions: list[str]
@@ -60,6 +69,27 @@ def normalize_scope(root: Path, values: list[str]) -> list[str]:
         if rel not in result:
             result.append(rel)
     return result
+
+
+def is_same_or_under(child: str, parent: str) -> bool:
+    child_path = Path(child)
+    parent_path = Path(parent)
+    return child == parent or parent == "." or child_path == parent_path or parent_path in child_path.parents
+
+
+def intersect_scope(scope: list[str], parent_scope: list[str]) -> list[str]:
+    if not parent_scope:
+        return scope
+    result: list[str] = []
+    for item in scope:
+        if any(is_same_or_under(item, parent) for parent in parent_scope):
+            result.append(item)
+    return result
+
+
+def narrower_policy(*policies: str) -> str:
+    valid = [policy for policy in policies if policy]
+    return min(valid, key=lambda item: WRITE_POLICY_RANK[item]) if valid else "read_only"
 
 
 def parse_inline_list(value: str) -> list[str]:
@@ -137,16 +167,32 @@ def build_brief(root: Path, args: argparse.Namespace) -> Brief:
     if args.role not in known_roles:
         raise ValueError(f"unknown specialist role: {args.role}")
     configured = registry.get(args.role, {})
-    write_policy = args.write_policy or str(configured.get("write_policy") or "read_only")
-    if write_policy not in WRITE_POLICIES:
+    configured_policy = str(configured.get("write_policy") or "read_only")
+    if configured_policy not in WRITE_POLICIES:
+        raise ValueError(f"invalid configured write policy: {configured_policy}")
+    requested_policy = args.write_policy or configured_policy
+    if requested_policy not in WRITE_POLICIES:
         raise ValueError(f"invalid write policy: {args.write_policy}")
+    if WRITE_POLICY_RANK[requested_policy] > WRITE_POLICY_RANK[configured_policy]:
+        raise ValueError(f"requested write policy {requested_policy} broadens specialist policy {configured_policy}")
+    inherited_policy = args.parent_write_policy or requested_policy
+    if inherited_policy not in WRITE_POLICIES:
+        raise ValueError(f"invalid parent write policy: {inherited_policy}")
+    if WRITE_POLICY_RANK[requested_policy] > WRITE_POLICY_RANK[inherited_policy]:
+        raise ValueError(f"requested write policy {requested_policy} broadens parent policy {inherited_policy}")
+    write_policy = narrower_policy(configured_policy, requested_policy, inherited_policy)
     default_scope = configured.get("default_scope") if isinstance(configured.get("default_scope"), list) else []
     scope_values = args.scope or [str(item) for item in default_scope] or ["."]
     scope = normalize_scope(root, scope_values)
+    parent_scope = normalize_scope(root, args.parent_scope) if args.parent_scope else []
+    effective_scope = intersect_scope(scope, parent_scope)
+    if parent_scope and not effective_scope:
+        raise ValueError("effective scope is empty after applying parent scope")
     forbidden = [
         "Do not edit files outside allowed_files.",
         "Do not run dependency install, git push, or destructive filesystem commands.",
         "Do not change public command boundaries; route through scripts/agent-flow.py.",
+        "Do not expand permissions beyond the parent/session brief.",
     ]
     if write_policy == "read_only":
         forbidden.append("Do not modify files; report findings only.")
@@ -157,8 +203,12 @@ def build_brief(root: Path, args: argparse.Namespace) -> Brief:
         goal=args.goal.strip(),
         scope=scope,
         write_policy=write_policy,
+        parent_role=args.parent_role.strip(),
+        inherited_write_policy=inherited_policy,
+        effective_write_policy=write_policy,
+        effective_scope=effective_scope,
         mission=str(configured.get("mission") or SPECIALISTS.get(args.role, "")),
-        allowed_files=scope,
+        allowed_files=effective_scope,
         forbidden_actions=forbidden,
         relevant_rules=["AGENTS.md", "scripts/catalog.yaml", "config/policy.yaml", "rules/common/confirmation-required.md"],
         recommended_checks=[str(item) for item in configured.get("recommended_checks", [])] if isinstance(configured.get("recommended_checks"), list) else recommended_checks(args.role),
@@ -173,6 +223,9 @@ def render_text(brief: Brief) -> str:
         f"Goal: {brief.goal}",
         f"Mission: {brief.mission}",
         f"Write policy: {brief.write_policy}",
+        f"Parent role: {brief.parent_role or '(none)'}",
+        f"Inherited write policy: {brief.inherited_write_policy}",
+        f"Effective write policy: {brief.effective_write_policy}",
         "Allowed files:",
         *[f"- {item}" for item in brief.allowed_files],
         "Forbidden actions:",
@@ -193,6 +246,9 @@ def main() -> int:
     parser.add_argument("--goal", required=True)
     parser.add_argument("--scope", action="append", default=[])
     parser.add_argument("--write-policy", choices=sorted(WRITE_POLICIES), default="")
+    parser.add_argument("--parent-role", default="")
+    parser.add_argument("--parent-write-policy", choices=sorted(WRITE_POLICIES), default="")
+    parser.add_argument("--parent-scope", action="append", default=[])
     parser.add_argument("--format", choices=("text", "json"), default="text")
     args = parser.parse_args()
     root = Path(args.root).resolve() if args.root else repo_root().resolve()

@@ -152,6 +152,7 @@ class ResumeReadinessTests(unittest.TestCase):
         handoff_event_ts: str = "2026-04-30T09:00:00Z",
         evidence_ts: str = "2026-04-30T08:58:00Z",
         evidence_outcome: str = "genuine_success",
+        evidence_disposition: str = "complete",
         include_resume_prompt: bool = True,
     ) -> Path:
         tmp = REPO_ROOT / "runtime" / f"resume-readiness-{uuid.uuid4().hex}"
@@ -201,6 +202,7 @@ class ResumeReadinessTests(unittest.TestCase):
             "changed_paths": ["docs/example.md"],
             "validations": [{"name": "verify", "status": "OK"}],
             "outcome": evidence_outcome,
+            "disposition": evidence_disposition,
         }
         (tmp / "runtime" / "completion-evidence.jsonl").write_text(
             json.dumps(evidence, separators=(",", ":")) + "\n",
@@ -218,6 +220,58 @@ class ResumeReadinessTests(unittest.TestCase):
             self.assertEqual(payload["summary"]["WARN"], 0)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_progress_placeholder_warns_until_progress_is_updated(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"resume-progress-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime" / "state").mkdir(parents=True)
+            (tmp / "state").mkdir()
+            handoff = "\n".join(
+                [
+                    "# Session Handoff",
+                    "## Last Updated",
+                    "2026-05-13T00:00:00Z",
+                    "## Current Task",
+                    "diagnostics",
+                    "## Last Completed",
+                    "setup",
+                    "## Validation",
+                    "ok",
+                    "## Recommended Next Step",
+                    "continue",
+                    "## Open Questions / Blockers",
+                    "none",
+                    "## Resume Prompt",
+                    "resume",
+                ]
+            )
+            (tmp / "runtime" / "state" / "session-handoff.md").write_text(handoff, encoding="utf-8")
+            (tmp / "runtime" / "activity-log.jsonl").write_text(
+                json.dumps({"ts": "2026-05-13T00:00:00Z", "phase": "session", "action": "handoff_saved"}) + "\n",
+                encoding="utf-8",
+            )
+            (tmp / "runtime" / "completion-evidence.jsonl").write_text(
+                json.dumps({"ts": "2026-05-12T23:59:00Z", "outcome": "genuine_success", "disposition": "complete"}) + "\n",
+                encoding="utf-8",
+            )
+            (tmp / "runtime" / "checkpoints.jsonl").write_text("", encoding="utf-8")
+            (tmp / "state" / "progress.md").write_text(
+                "# Progress\n\n## 현재 마일스톤\n(부트스트랩 완료 후 첫 plan에서 채워짐)\n\n## 다음 작업\n- (project-scaffolder가 채움)\n",
+                encoding="utf-8",
+            )
+            stale = _run([str(self.SCRIPT), "--root", str(tmp), "--strict", "--format", "json"])
+            (tmp / "state" / "progress.md").write_text(
+                "# Progress\n\n## 현재 마일스톤\n운영 진단 개선\n\n## 다음 작업\n- 없음\n",
+                encoding="utf-8",
+            )
+            ready = _run([str(self.SCRIPT), "--root", str(tmp), "--strict", "--format", "json"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertEqual(stale.returncode, 1, stale.stdout + stale.stderr)
+        stale_payload = json.loads(stale.stdout)
+        self.assertIn("progress_placeholder", {item["check"] for item in stale_payload["findings"]})
+        self.assertTrue(stale_payload["latest"]["progress"]["placeholder"])
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
 
     def test_activity_newer_than_handoff_fails_strict(self) -> None:
         tmp = self._make_root(activity_ts="2026-04-30T09:01:00Z")
@@ -239,14 +293,72 @@ class ResumeReadinessTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_checkpoint_newer_than_handoff_fails_strict(self) -> None:
+        tmp = self._make_root()
+        try:
+            (tmp / "runtime" / "checkpoints.jsonl").write_text(
+                json.dumps(
+                    {
+                        "id": "cp-new",
+                        "ts": "2026-04-30T09:01:00Z",
+                        "name": "newer",
+                        "goal": "smoke",
+                        "git_sha": "unknown",
+                        "changed_paths": ["."],
+                        "verify_status": "partial",
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--strict", "--format", "json"])
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            rules = {finding["check"] for finding in payload["findings"]}
+            self.assertIn("checkpoint_newer_than_handoff", rules)
+            self.assertEqual(payload["latest"]["checkpoint"]["latest_id"], "cp-new")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_checkpoint_pending_and_side_effects_warn(self) -> None:
+        tmp = self._make_root()
+        try:
+            (tmp / "runtime" / "checkpoints.jsonl").write_text(
+                json.dumps(
+                    {
+                        "id": "cp-pending",
+                        "ts": "2026-04-30T08:57:00Z",
+                        "name": "pending",
+                        "goal": "smoke",
+                        "git_sha": "unknown",
+                        "changed_paths": ["."],
+                        "verify_status": "partial",
+                        "side_effects": ["activity_log_appended"],
+                        "approval_state": "pending",
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--strict", "--format", "json"])
+            self.assertEqual(result.returncode, 1)
+            rules = {finding["check"] for finding in json.loads(result.stdout)["findings"]}
+            self.assertIn("checkpoint_approval_pending", rules)
+            self.assertIn("checkpoint_resume_from_missing", rules)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_partial_completion_evidence_warns_and_fails_strict(self) -> None:
-        tmp = self._make_root(evidence_outcome="partial_progress")
+        tmp = self._make_root(evidence_outcome="partial_progress", evidence_disposition="partial")
         try:
             result = _run([str(self.SCRIPT), "--root", str(tmp), "--strict", "--format", "json"])
             self.assertEqual(result.returncode, 1)
             payload = json.loads(result.stdout)
             rules = {finding["check"] for finding in payload["findings"]}
             self.assertIn("completion_evidence_not_genuine_success", rules)
+            self.assertIn("completion_evidence_not_complete", rules)
             self.assertEqual(payload["latest"]["completion_evidence"]["latest_outcome"], "partial_progress")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -415,6 +527,31 @@ class CompletionEvidenceTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_partial_disposition_requires_risk_or_next_action(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"completion-evidence-disposition-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            bad = _run([
+                str(self.SCRIPT),
+                "--root",
+                str(tmp),
+                "add",
+                "--goal",
+                "partial closeout",
+                "--changed-path",
+                ".",
+                "--validation",
+                '{"name":"verify","status":"OK"}',
+                "--outcome",
+                "partial_progress",
+                "--disposition",
+                "partial",
+            ])
+            self.assertEqual(bad.returncode, 1)
+            self.assertIn("requires residual_risk or next_action", bad.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_legacy_blocked_failed_outcomes_are_rejected(self) -> None:
         tmp = REPO_ROOT / "runtime" / f"completion-evidence-legacy-{uuid.uuid4().hex}"
         try:
@@ -443,7 +580,31 @@ class TaskCloseoutTests(unittest.TestCase):
 
     SCRIPT = SCRIPTS / "task-closeout.py"
 
+    def test_scripts_and_all_profiles_include_lsp_diagnostics(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("task_closeout_under_test", self.SCRIPT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.path.insert(0, str(SCRIPTS))
+        sys.modules[spec.name] = module
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            sys.path.remove(str(SCRIPTS))
+        scripts_commands = dict(module.profile_commands(REPO_ROOT, "scripts"))
+        all_commands = dict(module.profile_commands(REPO_ROOT, "all"))
+        self.assertIn("lsp-diagnostics", scripts_commands)
+        self.assertIn("lsp-diagnostics", all_commands)
+
     def test_docs_profile_runs_read_only_checks(self) -> None:
+        tracked_runtime = [
+            REPO_ROOT / "runtime" / "activity-log.jsonl",
+            REPO_ROOT / "runtime" / "completion-evidence.jsonl",
+            REPO_ROOT / "runtime" / "session-snapshot.json",
+        ]
+        before = {path: path.read_bytes() if path.exists() else None for path in tracked_runtime}
         result = _run(
             [
                 str(self.SCRIPT),
@@ -466,6 +627,8 @@ class TaskCloseoutTests(unittest.TestCase):
         self.assertIn("verify-skeleton", names)
         self.assertIn("agent-autonomy-check", names)
         self.assertFalse(payload["recorded"])
+        after = {path: path.read_bytes() if path.exists() else None for path in tracked_runtime}
+        self.assertEqual(before, after)
 
     def test_record_writes_completion_evidence_in_target_root(self) -> None:
         tmp = REPO_ROOT / "runtime" / f"task-closeout-{uuid.uuid4().hex}"
@@ -494,6 +657,8 @@ class TaskCloseoutTests(unittest.TestCase):
                     "--changed-path",
                     "docs/example.md",
                     "--record",
+                    "--disposition",
+                    "complete",
                     "--format",
                     "json",
                 ]
@@ -501,7 +666,79 @@ class TaskCloseoutTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertTrue(payload["recorded"])
+            self.assertEqual(payload["disposition"], "complete")
             self.assertTrue((tmp / "runtime" / "completion-evidence.jsonl").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_record_refreshes_codemaps_and_cleans_pycache(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"task-closeout-maintenance-{uuid.uuid4().hex}"
+        try:
+            (tmp / "scripts").mkdir(parents=True)
+            (tmp / "docs" / "CODEMAPS").mkdir(parents=True)
+            (tmp / "scripts" / "__pycache__").mkdir()
+            (tmp / "scripts" / "__pycache__" / "x.pyc").write_bytes(b"cache")
+            (tmp / "scripts" / "verify-skeleton.py").write_text("print('ok')\n", encoding="utf-8")
+            (tmp / "scripts" / "agent-autonomy-check.py").write_text("print('ok')\n", encoding="utf-8")
+            (tmp / "docs" / "CODEMAPS" / "INDEX.md").write_text("# stale\n", encoding="utf-8")
+            shutil.copyfile(SCRIPTS / "completion-evidence.py", tmp / "scripts" / "completion-evidence.py")
+            shutil.copyfile(SCRIPTS / "generate-codemaps.py", tmp / "scripts" / "generate-codemaps.py")
+            shutil.copyfile(SCRIPTS / "cleanup-ephemeral.py", tmp / "scripts" / "cleanup-ephemeral.py")
+
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "--profile",
+                    "docs",
+                    "--goal",
+                    "maintenance closeout",
+                    "--changed-path",
+                    "docs/example.md",
+                    "--record",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            actions = {item["name"]: item for item in payload["maintenance_actions"]}
+            self.assertIn("codemap_refresh", actions)
+            self.assertIn("pycache_cleanup", actions)
+            self.assertTrue((tmp / "docs" / "CODEMAPS" / "INDEX.md").exists())
+            self.assertFalse((tmp / "scripts" / "__pycache__").exists())
+            self.assertTrue(payload["recorded"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_no_record_does_not_run_maintenance_actions(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"task-closeout-no-maintenance-{uuid.uuid4().hex}"
+        try:
+            (tmp / "scripts").mkdir(parents=True)
+            (tmp / "scripts" / "verify-skeleton.py").write_text("print('ok')\n", encoding="utf-8")
+            (tmp / "scripts" / "agent-autonomy-check.py").write_text("print('ok')\n", encoding="utf-8")
+            shutil.copyfile(SCRIPTS / "generate-codemaps.py", tmp / "scripts" / "generate-codemaps.py")
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "--profile",
+                    "docs",
+                    "--goal",
+                    "no maintenance closeout",
+                    "--changed-path",
+                    "docs/example.md",
+                    "--no-record",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["maintenance_actions"], [])
+            self.assertFalse((tmp / "docs" / "CODEMAPS" / "INDEX.md").exists())
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -899,6 +1136,61 @@ class CheckpointTests(unittest.TestCase):
             listing = _run([str(self.SCRIPT), "--root", str(tmp), "list", "--format", "json"])
             self.assertEqual(len(json.loads(listing.stdout)), 1)
             check = _run([str(self.SCRIPT), "--root", str(tmp), "check"])
+            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_create_with_resume_safe_fields_and_legacy_check(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"checkpoint-fields-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            create = _run([
+                str(self.SCRIPT),
+                "--root",
+                str(tmp),
+                "create",
+                "--name",
+                "safe boundary",
+                "--goal",
+                "smoke",
+                "--changed-path",
+                ".",
+                "--verify-status",
+                "partial",
+                "--resume-from",
+                "continue after validation",
+                "--safe-point",
+                "files patched",
+                "--side-effect",
+                "activity_log_appended",
+                "--approval-state",
+                "pending",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(create.returncode, 0, create.stdout + create.stderr)
+            record = json.loads(create.stdout)
+            self.assertEqual(record["resume_from"], "continue after validation")
+            self.assertEqual(record["safe_point"], "files patched")
+            self.assertEqual(record["side_effects"], ["activity_log_appended"])
+            self.assertEqual(record["approval_state"], "pending")
+            with (tmp / "runtime" / "checkpoints.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "id": "legacy",
+                            "ts": "2026-05-01T00:00:00Z",
+                            "name": "legacy",
+                            "goal": "smoke",
+                            "git_sha": "unknown",
+                            "changed_paths": ["."],
+                            "verify_status": "passed",
+                        },
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
+            check = _run([str(self.SCRIPT), "--root", str(tmp), "check", "--format", "json"])
             self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

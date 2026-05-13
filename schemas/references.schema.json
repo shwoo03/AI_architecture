@@ -1,0 +1,24 @@
+{
+  "schema_version": "ai-architecture.schema.v1",
+  "name": "references",
+  "type": "object",
+  "required": [
+    "name",
+    "url",
+    "local_path",
+    "last_known_commit",
+    "last_known_commit_date",
+    "why_tracked",
+    "import_targets"
+  ],
+  "properties": {
+    "name": {"type": "string"},
+    "url": {"type": "string"},
+    "local_path": {"type": "string"},
+    "last_known_commit": {"type": "string"},
+    "last_known_commit_date": {"type": "string"},
+    "last_checked": {"type": ["string", "null"]},
+    "why_tracked": {"type": "string"},
+    "import_targets": {"type": "array", "items": {"type": "string"}}
+  }
+}

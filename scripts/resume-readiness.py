@@ -152,6 +152,15 @@ def check_latest_completion_outcome(records: list[dict[str, Any]], findings: lis
     if latest is None:
         return
     outcome = str(latest.get("outcome") or "").strip()
+    disposition = str(latest.get("disposition") or "").strip()
+    if disposition and disposition != "complete":
+        findings.append(
+            Finding(
+                "WARN",
+                "completion_evidence_not_complete",
+                f"latest completion evidence disposition is {disposition}; resume with next_action/residual_risk review",
+            )
+        )
     if outcome and outcome != "genuine_success":
         findings.append(
             Finding(
@@ -160,6 +169,20 @@ def check_latest_completion_outcome(records: list[dict[str, Any]], findings: lis
                 f"latest completion evidence outcome is {outcome}; resume with residual risk review",
             )
         )
+    if disposition == "complete" and outcome != "genuine_success":
+        findings.append(Finding("ERROR", "completion_disposition_conflict", "complete disposition requires genuine_success outcome"))
+
+
+def check_latest_checkpoint(records: list[dict[str, Any]], findings: list[Finding]) -> None:
+    latest = latest_record(records)
+    if latest is None:
+        return
+    approval_state = str(latest.get("approval_state") or "not_required").strip()
+    if approval_state == "pending":
+        findings.append(Finding("WARN", "checkpoint_approval_pending", "latest checkpoint is waiting for user approval"))
+    side_effects = latest.get("side_effects")
+    if isinstance(side_effects, list) and side_effects and not str(latest.get("resume_from") or "").strip():
+        findings.append(Finding("WARN", "checkpoint_resume_from_missing", "latest checkpoint has side_effects but no resume_from"))
 
 
 def compare_not_newer(
@@ -204,20 +227,46 @@ def check_handoff_event_alignment(
     return event_ts
 
 
+def check_progress_state(root: Path, handoff_ts: Optional[datetime], evidence_ts: Optional[datetime], findings: list[Finding]) -> dict[str, object]:
+    path = root / "state" / "progress.md"
+    latest: dict[str, object] = {"path": "state/progress.md", "exists": path.exists(), "mtime": "", "placeholder": False}
+    if not path.exists():
+        return latest
+    text = path.read_text(encoding="utf-8-sig", errors="replace")
+    placeholder = "(부트스트랩 완료 후 첫 plan에서 채워짐)" in text or "(project-scaffolder가 채움)" in text
+    latest["placeholder"] = placeholder
+    try:
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+    except OSError:
+        return latest
+    latest["mtime"] = format_ts(mtime)
+    if placeholder and (handoff_ts is not None or evidence_ts is not None):
+        findings.append(Finding("WARN", "progress_placeholder", "state/progress.md still contains bootstrap placeholders despite runtime handoff/evidence"))
+    if handoff_ts is not None and mtime < handoff_ts:
+        findings.append(Finding("WARN", "progress_older_than_handoff", f"state/progress.md mtime {format_ts(mtime)} is older than handoff {format_ts(handoff_ts)}"))
+    return latest
+
+
 def run_check(root: Path) -> ReadinessResult:
     findings: list[Finding] = []
     handoff_ts, handoff_latest = parse_handoff(root, findings)
     activity_records, activity_findings = read_jsonl(root / "runtime" / "activity-log.jsonl", root, "activity_log")
     evidence_records, evidence_findings = read_jsonl(root / "runtime" / "completion-evidence.jsonl", root, "completion_evidence")
+    checkpoint_records, checkpoint_findings = read_jsonl(root / "runtime" / "checkpoints.jsonl", root, "checkpoint")
     findings.extend(activity_findings)
     findings.extend(evidence_findings)
+    findings.extend(checkpoint_findings)
 
     activity_ts = latest_timestamp(activity_records)
     evidence_ts = latest_timestamp(evidence_records)
+    checkpoint_ts = latest_timestamp(checkpoint_records)
     check_latest_completion_outcome(evidence_records, findings)
+    check_latest_checkpoint(checkpoint_records, findings)
     handoff_event_ts = check_handoff_event_alignment(handoff_ts, activity_records, findings)
     compare_not_newer(handoff_ts, activity_ts, "activity_log", findings)
     compare_not_newer(handoff_ts, evidence_ts, "completion_evidence", findings)
+    compare_not_newer(handoff_ts, checkpoint_ts, "checkpoint", findings)
+    progress_latest = check_progress_state(root, handoff_ts, evidence_ts, findings)
 
     latest = {
         "handoff": handoff_latest,
@@ -227,7 +276,15 @@ def run_check(root: Path) -> ReadinessResult:
             "records": len(evidence_records),
             "latest_ts": format_ts(evidence_ts),
             "latest_outcome": latest_record(evidence_records).get("outcome") if latest_record(evidence_records) else None,
+            "latest_disposition": latest_record(evidence_records).get("disposition") if latest_record(evidence_records) else None,
         },
+        "checkpoint": {
+            "records": len(checkpoint_records),
+            "latest_ts": format_ts(checkpoint_ts),
+            "latest_id": latest_record(checkpoint_records).get("id") if latest_record(checkpoint_records) else None,
+            "latest_approval_state": latest_record(checkpoint_records).get("approval_state") if latest_record(checkpoint_records) else None,
+        },
+        "progress": progress_latest,
     }
     summary = dict(Counter(finding.severity for finding in findings))
     for severity in ("ERROR", "WARN", "INFO"):

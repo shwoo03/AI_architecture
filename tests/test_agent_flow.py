@@ -688,10 +688,49 @@ class AgentFlowTests(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertFalse(payload["recorded"])
             self.assertEqual(payload["skipped_record_reason"], "verify_or_quality_gate_failed")
+            self.assertIn("source-recovery.py", payload["source_recovery_command"])
+            self.assertIn("--failure verify", payload["source_recovery_command"])
+            self.assertIn("--changed-path docs/example.md", payload["source_recovery_command"])
+            self.assertIn("recovery_packet", payload)
+            self.assertFalse(payload["recovery_packet"]["mutates_files"])
+            self.assertEqual(payload["recovery_packet"]["failed_command"]["name"], "verify")
+            self.assertIn("failure_classification", payload["recovery_packet"])
             self.assertFalse((tmp / "called-task-closeout").exists())
             self.assertFalse((tmp / "runtime" / "completion-evidence.jsonl").exists())
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_start_routes_read_only_recommendations_to_research(self) -> None:
+        result = _run([
+            str(self.SCRIPT),
+            "--root",
+            str(REPO_ROOT),
+            "start",
+            "--goal",
+            "다른 기능들 살펴봐줘 추천해줘",
+            "--format",
+            "json",
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["mode"], "research")
+        self.assertEqual(payload["write_policy"], "read_only")
+
+    def test_start_keeps_direct_implementation_as_build(self) -> None:
+        result = _run([
+            str(self.SCRIPT),
+            "--root",
+            str(REPO_ROOT),
+            "start",
+            "--goal",
+            "바로 통합할 것 5개 구현",
+            "--format",
+            "json",
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["mode"], "build")
+        self.assertEqual(payload["write_policy"], "manual_work_required")
 
     def test_closeout_invokes_quality_gate_strict(self) -> None:
         tmp = self._tmp_root("closeout-strict")
@@ -700,7 +739,7 @@ class AgentFlowTests(unittest.TestCase):
             scripts.mkdir()
             (scripts / "verify.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
             (scripts / "quality-gate.py").write_text(
-                "from pathlib import Path\nimport sys\nPath('strict-seen').write_text(str('--strict' in sys.argv), encoding='utf-8')\nprint('{\"checks\": []}')\nsys.exit(0)\n",
+                "from pathlib import Path\nimport sys\nPath('strict-seen').write_text(str('--strict' in sys.argv), encoding='utf-8')\nPath('explain-seen').write_text(str('--explain' in sys.argv), encoding='utf-8')\nprint('{\"checks\": []}')\nsys.exit(0)\n",
                 encoding="utf-8",
             )
             (scripts / "task-closeout.py").write_text("import sys\nprint('{\"recorded\": true}')\nsys.exit(0)\n", encoding="utf-8")
@@ -720,6 +759,98 @@ class AgentFlowTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual((tmp / "strict-seen").read_text(encoding="utf-8"), "True")
+            self.assertEqual((tmp / "explain-seen").read_text(encoding="utf-8"), "True")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_closeout_quality_gate_failure_includes_explanations(self) -> None:
+        tmp = self._tmp_root("closeout-explain")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "verify.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+            (scripts / "quality-gate.py").write_text(
+                "import json, sys\n"
+                "print(json.dumps({'checks': [], 'explanations': [{'name': 'codemap-freshness', 'classification': 'stale_docs', 'mutates_files': True, 'requires_confirmation': True, 'write_policy': 'write_with_confirmation', 'read_only_alternative': 'python3 scripts/generate-codemaps.py'}]}))\n"
+                "sys.exit(1)\n",
+                encoding="utf-8",
+            )
+            (scripts / "task-closeout.py").write_text("from pathlib import Path\nPath('called-task-closeout').write_text('called', encoding='utf-8')\n", encoding="utf-8")
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "closeout",
+                    "--goal",
+                    "quality gate failure",
+                    "--changed-path",
+                    "docs/example.md",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["recorded"])
+            self.assertEqual(payload["quality_gate_explanations"][0]["classification"], "stale_docs")
+            self.assertTrue(payload["quality_gate_explanations"][0]["mutates_files"])
+            self.assertFalse((tmp / "called-task-closeout").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_start_build_intake_includes_plan_command(self) -> None:
+        tmp = self._tmp_root("plan-intake")
+        try:
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "start", "--goal", "새 기능 구현", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertIn("agent-flow.py plan", payload["build_intake"]["plan_command"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_plan_command_creates_structured_active_plan(self) -> None:
+        tmp = self._tmp_root("plan-create")
+        try:
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "plan", "--goal", "새 기능 구현", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            plan = tmp / payload["path"]
+            text = plan.read_text(encoding="utf-8")
+            self.assertIn("## Definition of Done", text)
+            self.assertIn("python3 scripts/agent-flow.py closeout", text)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_closeout_can_compare_quality_gate_baseline(self) -> None:
+        tmp = self._tmp_root("closeout-diff")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (tmp / "runtime").mkdir()
+            baseline = tmp / "runtime" / "baseline.json"
+            baseline.write_text('{"checks": []}', encoding="utf-8")
+            (scripts / "verify.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+            (scripts / "quality-gate.py").write_text("import sys\nprint('{\"checks\": []}')\nsys.exit(0)\n", encoding="utf-8")
+            (scripts / "diff-quality-gate.py").write_text("import sys\nprint('{\"introduced\": []}')\nsys.exit(0)\n", encoding="utf-8")
+            (scripts / "task-closeout.py").write_text("import sys\nprint('{\"recorded\": true}')\nsys.exit(0)\n", encoding="utf-8")
+            result = _run([
+                str(self.SCRIPT),
+                "--root",
+                str(tmp),
+                "closeout",
+                "--goal",
+                "diff closeout",
+                "--changed-path",
+                "docs/example.md",
+                "--quality-baseline",
+                str(baseline),
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            names = [item["name"] for item in json.loads(result.stdout)["commands"]]
+            self.assertIn("diff-quality-gate", names)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

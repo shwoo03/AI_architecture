@@ -1,16 +1,67 @@
 # Codemap: other
 
-- `files`: 39
-- `line_count`: 1378
-- `directories`: 22
+- `files`: 108
+- `line_count`: 14149
+- `directories`: 61
 
 ## Navigation Entry Points
 
+- `.agents/skills/brainstorming/SKILL.md`
+- `.agents/skills/code-review-expert/SKILL.md`
+- `.agents/skills/codex-skill-creator/SKILL.md`
+- `.agents/skills/find-skills/SKILL.md`
+- `.agents/skills/frontend-design/SKILL.md`
+- `.agents/skills/mcp-builder/SKILL.md`
+- `.agents/skills/notion-dedup/SKILL.md`
+- `.agents/skills/search-first/SKILL.md`
+- `.agents/skills/security-review/SKILL.md`
+- `.agents/skills/tdd-workflow/SKILL.md`
+- `.agents/skills/verification-loop/SKILL.md`
+- `.agents/skills/web-design-guidelines/SKILL.md`
+- `.agents/skills/writing-skills/SKILL.md`
 - `codex/skills/_template/SKILL.md`
 
 ## Directories
 
 - `.agents/plugins`
+- `.agents/skills/brainstorming`
+- `.agents/skills/brainstorming/goldens`
+- `.agents/skills/brainstorming/scripts`
+- `.agents/skills/code-review-expert`
+- `.agents/skills/code-review-expert/agents`
+- `.agents/skills/code-review-expert/goldens`
+- `.agents/skills/code-review-expert/references`
+- `.agents/skills/codex-skill-creator`
+- `.agents/skills/codex-skill-creator/agents`
+- `.agents/skills/codex-skill-creator/eval-viewer`
+- `.agents/skills/codex-skill-creator/goldens`
+- `.agents/skills/codex-skill-creator/references`
+- `.agents/skills/codex-skill-creator/scripts`
+- `.agents/skills/find-skills`
+- `.agents/skills/find-skills/goldens`
+- `.agents/skills/frontend-design`
+- `.agents/skills/frontend-design/goldens`
+- `.agents/skills/mcp-builder`
+- `.agents/skills/mcp-builder/goldens`
+- `.agents/skills/mcp-builder/reference`
+- `.agents/skills/mcp-builder/scripts`
+- `.agents/skills/notion-dedup`
+- `.agents/skills/notion-dedup/goldens`
+- `.agents/skills/search-first`
+- `.agents/skills/search-first/goldens`
+- `.agents/skills/security-review`
+- `.agents/skills/security-review/goldens`
+- `.agents/skills/tdd-workflow`
+- `.agents/skills/tdd-workflow/goldens`
+- `.agents/skills/verification-loop`
+- `.agents/skills/verification-loop/data`
+- `.agents/skills/verification-loop/data/examples`
+- `.agents/skills/verification-loop/goldens`
+- `.agents/skills/web-design-guidelines`
+- `.agents/skills/web-design-guidelines/goldens`
+- `.agents/skills/writing-skills`
+- `.agents/skills/writing-skills/examples`
+- `.agents/skills/writing-skills/goldens`
 - `.claude-plugin`
 - `.codex-plugin`
 - `.github/workflow-templates`
@@ -31,11 +82,78 @@
 - `examples/web-app`
 - `knowledge`
 - `plans`
+- `plans/active`
 - `schemas`
 
 ## Files
 
 - `.agents/plugins/marketplace.json`
+- `.agents/skills/brainstorming/SKILL.md`
+- `.agents/skills/brainstorming/goldens/case-001.yaml`
+- `.agents/skills/brainstorming/scripts/start-server.sh`
+- `.agents/skills/brainstorming/scripts/stop-server.sh`
+- `.agents/skills/brainstorming/spec-document-reviewer-prompt.md`
+- `.agents/skills/brainstorming/visual-companion.md`
+- `.agents/skills/code-review-expert/README.md`
+- `.agents/skills/code-review-expert/SKILL.md`
+- `.agents/skills/code-review-expert/agents/agent.yaml`
+- `.agents/skills/code-review-expert/goldens/case-001.yaml`
+- `.agents/skills/code-review-expert/references/code-quality-checklist.md`
+- `.agents/skills/code-review-expert/references/removal-plan.md`
+- `.agents/skills/code-review-expert/references/security-checklist.md`
+- `.agents/skills/code-review-expert/references/solid-checklist.md`
+- `.agents/skills/codex-skill-creator/LICENSE.txt`
+- `.agents/skills/codex-skill-creator/SKILL.md`
+- `.agents/skills/codex-skill-creator/agents/analyzer.md`
+- `.agents/skills/codex-skill-creator/agents/comparator.md`
+- `.agents/skills/codex-skill-creator/agents/grader.md`
+- `.agents/skills/codex-skill-creator/eval-viewer/generate_review.py`
+- `.agents/skills/codex-skill-creator/goldens/case-001.yaml`
+- `.agents/skills/codex-skill-creator/references/schemas.md`
+- `.agents/skills/codex-skill-creator/scripts/__init__.py`
+- `.agents/skills/codex-skill-creator/scripts/aggregate_benchmark.py`
+- `.agents/skills/codex-skill-creator/scripts/generate_report.py`
+- `.agents/skills/codex-skill-creator/scripts/improve_description.py`
+- `.agents/skills/codex-skill-creator/scripts/package_skill.py`
+- `.agents/skills/codex-skill-creator/scripts/quick_validate.py`
+- `.agents/skills/codex-skill-creator/scripts/run_eval.py`
+- `.agents/skills/codex-skill-creator/scripts/run_loop.py`
+- `.agents/skills/codex-skill-creator/scripts/utils.py`
+- `.agents/skills/find-skills/SKILL.md`
+- `.agents/skills/find-skills/goldens/case-001.yaml`
+- `.agents/skills/frontend-design/LICENSE.txt`
+- `.agents/skills/frontend-design/SKILL.md`
+- `.agents/skills/frontend-design/goldens/case-001.yaml`
+- `.agents/skills/mcp-builder/LICENSE.txt`
+- `.agents/skills/mcp-builder/SKILL.md`
+- `.agents/skills/mcp-builder/goldens/case-001.yaml`
+- `.agents/skills/mcp-builder/reference/evaluation.md`
+- `.agents/skills/mcp-builder/reference/mcp_best_practices.md`
+- `.agents/skills/mcp-builder/reference/node_mcp_server.md`
+- `.agents/skills/mcp-builder/reference/python_mcp_server.md`
+- `.agents/skills/mcp-builder/scripts/connections.py`
+- `.agents/skills/mcp-builder/scripts/evaluation.py`
+- `.agents/skills/mcp-builder/scripts/requirements.txt`
+- `.agents/skills/notion-dedup/SKILL.md`
+- `.agents/skills/notion-dedup/goldens/case-001.yaml`
+- `.agents/skills/search-first/SKILL.md`
+- `.agents/skills/search-first/goldens/case-001.yaml`
+- `.agents/skills/security-review/SKILL.md`
+- `.agents/skills/security-review/goldens/case-001.yaml`
+- `.agents/skills/tdd-workflow/SKILL.md`
+- `.agents/skills/tdd-workflow/goldens/case-001.yaml`
+- `.agents/skills/verification-loop/SKILL.md`
+- `.agents/skills/verification-loop/data/checklist.md`
+- `.agents/skills/verification-loop/data/examples/verification-report.md`
+- `.agents/skills/verification-loop/goldens/case-001.yaml`
+- `.agents/skills/web-design-guidelines/SKILL.md`
+- `.agents/skills/web-design-guidelines/goldens/case-001.yaml`
+- `.agents/skills/writing-skills/SKILL.md`
+- `.agents/skills/writing-skills/anthropic-best-practices.md`
+- `.agents/skills/writing-skills/examples/CLAUDE_MD_TESTING.md`
+- `.agents/skills/writing-skills/goldens/case-001.yaml`
+- `.agents/skills/writing-skills/persuasion-principles.md`
+- `.agents/skills/writing-skills/testing-skills-with-subagents.md`
 - `.claude-plugin/plugin.json`
 - `.codex-plugin/plugin.json`
 - `.github/workflow-templates/README.md`
@@ -69,8 +187,11 @@
 - `knowledge/log.md`
 - `knowledge/project-registry.md`
 - `plans/INDEX.md`
+- `plans/active/_template.md`
 - `schemas/catalog.schema.json`
+- `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`
 - `schemas/plugin-manifest.schema.json`
+- `schemas/references.schema.json`
 - `schemas/runtime-event.schema.json`
 - `schemas/session-snapshot.schema.json`

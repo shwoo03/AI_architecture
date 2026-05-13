@@ -79,6 +79,8 @@ internal:
       used_by: agent-flow research
     - path: scripts/reference-task-queue.py
       used_by: agent-flow research and resumable reference analysis
+    - path: scripts/reference-inventory.py
+      used_by: references.yaml and candidate/proposal inventory checks
     - path: scripts/create-reference-proposal.py
       used_by: agent-flow research
     - path: scripts/validate-reference-candidates.py
@@ -101,6 +103,18 @@ internal:
       used_by: verify and quality-gate
     - path: scripts/verify-parity.py
       used_by: verify
+    - path: scripts/operational-readiness.py
+      used_by: quality-gate harness, reference, and observability readiness checks
+    - path: scripts/diff-quality-gate.py
+      used_by: comparing baseline/current quality-gate results for newly introduced failures
+    - path: scripts/lsp-diagnostics.py
+      used_by: quality-gate and task-closeout optional LSP diagnostics
+    - path: scripts/validate-plans.py
+      used_by: quality-gate structured plan contract validation
+    - path: scripts/reference-wiki.py
+      used_by: quality-gate reference wiki contract validation
+    - path: scripts/safe-write.py
+      used_by: safe local file writes and dry-run boundary checks
     - path: scripts/portability-scan.py
       used_by: quality-gate and skeleton portability checks
     - path: scripts/checkpoint.py
@@ -151,6 +165,10 @@ internal:
   closeout:
     - path: scripts/task-closeout.py
       used_by: agent-flow closeout
+    - path: scripts/source-recovery.py
+      used_by: agent-flow closeout failure hints
+    - path: scripts/cleanup-ephemeral.py
+      used_by: task-closeout final pycache cleanup
     - path: scripts/completion-evidence.py
       used_by: task-closeout
     - path: scripts/resume-readiness.py

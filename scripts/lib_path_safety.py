@@ -8,6 +8,7 @@ from pathlib import Path
 
 WRITE_OPERATIONS = {"write", "delete"}
 GENERATED_ROOTS = {".codex", ".claude"}
+GENERATED_FILES = {".mcp.json", "CLAUDE.md"}
 PROTECTED_BASENAMES = {".env", ".env.local", ".env.production", ".env.development"}
 PROTECTED_SUFFIXES = {".key", ".pem", ".p12", ".pfx"}
 PROTECTED_PARTS = {".ssh", ".aws"}
@@ -57,6 +58,17 @@ def evaluate_path(root: Path, value: str, operation: str) -> PathSafetyResult:
     if not value or not str(value).strip():
         return PathSafetyResult("deny", "missing path", root.as_posix(), value, value, operation)
 
+    raw_path = Path(str(value).strip()).expanduser()
+    if not raw_path.is_absolute() and len(raw_path.parts) == 1 and raw_path.parts[0] in GENERATED_FILES:
+        return PathSafetyResult(
+            "deny",
+            "generated artifact files must be produced through convert/parity flow",
+            root.as_posix(),
+            value,
+            (root / raw_path).resolve(strict=False).as_posix(),
+            operation,
+        )
+
     resolved = _resolve_target(root, value)
     if not _is_under(resolved, root):
         return PathSafetyResult(
@@ -76,6 +88,15 @@ def evaluate_path(root: Path, value: str, operation: str) -> PathSafetyResult:
         return PathSafetyResult(
             "deny",
             "generated artifact paths must be produced through convert/parity flow",
+            root.as_posix(),
+            value,
+            resolved.as_posix(),
+            operation,
+        )
+    if len(parts) == 1 and parts[0] in GENERATED_FILES:
+        return PathSafetyResult(
+            "deny",
+            "generated artifact files must be produced through convert/parity flow",
             root.as_posix(),
             value,
             resolved.as_posix(),

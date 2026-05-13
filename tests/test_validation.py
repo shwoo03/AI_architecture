@@ -44,6 +44,8 @@ class ScriptHelpTests(unittest.TestCase):
         "generate-codemaps.py",
         "agent-autonomy-check.py",
         "completion-evidence.py",
+        "lsp-diagnostics.py",
+        "cleanup-ephemeral.py",
         "resume-readiness.py",
         "skill-surface-check.py",
         "task-closeout.py",
@@ -56,6 +58,7 @@ class ScriptHelpTests(unittest.TestCase):
         "cost-log.py",
         "session-snapshot.py",
         "refresh-references.py",
+        "reference-inventory.py",
         "reference-intake.py",
         "verify.py",
         "portability-scan.py",
@@ -65,6 +68,12 @@ class ScriptHelpTests(unittest.TestCase):
         "change-drift-check.py",
         "redact.py",
         "subdir-hints.py",
+        "operational-readiness.py",
+        "safe-write.py",
+        "diff-quality-gate.py",
+        "validate-plans.py",
+        "reference-wiki.py",
+        "source-recovery.py",
     )
 
     def test_each_main_script_prints_help(self) -> None:
@@ -97,6 +106,7 @@ class VerifySkeletonTests(unittest.TestCase):
 class ScriptCatalogValidationTests(unittest.TestCase):
     def _load_verify_module(self):
         import importlib.util
+        import sys
 
         spec = importlib.util.spec_from_file_location("verify_skeleton_module", SCRIPTS / "verify-skeleton.py")
         self.assertIsNotNone(spec)
@@ -294,7 +304,135 @@ class QualityGateTests(unittest.TestCase):
         self.assertIn("resume-readiness", names)
         self.assertIn("skill-surface", names)
         self.assertIn("codemap-freshness", names)
+        self.assertIn("operational-readiness", names)
+        self.assertIn("validate-plans", names)
+        self.assertIn("reference-wiki", names)
+        self.assertIn("reference-inventory", names)
+        self.assertIn("lsp-diagnostics", names)
         self.assertIn("python-syntax", names)
+        self.assertNotIn("python-unittest", names)
+
+    def test_quality_gate_uses_separate_unittest_timeout(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("quality_gate_under_test", self.SCRIPT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        seen = {}
+
+        def fake_run_command(root, command, timeout):
+            seen["timeout"] = timeout
+            return module.GateCheck("python-unittest", "OK", "mocked", command, 0.0)
+
+        original = module.run_command
+        try:
+            module.run_command = fake_run_command
+            check = module.check_unittest(REPO_ROOT, 240)
+        finally:
+            module.run_command = original
+        self.assertEqual(check.status, "OK")
+        self.assertEqual(seen["timeout"], 240)
+
+    def test_quality_gate_includes_first_json_finding_detail(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("quality_gate_under_test_detail", self.SCRIPT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "runtime") as tmp_name:
+            tmp = Path(tmp_name)
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "fake-findings.py").write_text(
+                "import json\nprint(json.dumps({'findings': [{'check': 'bad_check', 'detail': 'broken detail'}]}))\n",
+                encoding="utf-8",
+            )
+            check = module.check_json_findings_tool(tmp, "fake-findings.py", [], 10, strict=False, name="fake")
+        self.assertEqual(check.status, "WARN")
+        self.assertIn("bad_check", check.detail)
+        self.assertIn("broken detail", check.detail)
+
+    def test_quality_gate_lsp_includes_first_finding_detail(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("quality_gate_under_test_lsp", self.SCRIPT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "runtime") as tmp_name:
+            tmp = Path(tmp_name)
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "lsp-diagnostics.py").write_text(
+                "import json\nprint(json.dumps({'status': 'FAIL', 'findings': [{'tool': 'pyright', 'message': 'type problem'}]}))\nraise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            check = module.check_lsp_diagnostics(tmp, 10, strict=False)
+        self.assertEqual(check.status, "WARN")
+        self.assertIn("pyright", check.detail)
+        self.assertIn("type problem", check.detail)
+
+    def test_quality_gate_explain_classifies_common_warnings(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("quality_gate_under_test_explain", self.SCRIPT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        checks = [
+            module.GateCheck("operational-readiness", "WARN", "Harnesses parity failure", [], 0.0),
+            module.GateCheck("codemap-freshness", "WARN", "codemaps may be stale", [], 0.0),
+            module.GateCheck("reference-inventory", "WARN", "missing reference card", [], 0.0),
+            module.GateCheck("unknown-check", "WARN", "mystery", [], 0.0),
+        ]
+        explanations = module.explain_checks(checks)
+        by_name = {item["name"]: item for item in explanations}
+        self.assertEqual(by_name["operational-readiness"]["classification"], "stale_generated")
+        self.assertIn("verify-parity.py", by_name["operational-readiness"]["next_command"])
+        self.assertFalse(by_name["operational-readiness"]["mutates_files"])
+        self.assertEqual(by_name["operational-readiness"]["write_policy"], "read_only")
+        self.assertEqual(by_name["codemap-freshness"]["classification"], "stale_docs")
+        self.assertTrue(by_name["codemap-freshness"]["mutates_files"])
+        self.assertTrue(by_name["codemap-freshness"]["requires_confirmation"])
+        self.assertEqual(by_name["codemap-freshness"]["write_policy"], "write_with_confirmation")
+        self.assertIn("generate-codemaps.py", by_name["codemap-freshness"]["read_only_alternative"])
+        self.assertEqual(by_name["reference-inventory"]["classification"], "needs_review")
+        self.assertEqual(by_name["unknown-check"]["classification"], "investigate")
+
+    def test_quality_gate_reference_proposal_lifecycle_warns_and_strict_fails(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("quality_gate_under_test_lifecycle", self.SCRIPT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "runtime") as tmp_name:
+            tmp = Path(tmp_name)
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "validate-reference-proposals.py").write_text(
+                "import json, sys\n"
+                "print(json.dumps({'summary': {'checked': 1}, 'findings': [{'severity': 'WARN', 'path': 'proposal.md', 'message': 'missing lifecycle'}]}))\n"
+                "raise SystemExit(1 if '--strict-lifecycle' in sys.argv else 0)\n",
+                encoding="utf-8",
+            )
+            relaxed = module.check_reference_proposal_lifecycle(tmp, 10, strict=False)
+            strict = module.check_reference_proposal_lifecycle(tmp, 10, strict=True)
+        self.assertEqual(relaxed.status, "WARN")
+        self.assertEqual(strict.status, "FAIL")
+        self.assertIn("missing lifecycle", relaxed.detail)
 
     def test_quality_gate_bad_root_exits_two(self) -> None:
         result = _run(
@@ -333,6 +471,169 @@ class QualityGateTests(unittest.TestCase):
 
 
 class NewInternalToolTests(unittest.TestCase):
+    def test_lsp_diagnostics_skips_when_no_tools_available(self) -> None:
+        import os
+        import subprocess
+
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "runtime") as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('ok')\n", encoding="utf-8")
+            env = os.environ.copy()
+            env["PATH"] = ""
+            result = subprocess.run(
+                [sys.executable, str(SCRIPTS / "lsp-diagnostics.py"), "--root", str(root), "--format", "json"],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "SKIP")
+        self.assertEqual(payload["findings"], [])
+
+    def test_lsp_diagnostics_parses_fake_pyright_and_tsc_findings(self) -> None:
+        import os
+        import subprocess
+
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "runtime") as tmp:
+            root = Path(tmp)
+            fakebin = root / "fakebin"
+            fakebin.mkdir()
+            (root / "src").mkdir()
+            (root / "src" / "app.py").write_text("x: int = 'bad'\n", encoding="utf-8")
+            (root / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+            pyright = fakebin / "pyright"
+            pyright.write_text(
+                "#!/bin/sh\n"
+                "cat <<'JSON'\n"
+                "{\"generalDiagnostics\":[{\"file\":\"src/app.py\",\"range\":{\"start\":{\"line\":0,\"character\":1}},\"severity\":\"error\",\"message\":\"bad type\"}]}\n"
+                "JSON\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            tsc = fakebin / "tsc"
+            tsc.write_text("#!/bin/sh\nprintf '%s\n' \"src/app.ts(1,2): error TS2322: bad assignment\"\nexit 2\n", encoding="utf-8")
+            pyright.chmod(0o755)
+            tsc.chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = str(fakebin)
+            result = subprocess.run(
+                [sys.executable, str(SCRIPTS / "lsp-diagnostics.py"), "--root", str(root), "--format", "json"],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["status"], "FAIL")
+        self.assertIn("pyright", {tool["name"] for tool in payload["tools"]})
+        self.assertIn("tsc", {tool["name"] for tool in payload["tools"]})
+        self.assertIn("pyright", {item["tool"] for item in payload["findings"]})
+        self.assertIn("tsc", {item["tool"] for item in payload["findings"]})
+
+    def test_source_recovery_scripts_scope_plan(self) -> None:
+        result = _run(
+            [
+                str(SCRIPTS / "source-recovery.py"),
+                "--root",
+                str(REPO_ROOT),
+                "--changed-path",
+                "scripts/example.py",
+                "--failure",
+                "quality-gate",
+                "--format",
+                "json",
+            ]
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["mutates_files"])
+        self.assertEqual(payload["scopes"][0]["scope"], "scripts")
+        commands = "\n".join(payload["scopes"][0]["recommended_commands"])
+        self.assertIn("quality-gate", commands)
+        self.assertIn("unittest", commands)
+        self.assertIn("git reset --hard", payload["scopes"][0]["do_not_run"])
+
+    def test_source_recovery_runtime_scope_plan(self) -> None:
+        result = _run(
+            [
+                str(SCRIPTS / "source-recovery.py"),
+                "--root",
+                str(REPO_ROOT),
+                "--changed-path",
+                "runtime/state/session-handoff.md",
+                "--failure",
+                "resume-readiness",
+                "--format",
+                "json",
+            ]
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["scopes"][0]["scope"], "runtime")
+        commands = "\n".join(payload["scopes"][0]["recommended_commands"])
+        self.assertIn("session-snapshot", commands)
+        self.assertIn("resume-readiness", commands)
+
+    def test_source_recovery_rejects_empty_and_outside_paths(self) -> None:
+        empty = _run(
+            [
+                str(SCRIPTS / "source-recovery.py"),
+                "--root",
+                str(REPO_ROOT),
+                "--changed-path",
+                "",
+                "--failure",
+                "quality-gate",
+                "--format",
+                "json",
+            ]
+        )
+        outside = _run(
+            [
+                str(SCRIPTS / "source-recovery.py"),
+                "--root",
+                str(REPO_ROOT),
+                "--changed-path",
+                "../outside",
+                "--failure",
+                "quality-gate",
+                "--format",
+                "json",
+            ]
+        )
+        self.assertEqual(empty.returncode, 2)
+        self.assertEqual(outside.returncode, 2)
+
+    def test_source_recovery_does_not_modify_files(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "runtime") as tmp:
+            root = Path(tmp)
+            (root / "scripts").mkdir()
+            (root / "scripts" / "app.py").write_text("print('ok')\n", encoding="utf-8")
+            before = sorted(path.relative_to(root).as_posix() for path in root.rglob("*"))
+            result = _run(
+                [
+                    str(SCRIPTS / "source-recovery.py"),
+                    "--root",
+                    str(root),
+                    "--changed-path",
+                    "scripts/app.py",
+                    "--failure",
+                    "quality-gate",
+                    "--format",
+                    "json",
+                ]
+            )
+            after = sorted(path.relative_to(root).as_posix() for path in root.rglob("*"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(before, after)
+
     def test_portability_scan_reports_machine_path(self) -> None:
         tmp = REPO_ROOT / "runtime" / f"portability-{uuid.uuid4().hex}"
         try:
@@ -375,6 +676,64 @@ class NewInternalToolTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_knowledge_gap_check_reports_covered_missing_weak_and_blocked(self) -> None:
+        covered_root = REPO_ROOT / "runtime" / f"knowledge-gap-covered-{uuid.uuid4().hex}"
+        missing_root = REPO_ROOT / "runtime" / f"knowledge-gap-missing-{uuid.uuid4().hex}"
+        weak_root = REPO_ROOT / "runtime" / f"knowledge-gap-weak-{uuid.uuid4().hex}"
+        blocked_root = REPO_ROOT / "runtime" / f"knowledge-gap-blocked-{uuid.uuid4().hex}"
+        try:
+            (covered_root / "knowledge").mkdir(parents=True)
+            (covered_root / "knowledge" / "index.md").write_text(
+                "| id | topic | status | pointer |\n"
+                "| --- | --- | --- | --- |\n"
+                "| K001 | checkout | active | `checkout.md:1` |\n",
+                encoding="utf-8",
+            )
+            (covered_root / "knowledge" / "checkout.md").write_text("# Checkout\n\ncheckout flow uses checkout validation\n", encoding="utf-8")
+            covered = _run([str(SCRIPTS / "knowledge-search.py"), "--root", str(covered_root), "gap-check", "checkout", "--format", "json"])
+            self.assertEqual(covered.returncode, 0, covered.stdout + covered.stderr)
+            self.assertEqual(json.loads(covered.stdout)["status"], "covered")
+
+            missing_root.mkdir(parents=True)
+            missing = _run([str(SCRIPTS / "knowledge-search.py"), "--root", str(missing_root), "gap-check", "absent-topic", "--format", "json"])
+            self.assertEqual(missing.returncode, 0, missing.stdout + missing.stderr)
+            missing_payload = json.loads(missing.stdout)
+            self.assertEqual(missing_payload["status"], "missing")
+            self.assertIn("no_hits", {finding["category"] for finding in missing_payload["findings"]})
+
+            (weak_root / "knowledge").mkdir(parents=True)
+            (weak_root / "knowledge" / "note.md").write_text("only checkout appears here\n", encoding="utf-8")
+            weak = _run([str(SCRIPTS / "knowledge-search.py"), "--root", str(weak_root), "gap-check", "checkout", "--format", "json"])
+            self.assertEqual(weak.returncode, 0, weak.stdout + weak.stderr)
+            self.assertEqual(json.loads(weak.stdout)["status"], "weak")
+
+            (blocked_root / "docs").mkdir(parents=True)
+            (blocked_root / "docs" / "question.md").write_text("[NEEDS CLARIFICATION: Which target?]\n", encoding="utf-8")
+            blocked = _run([str(SCRIPTS / "knowledge-search.py"), "--root", str(blocked_root), "gap-check", "checkout", "--format", "json"])
+            self.assertEqual(blocked.returncode, 0, blocked.stdout + blocked.stderr)
+            blocked_payload = json.loads(blocked.stdout)
+            self.assertEqual(blocked_payload["status"], "blocked_by_question")
+            self.assertIn("open_question", {finding["category"] for finding in blocked_payload["findings"]})
+        finally:
+            for root in (covered_root, missing_root, weak_root, blocked_root):
+                shutil.rmtree(root, ignore_errors=True)
+
+    def test_knowledge_gap_check_surfaces_wiki_lint_and_does_not_mutate(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"knowledge-gap-lint-{uuid.uuid4().hex}"
+        try:
+            knowledge = tmp / "knowledge"
+            knowledge.mkdir(parents=True)
+            (knowledge / "index.md").write_text("| id | topic |\n| --- | --- |\n| bad | broken |\n", encoding="utf-8")
+            before = sorted(path.relative_to(tmp).as_posix() for path in tmp.rglob("*"))
+            result = _run([str(SCRIPTS / "knowledge-search.py"), "--root", str(tmp), "gap-check", "broken", "--format", "json"])
+            after = sorted(path.relative_to(tmp).as_posix() for path in tmp.rglob("*"))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertIn("knowledge_lint", {finding["category"] for finding in payload["findings"]})
+            self.assertEqual(before, after)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_agent_brief_reports_scope_and_policy(self) -> None:
         result = _run([
             str(SCRIPTS / "agent-brief.py"),
@@ -396,6 +755,163 @@ class NewInternalToolTests(unittest.TestCase):
         self.assertEqual(payload["role"], "security-reviewer")
         self.assertEqual(payload["allowed_files"], ["scripts"])
         self.assertIn("Do not modify files", "\n".join(payload["forbidden_actions"]))
+
+    def test_agent_brief_rejects_policy_broadening(self) -> None:
+        result = _run([
+            str(SCRIPTS / "agent-brief.py"),
+            "--root",
+            str(REPO_ROOT),
+            "--role",
+            "security-reviewer",
+            "--goal",
+            "review copied code",
+            "--write-policy",
+            "manual_work_required",
+            "--format",
+            "json",
+        ])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("broadens specialist policy", result.stderr)
+
+    def test_agent_brief_intersects_parent_scope(self) -> None:
+        result = _run([
+            str(SCRIPTS / "agent-brief.py"),
+            "--root",
+            str(REPO_ROOT),
+            "--role",
+            "reference-reviewer",
+            "--goal",
+            "review references",
+            "--scope",
+            "runtime/proposals/reference-adoption",
+            "--parent-role",
+            "strategy-planner",
+            "--parent-write-policy",
+            "manual_work_required",
+            "--parent-scope",
+            "runtime",
+            "--format",
+            "json",
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["effective_scope"], ["runtime/proposals/reference-adoption"])
+        self.assertEqual(payload["inherited_write_policy"], "manual_work_required")
+
+    def test_path_safety_denies_generated_files(self) -> None:
+        for rel in (".mcp.json", "CLAUDE.md"):
+            with self.subTest(path=rel):
+                result = _run([
+                    str(SCRIPTS / "path-safety.py"),
+                    "--root",
+                    str(REPO_ROOT),
+                    "--format",
+                    "json",
+                    "check",
+                    "--path",
+                    rel,
+                    "--operation",
+                    "write",
+                ])
+                self.assertEqual(result.returncode, 1)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["decision"], "deny")
+
+    def test_operational_readiness_reports_harnesses(self) -> None:
+        result = _run([str(SCRIPTS / "operational-readiness.py"), "--root", str(REPO_ROOT), "--format", "json"])
+        self.assertIn(result.returncode, {0, 1}, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        names = {item["name"] for item in payload["harnesses"]}
+        self.assertIn("codex", names)
+        self.assertIn("claude", names)
+        self.assertIn("observability", payload)
+
+    def test_safe_write_rejects_generated_artifact(self) -> None:
+        result = _run([
+            str(SCRIPTS / "safe-write.py"),
+            "--root",
+            str(REPO_ROOT),
+            "--format",
+            "json",
+            "check",
+            "--path",
+            "CLAUDE.md",
+        ])
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(json.loads(result.stdout)["ok"])
+
+    def test_safe_write_applies_inside_runtime(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"safe-write-{uuid.uuid4().hex}"
+        try:
+            result = _run([
+                str(SCRIPTS / "safe-write.py"),
+                "--root",
+                str(REPO_ROOT),
+                "--format",
+                "json",
+                "write",
+                "--path",
+                str(tmp.relative_to(REPO_ROOT) / "note.txt"),
+                "--text",
+                "safe\n",
+                "--apply",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual((tmp / "note.txt").read_text(encoding="utf-8"), "safe\n")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_diff_quality_gate_reports_new_failure(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"diff-quality-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            baseline = tmp / "baseline.json"
+            current = tmp / "current.json"
+            baseline.write_text(json.dumps({"checks": [{"name": "unit", "status": "OK"}]}), encoding="utf-8")
+            current.write_text(json.dumps({"checks": [{"name": "unit", "status": "FAIL", "detail": "boom"}]}), encoding="utf-8")
+            result = _run([
+                str(SCRIPTS / "diff-quality-gate.py"),
+                "--baseline",
+                str(baseline),
+                "--current",
+                str(current),
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["introduced"][0]["name"], "unit")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_validate_plans_rejects_unstructured_plan(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"plan-contract-{uuid.uuid4().hex}"
+        try:
+            (tmp / "plans" / "active").mkdir(parents=True)
+            (tmp / "plans" / "active" / "0001-bad.md").write_text("# Bad\n", encoding="utf-8")
+            result = _run([str(SCRIPTS / "validate-plans.py"), "--root", str(tmp), "--format", "json"])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("missing heading", "\n".join(json.loads(result.stdout)["findings"]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_reference_wiki_current_contract_passes(self) -> None:
+        result = _run([str(SCRIPTS / "reference-wiki.py"), "--root", str(REPO_ROOT), "--format", "json"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(json.loads(result.stdout)["ok"])
+
+    def test_reference_wiki_sync_indexes_raw_sources(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"reference-wiki-{uuid.uuid4().hex}"
+        try:
+            (tmp / "docs" / "reference-wiki" / "raw").mkdir(parents=True)
+            (tmp / "docs" / "reference-wiki" / "wiki").mkdir(parents=True)
+            (tmp / "docs" / "reference-wiki" / "README.md").write_text("# Wiki\n", encoding="utf-8")
+            (tmp / "docs" / "reference-wiki" / "raw" / "sample.md").write_text("# Sample\n", encoding="utf-8")
+            result = _run([str(SCRIPTS / "reference-wiki.py"), "--root", str(tmp), "--format", "json", "--sync"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("docs/reference-wiki/raw/sample.md", (tmp / "docs" / "reference-wiki" / "wiki" / "index.md").read_text(encoding="utf-8"))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class CodemapTests(unittest.TestCase):
@@ -484,6 +1000,38 @@ class WikiGraphReportTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue((tmp / "docs" / "CODEMAPS" / "INDEX.md").exists())
             self.assertIn("docs/CODEMAPS/INDEX.md", json.loads(result.stdout)["written"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+class CleanupEphemeralTests(unittest.TestCase):
+    SCRIPT = SCRIPTS / "cleanup-ephemeral.py"
+
+    def test_preview_does_not_delete_and_apply_removes_pycache(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"cleanup-ephemeral-{uuid.uuid4().hex}"
+        try:
+            cache = tmp / "scripts" / "__pycache__"
+            cache.mkdir(parents=True)
+            (cache / "x.pyc").write_bytes(b"cache")
+            preview = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json"])
+            self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+            self.assertTrue(cache.exists())
+            self.assertEqual(json.loads(preview.stdout)["matches"], ["scripts/__pycache__"])
+
+            apply = _run([str(self.SCRIPT), "--root", str(tmp), "--apply", "--format", "json"])
+            self.assertEqual(apply.returncode, 0, apply.stdout + apply.stderr)
+            self.assertFalse(cache.exists())
+            self.assertEqual(json.loads(apply.stdout)["removed"], ["scripts/__pycache__"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_rejects_targets_outside_root(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"cleanup-ephemeral-outside-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--target", "../outside", "--format", "json"])
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("inside project root", result.stderr)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -627,6 +1175,37 @@ class VerifyParityTests(unittest.TestCase):
             result = _run([str(self.SCRIPT), "--root", str(tmp)])
             self.assertEqual(result.returncode, 1)
             self.assertIn("nested/note.txt", result.stdout)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_brief_json_explains_parity_drift(self) -> None:
+        tmp = self._root()
+        try:
+            convert = _run([str(self.CONVERT), "--root", str(tmp)])
+            self.assertEqual(convert.returncode, 0, convert.stdout + convert.stderr)
+            (tmp / ".codex" / "skills" / "demo" / "SKILL.md").write_text("changed\n", encoding="utf-8")
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--brief", "--format", "json"])
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            self.assertIn("brief", payload)
+            finding = payload["findings"][0]
+            self.assertEqual(finding["canonical_source"], "skills/active")
+            self.assertEqual(finding["generated_target"], ".codex/skills")
+            self.assertFalse(finding["direct_edit_allowed"])
+            self.assertIn("scripts/convert.py", finding["recommended_command"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_brief_json_is_clean_when_parity_matches(self) -> None:
+        tmp = self._root()
+        try:
+            convert = _run([str(self.CONVERT), "--root", str(tmp)])
+            self.assertEqual(convert.returncode, 0, convert.stdout + convert.stderr)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--brief", "--format", "json"])
+            self.assertEqual(result.returncode, 0)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["findings"], [])
+            self.assertTrue(payload["brief"]["ok"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

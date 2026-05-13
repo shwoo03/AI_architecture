@@ -233,3 +233,35 @@ class SessionSnapshotTests(unittest.TestCase):
             self.assertIn("outside repo", check.stdout)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_check_rejects_stale_checkpoint_snapshot(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"session-snapshot-checkpoint-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime" / "state").mkdir(parents=True)
+            (tmp / "runtime" / "state" / "session-handoff.md").write_text("# Handoff\n", encoding="utf-8")
+            (tmp / "runtime" / "activity-log.jsonl").write_text(
+                json.dumps({"ts": "2026-05-02T00:00:00Z", "phase": "test", "action": "ok"}) + "\n",
+                encoding="utf-8",
+            )
+            write = _run([str(self.SCRIPT), "--root", str(tmp), "write"])
+            self.assertEqual(write.returncode, 0, write.stdout + write.stderr)
+            (tmp / "runtime" / "checkpoints.jsonl").write_text(
+                json.dumps(
+                    {
+                        "id": "cp-late",
+                        "ts": "2026-05-02T00:01:00Z",
+                        "name": "late",
+                        "goal": "smoke",
+                        "git_sha": "unknown",
+                        "changed_paths": ["."],
+                        "verify_status": "partial",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            check = _run([str(self.SCRIPT), "--root", str(tmp), "check"])
+            self.assertEqual(check.returncode, 1)
+            self.assertIn("checkpoint_last is stale", check.stdout)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)

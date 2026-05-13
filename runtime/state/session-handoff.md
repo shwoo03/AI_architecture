@@ -1,66 +1,32 @@
 # Session Handoff
 
 ## Last Updated
-
-2026-05-02T06:23:33Z
-
-## Session ID
-
-stabilization-operations-2026-05-02
-
-## Project
-
-common-ai-architecture
+2026-05-13T08:09:20Z
 
 ## Current Task
-
-Implemented the latest stabilization and reference absorption pass. The active system now includes schema-backed contract checks, CI validation workflow, conservative generated Markdown sanitizer, failure classifier, stricter closeout routing confirmation, install-state strict validation, refreshed codemaps, and clearer hook lifecycle docs.
+Reference inventory alignment plus closeout codemap/pycache hygiene is implemented.
 
 ## Last Completed
-
-- Added schema contracts in `schemas/` for install-state, plugin manifests, session snapshot, runtime events, and script catalog.
-- Added internal scripts: `scripts/schema-check.py`, `scripts/markdown-sanitize.py`, and `scripts/failure-classify.py`.
-- Connected schema and sanitizer checks to `scripts/verify-skeleton.py` and `scripts/quality-gate.py`.
-- Updated `scripts/agent-flow.py` and `scripts/catalog.yaml` so `write_with_confirmation` routes require confirmation; closeout now reports `next_action_type: confirmation_required`.
-- Added `.github/workflows/ci.yml` for local-quality CI without external dependency installation.
-- Regenerated `docs/CODEMAPS/` and regenerated generated Codex/Claude artifacts through `scripts/convert.py`.
-- Appended verified install-state and genuine completion evidence for the current stabilization pass.
+- Normalized tracked reference metadata in `references.yaml` for the 6 tracked repositories.
+- Added candidate cards for `oh-my-codex`, `oh-my-claudecode`, `paperclip`, and `opencode` without auto-generating adoption proposals.
+- Added read-only `scripts/reference-inventory.py` and wired it into `quality-gate`.
+- Added `scripts/cleanup-ephemeral.py` for repo-bounded `__pycache__` cleanup.
+- Integrated closeout maintenance actions in `task-closeout.py`: codemap refresh and pycache cleanup with JSON `maintenance_actions`.
+- Fixed task-closeout completion evidence commands so runtime snapshots do not persist machine-specific absolute Python paths.
+- Refreshed codemaps and cleaned generated `__pycache__` artifacts.
 
 ## Validation
-
-- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest <targeted operational tests> -v`: 6 tests passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/agent-flow.py start --goal "검증하고 마무리해줘" --format json`: mode closeout, `requires_confirmation: true`, `next_action_type: confirmation_required`.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/schema-check.py --format json`: passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/markdown-sanitize.py --check --format json`: passed after applying 3 final-newline fixes.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate-codemaps.py --root . --write`: codemaps regenerated.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify-parity.py --root .`: passed after `scripts/convert.py`.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/install-state.py --root . check --strict`: passed, latest convert event verified.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify-skeleton.py --root .`: passed.
-
-## Current Skeleton State
-
-- Public command remains `scripts/agent-flow.py`.
-- New scripts are internal tools only and are listed in `scripts/catalog.yaml`.
-- `.codex/` and `.claude/` are still generated artifacts; canonical changes flow through `scripts/convert.py`.
-- Active quality gate now includes schema check, Markdown sanitizer check, and failure classifier smoke in addition to existing runtime, security, parity, and lifecycle checks.
+- Focused unittest: `python3 -m unittest tests.test_reference_security tests.test_validation tests.test_runtime -v` passed, 120 tests.
+- Full unittest: `python3 -m unittest discover -s tests -v` passed, 192 tests.
+- `python3 scripts/quality-gate.py --root . --test-timeout 300 --format json` passed with summary `OK 36, SKIP 2`.
+- `python3 scripts/resume-readiness.py --root . --strict --format json` passed before closeout record refresh.
+- `python3 scripts/session-snapshot.py --root . write --format json` passed after sanitizing portable validation commands.
 
 ## Recommended Next Step
-
-Run the current full health checks first:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify.py
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --format json
-```
-
-If continuing optimization work, the next practical target is to review strict warnings from golden coverage and decide which active skills need seed goldens first.
+No required next implementation step for this plan. If continuing v2 work, the next natural area is specialist-agent execution policy and team orchestration.
 
 ## Open Questions / Blockers
-
-- Full regression and final quality gate should be rerun after this handoff update and snapshot refresh.
-- Golden coverage warnings remain expected until more active skills get schema-check goldens.
+None for this plan.
 
 ## Resume Prompt
-
-Continue from the stabilization and reference absorption pass. Start with `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v`, `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify.py`, and `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --format json`. If these pass, the system is ready for the next reference-driven improvement cycle.
+Continue from /Users/shwoo/mydir/AI/AI_architecture. Reference inventory, candidate cards, reference-inventory quality gate check, closeout codemap refresh, and pycache cleanup are implemented and validated. Start by checking `runtime/state/session-handoff.md`, then run `python3 scripts/resume-readiness.py --root . --strict --format json` if you need a fresh handoff check.

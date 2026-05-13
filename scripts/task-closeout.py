@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from lib_safe_write import append_text
+
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -23,6 +25,7 @@ except (AttributeError, OSError):
 
 
 PROFILES = {"auto", "docs", "scripts", "reference", "copy", "runtime", "all"}
+DISPOSITIONS = {"auto", "complete", "partial", "blocked", "deferred", "failed"}
 
 
 @dataclass
@@ -45,6 +48,9 @@ class CloseoutResult:
     recorded: bool
     evidence_path: str
     skills: list[str]
+    disposition: str
+    next_action: str
+    maintenance_actions: list[dict[str, Any]]
 
 
 def repo_root() -> Path:
@@ -66,6 +72,33 @@ def command_env() -> dict[str, str]:
 def first_lines(text: str, *, max_lines: int = 4) -> str:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return " | ".join(lines[:max_lines])
+
+
+def portable_command(root: Path, command: list[str]) -> list[str]:
+    """Return a command safe to persist in portable runtime ledgers."""
+    root_resolved = root.resolve()
+    python_resolved = Path(sys.executable).resolve(strict=False)
+    result: list[str] = []
+    for item in command:
+        if not item:
+            continue
+        path = Path(item)
+        if path.is_absolute():
+            resolved = path.resolve(strict=False)
+            if resolved == python_resolved:
+                result.append("python3")
+                continue
+            if resolved == root_resolved:
+                result.append(".")
+                continue
+            try:
+                result.append(resolved.relative_to(root_resolved).as_posix())
+                continue
+            except ValueError:
+                result.append(path.name)
+                continue
+        result.append(item)
+    return result
 
 
 def resolve_under_root(root: Path, value: str) -> Path:
@@ -127,6 +160,7 @@ def profile_commands(root: Path, profile: str) -> list[tuple[str, list[str]]]:
     if profile in {"scripts"}:
         add("verify-skeleton", [py, str(root / "scripts" / "verify-skeleton.py"), "--root", str(root)])
         add("agent-autonomy-check", [py, str(root / "scripts" / "agent-autonomy-check.py"), "--root", str(root), "--strict"])
+        add("lsp-diagnostics", [py, str(root / "scripts" / "lsp-diagnostics.py"), "--root", str(root), "--format", "json"])
         add("python-unittest", [py, "-m", "unittest", "discover", "-s", "tests", "-v"])
         add("security-scan", [py, str(root / "scripts" / "security-scan.py"), "--root", str(root), "--include-runtime", "--strict"])
     if profile in {"reference", "copy", "all"}:
@@ -141,6 +175,7 @@ def profile_commands(root: Path, profile: str) -> list[tuple[str, list[str]]]:
         add("resume-readiness", [py, str(root / "scripts" / "resume-readiness.py"), "--root", str(root), "--strict"])
         add("skill-surface", [py, str(root / "scripts" / "skill-surface-check.py"), "--root", str(root), "--strict"])
     if profile == "all":
+        add("lsp-diagnostics", [py, str(root / "scripts" / "lsp-diagnostics.py"), "--root", str(root), "--format", "json"])
         add("quality-gate", [py, str(root / "scripts" / "quality-gate.py"), "--root", str(root), "--format", "json"])
     return list(commands.items())
 
@@ -162,6 +197,49 @@ def run_command(root: Path, name: str, command: list[str], timeout: int) -> Clos
     output = first_lines((result.stdout or "") + "\n" + (result.stderr or ""))
     status = "OK" if result.returncode == 0 else "FAIL"
     return CloseoutCheck(name, status, command, result.returncode, output or f"exit {result.returncode}", round(time.monotonic() - started, 3))
+
+
+def run_maintenance_action(root: Path, name: str, command: list[str], timeout: int) -> dict[str, Any]:
+    started = time.monotonic()
+    output = ""
+    try:
+        result = subprocess.run(
+            command,
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=command_env(),
+            timeout=timeout,
+        )
+        output = result.stdout or ""
+        detail = first_lines(output + "\n" + (result.stderr or "")) or f"exit {result.returncode}"
+        check = CloseoutCheck(name, "OK" if result.returncode == 0 else "FAIL", command, result.returncode, detail, round(time.monotonic() - started, 3))
+    except subprocess.TimeoutExpired:
+        check = CloseoutCheck(name, "FAIL", command, 124, f"timed out after {timeout}s", round(time.monotonic() - started, 3))
+    changed_paths: list[str] = []
+    try:
+        payload = json.loads(output or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+    if isinstance(payload, dict):
+        if isinstance(payload.get("written"), list):
+            changed_paths = [str(item) for item in payload["written"]]
+        elif isinstance(payload.get("removed"), list):
+            changed_paths = [str(item) for item in payload["removed"]]
+    return {
+        "name": name,
+        "status": check.status,
+        "command": check.command,
+        "exit_code": check.exit_code,
+        "detail": check.detail,
+        "duration_s": check.duration_s,
+        "changed_paths": changed_paths,
+    }
+
+
+def maintenance_ok(actions: list[dict[str, Any]]) -> bool:
+    return all(str(action.get("status")) in {"OK", "SKIP"} for action in actions)
 
 
 def parse_prevalidated_check(value: str) -> CloseoutCheck:
@@ -214,7 +292,16 @@ def record_skill_use(root: Path, skill: str, run_id: str, outcome: str, goal: st
     return result.returncode == 0
 
 
-def record_evidence(root: Path, goal: str, changed_paths: list[str], checks: list[CloseoutCheck], residual_risk: str, skills: list[str]) -> tuple[bool, str]:
+def record_evidence(
+    root: Path,
+    goal: str,
+    changed_paths: list[str],
+    checks: list[CloseoutCheck],
+    residual_risk: str,
+    next_action: str,
+    skills: list[str],
+    disposition: str,
+) -> tuple[bool, str]:
     script = root / "scripts" / "completion-evidence.py"
     run_id = utc_run_id()
     checks_ok = all(check.status == "OK" for check in checks)
@@ -222,7 +309,7 @@ def record_evidence(root: Path, goal: str, changed_paths: list[str], checks: lis
         json.dumps(
             {
                 "name": check.name,
-                "command": " ".join(check.command),
+                "command": " ".join(portable_command(root, check.command)),
                 "status": check.status,
                 "exit_code": check.exit_code,
                 "detail": check.detail,
@@ -237,7 +324,10 @@ def record_evidence(root: Path, goal: str, changed_paths: list[str], checks: lis
     for validation in validations:
         command.extend(["--validation", validation])
     command.extend(["--outcome", "genuine_success" if checks_ok else "partial_progress"])
+    command.extend(["--disposition", disposition])
     command.extend(["--residual-risk", residual_risk])
+    if next_action:
+        command.extend(["--next-action", next_action])
     result = subprocess.run(
         command,
         cwd=str(root),
@@ -270,6 +360,17 @@ def record_evidence(root: Path, goal: str, changed_paths: list[str], checks: lis
     return True, evidence_ref
 
 
+def append_activity_log(root: Path, goal: str, result: str) -> None:
+    event = {
+        "ts": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "phase": "closeout",
+        "action": "task_closeout",
+        "goal": goal,
+        "result": result,
+    }
+    append_text(root, "runtime/activity-log.jsonl", json.dumps(event, ensure_ascii=False) + "\n")
+
+
 def render_text(result: CloseoutResult) -> str:
     lines = [
         "Task Closeout",
@@ -282,6 +383,9 @@ def render_text(result: CloseoutResult) -> str:
     for check in result.checks:
         lines.append(f"  {check['status']:<4} {check['name']}: {check['detail']}")
     lines.append(f"recorded: {result.recorded}")
+    lines.append(f"disposition: {result.disposition}")
+    if result.next_action:
+        lines.append(f"next_action: {result.next_action}")
     if result.evidence_path:
         lines.append(f"evidence_path: {result.evidence_path}")
     return "\n".join(lines)
@@ -298,6 +402,8 @@ def main() -> int:
     parser.add_argument("--record", dest="record", action="store_true", help="Append completion evidence.")
     parser.add_argument("--no-record", dest="record", action="store_false", help="Do not append completion evidence.")
     parser.add_argument("--residual-risk", default="")
+    parser.add_argument("--next-action", default="")
+    parser.add_argument("--disposition", choices=sorted(DISPOSITIONS), default="auto")
     parser.add_argument("--skill", action="append", default=[], help="Skill used by this task, repeatable. Only recorded with --record.")
     parser.add_argument("--prevalidated-check", action="append", default=[], help="Validation JSON from an upstream gate; skips local profile checks when present.")
     parser.set_defaults(record=False)
@@ -324,10 +430,42 @@ def main() -> int:
     else:
         checks = [run_command(root, name, command, args.timeout) for name, command in profile_commands(root, profile)]
     skills = unique_values(args.skill)
+    checks_ok = all(check.status == "OK" for check in checks)
+    disposition = "complete" if args.disposition == "auto" and checks_ok else "partial" if args.disposition == "auto" else args.disposition
+    if disposition == "complete" and not checks_ok:
+        print("disposition `complete` requires all closeout checks to be OK", file=sys.stderr)
+        return 1
+    if disposition != "complete" and not (args.residual_risk.strip() or args.next_action.strip()):
+        print(f"disposition `{disposition}` requires --residual-risk or --next-action", file=sys.stderr)
+        return 1
     recorded = False
     evidence = ""
+    maintenance_actions: list[dict[str, Any]] = []
     if args.record:
-        recorded, evidence = record_evidence(root, args.goal, changed_paths, checks, args.residual_risk, skills)
+        append_activity_log(root, args.goal, "recording")
+        if checks_ok:
+            codemap = root / "scripts" / "generate-codemaps.py"
+            if codemap.exists():
+                maintenance_actions.append(
+                    run_maintenance_action(
+                        root,
+                        "codemap_refresh",
+                        [sys.executable, str(codemap), "--root", str(root), "--write", "--format", "json"],
+                        args.timeout,
+                    )
+                )
+            cleanup = root / "scripts" / "cleanup-ephemeral.py"
+            if cleanup.exists():
+                maintenance_actions.append(
+                    run_maintenance_action(
+                        root,
+                        "pycache_cleanup",
+                        [sys.executable, str(cleanup), "--root", str(root), "--apply", "--format", "json"],
+                        args.timeout,
+                    )
+                )
+        if maintenance_ok(maintenance_actions):
+            recorded, evidence = record_evidence(root, args.goal, changed_paths, checks, args.residual_risk, args.next_action.strip(), skills, disposition)
     result = CloseoutResult(
         root=str(root),
         goal=args.goal,
@@ -337,12 +475,15 @@ def main() -> int:
         recorded=recorded,
         evidence_path=evidence,
         skills=skills,
+        disposition=disposition,
+        next_action=args.next_action.strip(),
+        maintenance_actions=maintenance_actions,
     )
     if args.format == "json":
         print(json.dumps(asdict(result), ensure_ascii=False, indent=2))
     else:
         print(render_text(result))
-    return 1 if any(check.status == "FAIL" for check in checks) or (args.record and not recorded) else 0
+    return 1 if any(check.status == "FAIL" for check in checks) or not maintenance_ok(maintenance_actions) or (args.record and not recorded) else 0
 
 
 if __name__ == "__main__":

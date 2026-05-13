@@ -140,6 +140,53 @@ def compare_claude_entrypoint(root: Path, findings: list[Finding]) -> None:
         findings.append(Finding("ERROR", "claude_entrypoint", "CLAUDE.md file fallback differs from AGENTS.md"))
 
 
+def parity_context(check: str) -> tuple[str, str]:
+    if check.startswith("codex_skills"):
+        return "skills/active", ".codex/skills"
+    if check.startswith("claude_skills"):
+        return "skills/active", ".claude/skills"
+    if check.startswith("codex_agents"):
+        return "agents", ".codex/agents"
+    if check.startswith("claude_agents"):
+        return "agents", ".claude/agents"
+    if check.startswith("codex_rules"):
+        return "rules", ".codex/rules"
+    if check.startswith("claude_rules"):
+        return "rules", ".claude/rules"
+    if check.startswith("codex_mcp"):
+        return "mcp/servers.yaml", ".codex/mcp.json"
+    if check.startswith("claude_mcp"):
+        return "mcp/servers.yaml", ".mcp.json"
+    if check == "claude_entrypoint":
+        return "AGENTS.md", "CLAUDE.md"
+    return "canonical source", "generated artifact"
+
+
+def finding_payload(root: Path, finding: Finding, *, brief: bool) -> dict[str, object]:
+    payload: dict[str, object] = asdict(finding)
+    if brief:
+        source, target = parity_context(finding.check)
+        payload.update(
+            {
+                "canonical_source": source,
+                "generated_target": target,
+                "recommended_command": f"python3 scripts/convert.py --root {root}",
+                "direct_edit_allowed": False,
+            }
+        )
+    return payload
+
+
+def build_brief(root: Path, findings: list[Finding]) -> dict[str, object]:
+    return {
+        "ok": not findings,
+        "summary": "canonical sources match generated artifacts" if not findings else "regenerate generated adapters from canonical sources",
+        "recommended_command": f"python3 scripts/convert.py --root {root}",
+        "direct_edit_allowed": False,
+        "findings": [finding_payload(root, finding, brief=True) for finding in findings],
+    }
+
+
 def run_check(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     manifest = convert_lib.load_manifest(root)
@@ -170,6 +217,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=None, help="Project root (default: this skeleton root).")
     parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument("--brief", action="store_true", help="Include a read-only repair brief for generated adapter drift.")
     args = parser.parse_args()
     root = Path(args.root).resolve() if args.root else repo_root().resolve()
     if not root.is_dir():
@@ -177,7 +225,10 @@ def main() -> int:
         return 2
     findings = run_check(root)
     if args.format == "json":
-        print(json.dumps({"root": str(root), "findings": [asdict(f) for f in findings]}, ensure_ascii=False, indent=2))
+        payload = {"root": str(root), "findings": [finding_payload(root, finding, brief=args.brief) for finding in findings]}
+        if args.brief:
+            payload["brief"] = build_brief(root, findings)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(render_text(findings))
     return 1 if any(f.severity == "ERROR" for f in findings) else 0

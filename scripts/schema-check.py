@@ -122,6 +122,45 @@ def read_jsonl(path: Path, root: Path, findings: list[str]) -> list[dict[str, An
     return records
 
 
+def parse_inline_list(value: str) -> list[str]:
+    value = value.strip()
+    if not (value.startswith("[") and value.endswith("]")):
+        return []
+    return [item.strip().strip('"').strip("'") for item in value[1:-1].split(",") if item.strip()]
+
+
+def read_references_yaml(root: Path, findings: list[str]) -> list[dict[str, Any]]:
+    path = root / "references.yaml"
+    if not path.exists():
+        return []
+    repos: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    in_repos = False
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped == "repos:":
+            in_repos = True
+            continue
+        if not in_repos:
+            continue
+        if stripped.startswith("- "):
+            if current:
+                repos.append(current)
+            current = {}
+            stripped = stripped[2:].strip()
+            if not stripped:
+                continue
+        if current is not None and ":" in stripped:
+            key, value = stripped.split(":", 1)
+            cleaned = value.strip().strip('"').strip("'")
+            current[key.strip()] = parse_inline_list(value.strip()) if value.strip().startswith("[") else None if cleaned == "null" else cleaned
+    if current:
+        repos.append(current)
+    return repos
+
+
 def load_schemas(root: Path, findings: list[str]) -> dict[str, dict[str, Any]]:
     schemas: dict[str, dict[str, Any]] = {}
     schema_dir = root / "schemas"
@@ -157,6 +196,20 @@ def run_check(root: Path) -> dict[str, Any]:
         checked["install_state_records"] = len(records)
         for index, record in enumerate(records, start=1):
             findings.extend(validate_object(install_schema, record, f"runtime/install-state.jsonl record {index}"))
+
+    completion_schema = schemas.get("completion-evidence")
+    if completion_schema:
+        records = read_jsonl(root / "runtime" / "completion-evidence.jsonl", root, findings)
+        checked["completion_evidence_records"] = len(records)
+        for index, record in enumerate(records, start=1):
+            findings.extend(validate_object(completion_schema, record, f"runtime/completion-evidence.jsonl record {index}"))
+
+    references_schema = schemas.get("references")
+    if references_schema:
+        records = read_references_yaml(root, findings)
+        checked["references"] = len(records)
+        for index, record in enumerate(records, start=1):
+            findings.extend(validate_object(references_schema, record, f"references.yaml repo {index}"))
 
     plugin_schema = schemas.get("plugin-manifest")
     if plugin_schema:

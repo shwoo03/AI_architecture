@@ -1,7 +1,7 @@
 # Codemap: runtime
 
-- `files`: 14
-- `line_count`: 705
+- `files`: 15
+- `line_count`: 851
 - `directories`: 8
 
 ## Navigation Entry Points
@@ -24,6 +24,7 @@
 - `runtime/AGENTS.md`
 - `runtime/proposals/README.md`
 - `runtime/proposals/reference-adoption/2026-04-27-example-resume-safe-checkpoint.md`
+- `runtime/proposals/reference-adoption/2026-05-12-p0-operational-skeleton-hardening.md`
 - `runtime/proposals/reference-adoption/README.md`
 - `runtime/proposals/reference-adoption/_template.md`
 - `runtime/proposals/skill-lifecycle/README.md`

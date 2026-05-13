@@ -121,6 +121,66 @@
   },
   {
     "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/start-server.sh",
+    "line": 96,
+    "reason": "generated duplicate of approved helper cleanup probe"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/start-server.sh",
+    "line": 105,
+    "reason": "generated duplicate of approved helper ownership probe"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/start-server.sh",
+    "line": 121,
+    "reason": "generated duplicate of approved background disown fallback"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/start-server.sh",
+    "line": 126,
+    "reason": "generated duplicate of approved startup log polling"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/start-server.sh",
+    "line": 130,
+    "reason": "generated duplicate of approved process liveness probe"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/stop-server.sh",
+    "line": 23,
+    "reason": "generated duplicate of approved idempotent server stop"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/stop-server.sh",
+    "line": 27,
+    "reason": "generated duplicate of approved process liveness probe"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/stop-server.sh",
+    "line": 34,
+    "reason": "generated duplicate of approved process liveness probe"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/stop-server.sh",
+    "line": 35,
+    "reason": "generated duplicate of approved force kill fallback"
+  },
+  {
+    "rule": "silent_error_suppression",
+    "path": ".agents/skills/brainstorming/scripts/stop-server.sh",
+    "line": 41,
+    "reason": "generated duplicate of approved final liveness probe"
+  },
+  {
+    "rule": "silent_error_suppression",
     "path": "skills/active/brainstorming/scripts/start-server.sh",
     "line": 96,
     "reason": "canonical helper cleanup probes intentionally ignore best-effort kill failures"

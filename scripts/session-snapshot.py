@@ -11,6 +11,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from lib_runtime_lock import runtime_lock
+except ModuleNotFoundError:
+    from contextlib import contextmanager
+
+    @contextmanager
+    def runtime_lock(root: Path, name: str, **_: object):
+        yield root / "runtime" / f".{name}.lock"
+
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -26,6 +35,7 @@ REQUIRED_FIELDS = (
     "handoff_path",
     "activity_log_last",
     "completion_evidence_last",
+    "checkpoint_last",
     "open_blockers",
 )
 
@@ -85,6 +95,8 @@ def build_snapshot(root: Path) -> dict[str, Any]:
     handoff = root / "runtime" / "state" / "session-handoff.md"
     activity_last = last_jsonl_record(root / "runtime" / "activity-log.jsonl")
     evidence_last = last_jsonl_record(root / "runtime" / "completion-evidence.jsonl")
+    checkpoint_last = last_jsonl_record(root / "runtime" / "checkpoints.jsonl")
+    latest_disposition = evidence_last.get("disposition") if isinstance(evidence_last, dict) else None
     return {
         "schema_version": "ai-architecture.session-snapshot.v1",
         "ts": utc_now(),
@@ -93,6 +105,8 @@ def build_snapshot(root: Path) -> dict[str, Any]:
         "handoff_exists": handoff.exists(),
         "activity_log_last": activity_last,
         "completion_evidence_last": evidence_last,
+        "checkpoint_last": checkpoint_last,
+        "latest_disposition": latest_disposition,
         "open_blockers": open_blockers(root),
     }
 
@@ -112,14 +126,19 @@ def validate_snapshot(root: Path, payload: dict[str, Any]) -> list[str]:
         findings.append("field `activity_log_last` must be object or null")
     if payload.get("completion_evidence_last") is not None and not isinstance(payload.get("completion_evidence_last"), dict):
         findings.append("field `completion_evidence_last` must be object or null")
+    if payload.get("checkpoint_last") is not None and not isinstance(payload.get("checkpoint_last"), dict):
+        findings.append("field `checkpoint_last` must be object or null")
     if payload.get("handoff_path") and not (root / str(payload["handoff_path"])).exists():
         findings.append(f"handoff path missing: {payload['handoff_path']}")
     current_activity = last_jsonl_record(root / "runtime" / "activity-log.jsonl")
     current_evidence = last_jsonl_record(root / "runtime" / "completion-evidence.jsonl")
+    current_checkpoint = last_jsonl_record(root / "runtime" / "checkpoints.jsonl")
     if payload.get("activity_log_last") != current_activity:
         findings.append("activity_log_last is stale; run session-snapshot.py write")
     if payload.get("completion_evidence_last") != current_evidence:
         findings.append("completion_evidence_last is stale; run session-snapshot.py write")
+    if payload.get("checkpoint_last") != current_checkpoint:
+        findings.append("checkpoint_last is stale; run session-snapshot.py write")
     findings.extend(foreign_path_findings(root, payload))
     return findings
 
@@ -184,7 +203,8 @@ def cmd_write(root: Path, args: argparse.Namespace) -> int:
         return 1
     path = snapshot_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with runtime_lock(root, "session-snapshot"):
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -218,6 +238,8 @@ def cmd_summary(root: Path, args: argparse.Namespace) -> int:
         "open_blockers": len(payload.get("open_blockers") or []),
         "has_activity": payload.get("activity_log_last") is not None,
         "has_completion_evidence": payload.get("completion_evidence_last") is not None,
+        "has_checkpoint": payload.get("checkpoint_last") is not None,
+        "latest_disposition": payload.get("latest_disposition"),
     }
     if args.format == "json":
         print(json.dumps(summary, ensure_ascii=False, indent=2))

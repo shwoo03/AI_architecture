@@ -8,10 +8,19 @@ import json
 import subprocess
 import sys
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from lib_runtime_lock import runtime_lock
+except ModuleNotFoundError:
+    from contextlib import contextmanager
+
+    @contextmanager
+    def runtime_lock(root: Path, name: str, **_: object):
+        yield root / "runtime" / f".{name}.lock"
 
 
 try:
@@ -22,6 +31,7 @@ except (AttributeError, OSError):
 
 
 ALLOWED_VERIFY_STATUS = {"not_run", "passed", "failed", "partial"}
+ALLOWED_APPROVAL_STATE = {"not_required", "pending", "approved", "blocked"}
 
 
 @dataclass
@@ -34,6 +44,10 @@ class Checkpoint:
     changed_paths: list[str]
     verify_status: str
     note: str = ""
+    resume_from: str = ""
+    safe_point: str = ""
+    side_effects: list[str] = field(default_factory=list)
+    approval_state: str = "not_required"
 
 
 def repo_root() -> Path:
@@ -100,6 +114,16 @@ def validate_record(record: dict[str, Any], index: int) -> list[str]:
         findings.append(f"record {index} invalid verify_status: {record.get('verify_status')}")
     if not isinstance(record.get("changed_paths"), list) or not record.get("changed_paths"):
         findings.append(f"record {index} changed_paths must be a non-empty list")
+    if "resume_from" in record and not isinstance(record.get("resume_from"), str):
+        findings.append(f"record {index} resume_from must be a string")
+    if "safe_point" in record and not isinstance(record.get("safe_point"), str):
+        findings.append(f"record {index} safe_point must be a string")
+    if "side_effects" in record:
+        side_effects = record.get("side_effects")
+        if not isinstance(side_effects, list) or any(not isinstance(item, str) or not item.strip() for item in side_effects):
+            findings.append(f"record {index} side_effects must be a list of non-empty strings")
+    if "approval_state" in record and record.get("approval_state") not in ALLOWED_APPROVAL_STATE:
+        findings.append(f"record {index} invalid approval_state: {record.get('approval_state')}")
     return findings
 
 
@@ -118,6 +142,10 @@ def cmd_create(root: Path, args: argparse.Namespace) -> int:
         changed_paths=changed_paths,
         verify_status=args.verify_status,
         note=args.note,
+        resume_from=args.resume_from,
+        safe_point=args.safe_point,
+        side_effects=args.side_effect,
+        approval_state=args.approval_state,
     )
     findings = validate_record(asdict(record), 1)
     if findings:
@@ -126,8 +154,9 @@ def cmd_create(root: Path, args: argparse.Namespace) -> int:
         return 1
     path = checkpoint_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(asdict(record), ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n")
+    with runtime_lock(root, "checkpoints"):
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(asdict(record), ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n")
     if args.format == "json":
         print(json.dumps(asdict(record), ensure_ascii=False, indent=2))
     else:
@@ -179,6 +208,10 @@ def main() -> int:
     create.add_argument("--verify-status", choices=sorted(ALLOWED_VERIFY_STATUS), default="not_run")
     create.add_argument("--note", default="")
     create.add_argument("--id", default="")
+    create.add_argument("--resume-from", default="")
+    create.add_argument("--safe-point", default="")
+    create.add_argument("--side-effect", action="append", default=[])
+    create.add_argument("--approval-state", choices=sorted(ALLOWED_APPROVAL_STATE), default="not_required")
     create.add_argument("--format", choices=("text", "json"), default="text")
     create.set_defaults(func=cmd_create)
     list_parser = sub.add_parser("list")

@@ -19,6 +19,7 @@
     "handoff_exists": {"type": "boolean"},
     "activity_log_last": {"type": ["object", "null"]},
     "completion_evidence_last": {"type": ["object", "null"]},
+    "latest_disposition": {"type": ["string", "null"]},
     "open_blockers": {"type": "array", "items": {"type": "string"}}
   }
 }

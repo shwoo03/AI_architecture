@@ -39,6 +39,14 @@ except (AttributeError, OSError):
 
 REQUIRED_FIELDS = ("ts", "goal", "changed_paths", "validations", "outcome")
 ALLOWED_OUTCOMES = {"genuine_success", "partial_progress", "timeout", "infra_error", "blocked_by_policy"}
+ALLOWED_DISPOSITIONS = {"complete", "partial", "blocked", "deferred", "failed"}
+OUTCOME_DEFAULT_DISPOSITION = {
+    "genuine_success": "complete",
+    "partial_progress": "partial",
+    "timeout": "failed",
+    "infra_error": "failed",
+    "blocked_by_policy": "blocked",
+}
 ALLOWED_VALIDATION_STATUSES = {"OK", "PASS", "WARN", "SKIP", "FAIL", "ERROR"}
 PASSING_VALIDATION_STATUSES = {"OK", "PASS"}
 RISK_VALIDATION_STATUSES = {"WARN", "SKIP"}
@@ -51,6 +59,7 @@ class EvidenceRecord:
     changed_paths: list[str]
     validations: list[dict[str, Any]]
     outcome: str
+    disposition: str = ""
     residual_risk: str = ""
     next_action: str = ""
     notes: str = ""
@@ -137,8 +146,11 @@ def validate_record(root: Path, record: dict[str, Any], index: int) -> list[str]
     if not str(record.get("goal", "")).strip():
         findings.append(f"{label} field `goal` is blank")
     outcome = str(record.get("outcome", ""))
+    disposition = str(record.get("disposition", "") or "").strip()
     if outcome and outcome not in ALLOWED_OUTCOMES:
         findings.append(f"{label} field `outcome` invalid: {outcome}")
+    if disposition and disposition not in ALLOWED_DISPOSITIONS:
+        findings.append(f"{label} field `disposition` invalid: {disposition}")
     changed_paths = record.get("changed_paths")
     if not isinstance(changed_paths, list) or not changed_paths:
         findings.append(f"{label} field `changed_paths` must be a non-empty list")
@@ -173,6 +185,20 @@ def validate_record(root: Path, record: dict[str, Any], index: int) -> list[str]
             ]
             if failing:
                 findings.append(f"{label} outcome `genuine_success` requires all validations passing (OK/PASS); got {failing}")
+        if disposition == "complete" and outcome != "genuine_success":
+            findings.append(f"{label} disposition `complete` requires outcome `genuine_success`")
+        if disposition == "complete":
+            failing = [
+                validation_status(validation)
+                for validation in validations
+                if isinstance(validation, dict) and validation_status(validation) not in PASSING_VALIDATION_STATUSES
+            ]
+            if failing:
+                findings.append(f"{label} disposition `complete` requires all validations passing (OK/PASS); got {failing}")
+        if disposition in {"partial", "blocked", "deferred", "failed"} and not (
+            str(record.get("residual_risk", "")).strip() or str(record.get("next_action", "")).strip()
+        ):
+            findings.append(f"{label} disposition `{disposition}` requires residual_risk or next_action")
         if outcome == "partial_progress":
             risk_statuses = [
                 validation_status(validation)
@@ -209,12 +235,14 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         print(f"invalid evidence input: {exc}", file=sys.stderr)
         return 2
+    disposition = args.disposition or OUTCOME_DEFAULT_DISPOSITION.get(args.outcome, "")
     record = EvidenceRecord(
         ts=args.ts or utc_now(),
         goal=redact_text(args.goal.strip()),
         changed_paths=changed_paths,
         validations=redact_json(validations),
         outcome=args.outcome,
+        disposition=disposition,
         residual_risk=redact_text(args.residual_risk.strip()),
         next_action=redact_text(args.next_action.strip()),
         notes=redact_text(args.notes.strip()),
@@ -280,6 +308,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.add_argument("--changed-path", action="append", default=[], required=True)
     add_parser.add_argument("--validation", action="append", default=[], required=True)
     add_parser.add_argument("--outcome", choices=sorted(ALLOWED_OUTCOMES), default="genuine_success")
+    add_parser.add_argument("--disposition", choices=sorted(ALLOWED_DISPOSITIONS), default="")
     add_parser.add_argument("--residual-risk", default="")
     add_parser.add_argument("--next-action", default="")
     add_parser.add_argument("--notes", default="")

@@ -72,6 +72,7 @@
 - `scripts/validate-reference-proposals.py`: `runtime/proposals/reference-adoption/`의 실제 dry-run 제안서가 필수 필드, 후보 카드 링크, 모듈형 흡수 판단, 검증 계획, 중단 조건을 갖췄는지 검사합니다.
 - `scripts/create-reference-proposal.py`: 후보 카드에서 reference-adoption dry-run 제안서 초안을 만듭니다. 기본은 화면 출력이며, 에이전트가 승인된 경우 `--write`로 파일을 생성합니다. 제안서에는 dependency, wrapper, partial copy, concept-only, direct implementation 중 어떤 흡수 방식을 택할지 판단하는 섹션이 포함됩니다. 후보 카드가 `adoption_decision: copy`이면 개인 로컬 사용을 전제로 partial copy 경계를 기록하게 합니다.
 - `scripts/reference-intake.py`: 새 구현 전 외부 오픈소스나 로컬 레퍼런스를 먼저 분석합니다. `analyze`는 clone된 repo의 README/docs/tests/license/module inventory를 보고, `card-draft`는 후보 카드 초안을 만들며, `clone`은 기본 dry-run으로 `runtime/external-repos/` 아래 안전한 clone 경로를 계획합니다. `--cache` 또는 카드 `--write`가 있을 때만 `runtime/reference-intake-cache.jsonl`을 갱신하므로 preview는 원본과 프로젝트를 수정하지 않습니다.
+- `scripts/reference-inventory.py`: `references.yaml`, 후보 카드, reference-adoption proposal을 read-only로 대조해 tracked reference가 후보 카드 없이 방치되지 않게 합니다.
 - `scripts/reference-task-queue.py`: 긴 reference 분석을 중단/재개할 수 있도록 `runtime/reference-tasks.jsonl`에 append-only 작업 상태를 남깁니다. source hash 기반 unchanged skip과 retry 장부를 포함합니다.
 - `scripts/notion-doc-quality-check.py`: Notion에 올릴 Markdown 초안이 기능 중심 섹션, 입력/출력, 성공/실패 신호, 판단 기준을 갖췄는지 검사합니다. 짧은 changelog나 파일 목록 중심 문서를 완료 문서로 올리지 않기 위한 사전 점검입니다.
 - `scripts/skeleton-doctor.py`: 프로젝트가 바로 문서화, reference review, runtime startup, 로그/인수인계, 구조 검증을 수행할 준비가 되었는지 `OK/WARN/FAIL/INFO`로 진단합니다. 기본은 read-only이며 `--format json`과 선택적 `--projects-root` 전파 상태 점검을 지원합니다.
@@ -85,6 +86,7 @@
 - `scripts/cost-log.py`: `state/cost-log.jsonl` 비용 이벤트를 추가, 검증, 요약합니다.
 - `scripts/session-snapshot.py`: `runtime/session-snapshot.json`을 생성하고 검증합니다. 사람이 읽는 handoff를 대체하지 않는 machine-readable 현재 상태입니다.
 - `scripts/security-scan.py`: 운영 문서, scripts, hooks, agent/skill 설정, reference adoption 산출물을 read-only로 훑어 secret, 위험한 명령, 위험한 hook/config, 코드 복사 governance 누락을 찾습니다. 기본은 보고 전용이며 `--strict`에서 HIGH/CRITICAL finding이 있으면 실패합니다.
+- `scripts/cleanup-ephemeral.py`: 기본 preview 모드로 repo 내부 `__pycache__`를 찾고, closeout의 승인된 `--apply` 경로에서만 안전한 Python cache 디렉터리를 삭제합니다.
 
 이 스크립트들은 사용자가 직접 실행해야 하는 UI가 아닙니다. 에이전트가 구조 검증, 반복 작업, 승인 후 반영을 안정적으로 수행하기 위해 사용하는 내부 운영 도구입니다.
 

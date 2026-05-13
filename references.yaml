@@ -30,6 +30,24 @@ repos:
     why_tracked: "multi-provider coding agent CLI와 config 패턴 참고"
     import_targets: ["config/", "rules/common/", "docs/"]
 
+  - name: "oh-my-codex"
+    url: "https://github.com/Yeachan-Heo/oh-my-codex.git"
+    local_path: "../AI_architecture_references/oh-my-codex"
+    last_known_commit: "148effde4e7c6a35f5bdde3ecd5db3488b3156b5"
+    last_known_commit_date: "not checked"
+    last_checked: null
+    why_tracked: "Codex CLI workflow layer, skills, agents, prompts, runtime state, and team orchestration patterns 참고"
+    import_targets: ["skills/", "agents/", "docs/", "rules/common/", "config/"]
+
+  - name: "oh-my-claudecode"
+    url: "https://github.com/Yeachan-Heo/oh-my-claudecode.git"
+    local_path: "../AI_architecture_references/oh-my-claudecode"
+    last_known_commit: "679b418f32409e6d0edecf5038fd2de460cfce04"
+    last_known_commit_date: "not checked"
+    last_checked: null
+    why_tracked: "Claude Code multi-agent orchestration, plugin/marketplace flow, workflows, and specialist agent patterns 참고"
+    import_targets: ["skills/", "agents/", "docs/", "rules/common/", "config/"]
+
   - name: "paperclip"
     url: "https://github.com/paperclipai/paperclip.git"
     local_path: "../AI_architecture_references/paperclip"

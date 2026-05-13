@@ -301,6 +301,44 @@ def summarize(actions: list[Action]) -> dict[str, int]:
     return dict(sorted(summary.items()))
 
 
+def action_payload(action: Action) -> dict[str, object]:
+    return asdict(action)
+
+
+def build_brief(actions: list[Action]) -> dict[str, object]:
+    safe_additions = [action for action in actions if action.action == "add" and action.safety == "safe"]
+    manual_reviews = [action for action in actions if action.action == "review" or action.safety == "manual"]
+    risky_reviews = [action for action in actions if action.safety == "risky" or action.action == "update_available"]
+    protected_skips = [action for action in actions if action.action == "skip" or action.safety == "protected"]
+    review_items = manual_reviews + risky_reviews
+    priority = {
+        "AGENTS.md": 0,
+        "CLAUDE.md": 1,
+        "docs/PROJECT_PROFILE.md": 2,
+        "docs/PROJECT_SPEC.md": 3,
+        "docs/PROJECT_OPERATING_PLAN.md": 4,
+    }
+    ordered_review_paths = sorted(
+        {action.path for action in review_items if action.path != "."},
+        key=lambda path: (priority.get(path, 50), path),
+    )
+    return {
+        "safe_additions": [action_payload(action) for action in safe_additions],
+        "manual_reviews": [action_payload(action) for action in manual_reviews],
+        "risky_reviews": [action_payload(action) for action in risky_reviews],
+        "protected_skips": [action_payload(action) for action in protected_skips],
+        "recommended_next_prompt": "Review manual_merge/risky entries one by one with the user before applying changes.",
+        "manual_merge_order": ordered_review_paths,
+        "validation_commands": [
+            "python3 scripts/verify.py",
+            "python3 scripts/quality-gate.py --format json",
+            "python3 scripts/resume-readiness.py --strict --format json",
+        ],
+        "approval_required": bool(review_items),
+        "approval_note": "This brief is not approval to overwrite risky or manual-merge files.",
+    }
+
+
 def render_text(actions: list[Action], *, dry_run: bool) -> str:
     lines: list[str] = []
     by_target: dict[str, list[Action]] = {}
@@ -395,8 +433,21 @@ def main() -> int:
         action="store_true",
         help="Emit machine-readable JSON instead of text.",
     )
+    parser.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default=None,
+        help="Output format. --json is kept as a compatibility alias for --format json.",
+    )
+    parser.add_argument(
+        "--brief",
+        action="store_true",
+        help="Emit an AI-assisted dry-run upgrade brief. Incompatible with --apply.",
+    )
     args = parser.parse_args()
 
+    if args.brief and args.apply:
+        raise SystemExit("--brief is dry-run only and cannot be combined with --apply")
     if args.include_risky and args.safe_only:
         raise SystemExit("--include-risky cannot be combined with --safe-only")
     if args.include_risky and not args.apply:
@@ -441,13 +492,16 @@ def main() -> int:
             )
             append_upgrade_log(target, actions)
 
-    if args.json:
+    output_format = "json" if args.json else (args.format or "text")
+    if output_format == "json":
         payload = {
             "source": str(source),
             "dry_run": not args.apply,
             "summary": summarize(all_actions),
-            "actions": [asdict(action) for action in all_actions],
+            "actions": [action_payload(action) for action in all_actions],
         }
+        if args.brief:
+            payload["brief"] = build_brief(all_actions)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(render_text(all_actions, dry_run=not args.apply))

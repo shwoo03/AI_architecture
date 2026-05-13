@@ -1,7 +1,7 @@
 # Codemap: reference
 
-- `files`: 10
-- `line_count`: 833
+- `files`: 14
+- `line_count`: 1255
 - `directories`: 3
 
 ## Navigation Entry Points
@@ -25,5 +25,9 @@
 - `research/reference-candidates/2026-04-29-everything-claude-code.md`
 - `research/reference-candidates/2026-04-29-hermes-agent.md`
 - `research/reference-candidates/2026-04-29-llm-wiki.md`
+- `research/reference-candidates/2026-05-13-oh-my-claudecode.md`
+- `research/reference-candidates/2026-05-13-oh-my-codex.md`
+- `research/reference-candidates/2026-05-13-opencode.md`
+- `research/reference-candidates/2026-05-13-paperclip.md`
 - `research/reference-candidates/README.md`
 - `research/reference-candidates/_template.md`

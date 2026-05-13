@@ -1,8 +1,8 @@
 # Codemap: docs
 
-- `files`: 43
-- `line_count`: 3835
-- `directories`: 5
+- `files`: 46
+- `line_count`: 3872
+- `directories`: 7
 
 ## Navigation Entry Points
 
@@ -15,6 +15,8 @@
 - `docs/_meta`
 - `docs/commands`
 - `docs/decisions`
+- `docs/reference-wiki`
+- `docs/reference-wiki/wiki`
 - `docs/wiki-ops`
 
 ## Files
@@ -59,6 +61,9 @@
 - `docs/decisions/ADR-0001-reference-discovery-and-adoption.md`
 - `docs/decisions/README.md`
 - `docs/plugin-manifest-notes.md`
+- `docs/reference-wiki/README.md`
+- `docs/reference-wiki/wiki/index.md`
+- `docs/reference-wiki/wiki/log.md`
 - `docs/tooling-requirements.md`
 - `docs/wiki-ops/wiki-lint.md`
 - `docs/wiki-ops/wiki-query.md`

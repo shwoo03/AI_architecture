@@ -353,10 +353,12 @@ def format_catalog_command(template: str, *, goal: str = "", proposal: str = "")
 
 def build_intake_for(root: Path, goal: str, catalog_modes: dict[str, dict[str, Any]]) -> dict[str, Any]:
     build_questions = suggested_questions_for_mode(root, "build")
+    plan_command = "python3 scripts/agent-flow.py plan --goal " + shell_command([goal]) + " --format json"
     return {
         "goal": goal,
         "plan_required": True,
         "plan_location": "plans/active/<seq>-<slug>.md",
+        "plan_command": plan_command,
         "scope_questions": build_questions[:1] or ["이번에 구현할 정확한 범위는 어디까지인가요?"],
         "acceptance_criteria_questions": build_questions[1:2] or ["완료 여부를 판단할 수용 기준이나 테스트 시나리오는 무엇인가요?"],
         "constraint_questions": build_questions[2:] or ["선호하는 스택, 라이브러리, 피해야 할 제약이 있나요?"],
@@ -470,6 +472,20 @@ def classify_start(
             "requires_confirmation": False,
             "write_policy": "read_only",
             "signals": [*base_signals, "goal_mentions_maintain", "goal_mentions_reference", "reference_review_required"],
+            "catalog_status": catalog_status,
+        }
+    if is_read_only_inspection_goal(goal):
+        config = catalog_modes["research"]
+        next_command = format_catalog_command("python3 scripts/agent-flow.py research --auto --goal \"{goal}\" --format json", goal=goal)
+        return {
+            "mode": "research",
+            "reason": "요청이 구현보다 읽기 전용 조사, 검토, 추천에 가깝습니다.",
+            "next_command": next_command,
+            "next_action_type": "agent_flow_command",
+            "confidence": "high",
+            "requires_confirmation": False,
+            "write_policy": "read_only",
+            "signals": [*base_signals, "goal_mentions_read_only_inspection"],
             "catalog_status": catalog_status,
         }
     for mode in ("research", "closeout", "maintain"):
@@ -1223,10 +1239,35 @@ def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
             run_command(
                 root,
                 "quality-gate",
-                [sys.executable, str(root / "scripts" / "quality-gate.py"), "--root", str(root), "--format", "json", "--strict"],
+                [sys.executable, str(root / "scripts" / "quality-gate.py"), "--root", str(root), "--format", "json", "--strict", "--explain", "--test-timeout", str(args.test_timeout)],
                 args.timeout,
             )
         )
+    if args.quality_baseline and commands[-1].name == "quality-gate":
+        current_path = root / "runtime" / "quality-gate-current.json"
+        try:
+            from lib_safe_write import atomic_write_text
+
+            atomic_write_text(root, "runtime/quality-gate-current.json", commands[-1].stdout or "{}")
+            commands.append(
+                run_command(
+                    root,
+                    "diff-quality-gate",
+                    [
+                        sys.executable,
+                        str(root / "scripts" / "diff-quality-gate.py"),
+                        "--baseline",
+                        args.quality_baseline,
+                        "--current",
+                        str(current_path),
+                        "--format",
+                        "json",
+                    ],
+                    args.timeout,
+                )
+            )
+        except Exception as exc:
+            commands.append(CommandResult("diff-quality-gate", [args.quality_baseline], 1, "", str(exc)))
     checks_ok = all(result.ok for result in commands)
     recorded = False
     if checks_ok:
@@ -1252,13 +1293,22 @@ def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
         closeout_result = run_command(root, "task-closeout", closeout_command, args.timeout)
         commands.append(closeout_result)
         recorded = closeout_result.ok
+    failure_name = next((result.name for result in commands if not result.ok), "")
     payload = {
         "root": str(root),
         "goal": args.goal,
         "recorded": recorded,
-        "skipped_record_reason": "" if checks_ok else "verify_or_quality_gate_failed",
+        "skipped_record_reason": "" if recorded else ("verify_or_quality_gate_failed" if not checks_ok else "task_closeout_failed"),
         "commands": [result_payload(result) for result in commands],
     }
+    if failure_name:
+        payload["source_recovery_command"] = source_recovery_command(args.changed_path or ["."], failure_name)
+        failed_result = next((result for result in commands if not result.ok), None)
+        if failed_result:
+            payload["recovery_packet"] = recovery_packet(root, args.changed_path or ["."], failed_result, payload["source_recovery_command"], args.timeout)
+        explanations = quality_gate_explanations(commands)
+        if explanations:
+            payload["quality_gate_explanations"] = explanations
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -1269,6 +1319,179 @@ def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
                 print(compact_output(result.stderr))
         print(f"recorded: {recorded}")
     return 0 if all(result.ok for result in commands) and (not checks_ok or recorded) else 1
+
+
+def source_recovery_command(changed_paths: list[str], failure: str) -> str:
+    parts = ["python3", "scripts/source-recovery.py"]
+    for path in changed_paths:
+        parts.extend(["--changed-path", path])
+    parts.extend(["--failure", failure, "--format", "json"])
+    return shell_command(parts)
+
+
+def quality_gate_explanations(commands: list[CommandResult]) -> list[dict[str, object]]:
+    for result in commands:
+        if result.name != "quality-gate" or not result.stdout.strip():
+            continue
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return []
+        explanations = payload.get("explanations") if isinstance(payload, dict) else []
+        if isinstance(explanations, list):
+            return [item for item in explanations if isinstance(item, dict)]
+    return []
+
+
+def is_read_only_inspection_goal(goal: str) -> bool:
+    lowered = goal.lower()
+    read_only_terms = (
+        "살펴봐",
+        "추천",
+        "검토",
+        "조사",
+        "분석",
+        "찾아봐",
+        "알려줘",
+        "read-only",
+        "read only",
+        "inspect",
+        "recommend",
+        "review",
+        "do not edit",
+        "수정하지",
+        "변경하지",
+        "건드리지",
+    )
+    direct_build_terms = ("구현 해줘", "구현해줘", "implement this", "please implement")
+    if any(term in lowered for term in direct_build_terms):
+        return False
+    return any(term in lowered for term in read_only_terms)
+
+
+def failure_classification(root: Path, result: CommandResult, timeout: int) -> dict[str, object]:
+    text = compact_output((result.stderr or "") + "\n" + (result.stdout or ""))
+    script = root / "scripts" / "failure-classify.py"
+    if not script.exists():
+        return {
+            "category": "unknown",
+            "retryable": False,
+            "matched": "",
+            "next_action": "Inspect stderr/stdout; failure-classify.py is not available.",
+        }
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(script), "--text", text, "--format", "json"],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=min(timeout, 20),
+        )
+        payload = json.loads(completed.stdout or "{}")
+        if isinstance(payload, dict):
+            return payload
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError):
+        pass
+    return {
+        "category": "unknown",
+        "retryable": False,
+        "matched": "",
+        "next_action": "Inspect stderr/stdout and rerun the failing command manually.",
+    }
+
+
+def recovery_packet(root: Path, changed_paths: list[str], result: CommandResult, recovery_command: str, timeout: int) -> dict[str, object]:
+    return {
+        "mutates_files": False,
+        "failed_command": {
+            "name": result.name,
+            "exit_code": result.exit_code,
+            "command": shell_command(result.command),
+            "stderr": compact_output(result.stderr),
+            "stdout": compact_output(result.stdout),
+        },
+        "failure_classification": failure_classification(root, result, timeout),
+        "changed_paths": changed_paths,
+        "source_recovery_command": recovery_command,
+        "suggested_next_commands": [recovery_command],
+        "do_not_run": ["git reset --hard", "git checkout -- <path>", "rm -rf <path>", "automatic rollback without source review"],
+    }
+
+
+def plan_slug(goal: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9가-힣]+", "-", goal.strip().lower()).strip("-")
+    return slug[:48] or "implementation"
+
+
+def next_plan_path(root: Path, goal: str) -> Path:
+    directory = root / "plans" / "active"
+    max_seq = 0
+    if directory.is_dir():
+        for path in directory.glob("*.md"):
+            match = re.match(r"(\d+)-", path.name)
+            if match:
+                max_seq = max(max_seq, int(match.group(1)))
+    return directory / f"{max_seq + 1:04d}-{plan_slug(goal)}.md"
+
+
+def render_plan(goal: str) -> str:
+    closeout = f'python3 scripts/agent-flow.py closeout --goal "{goal}" --changed-path . --format json'
+    return "\n".join(
+        [
+            f"# {goal}",
+            "",
+            "## Summary",
+            f"- Goal: {goal}",
+            "- Status: active",
+            "",
+            "## Assumptions",
+            "- The user has approved implementation of this goal.",
+            "- Changes stay inside the project repository.",
+            "",
+            "## Out of Scope",
+            "- External network changes, dependency installation, and publishing.",
+            "",
+            "## Implementation Steps",
+            "- Inspect the existing project contracts.",
+            "- Implement the smallest safe changes.",
+            "- Update focused tests and documentation where needed.",
+            "- Run the validation commands below.",
+            "",
+            "## Definition of Done",
+            "- Required files are implemented.",
+            "- Focused tests pass.",
+            "- Closeout evidence and handoff are updated.",
+            "",
+            "## Rollback Plan",
+            "- Revert only the files changed for this plan.",
+            "",
+            "## Stop Conditions",
+            "- Stop if validation reveals unrelated unexpected changes.",
+            "- Stop if a write would escape the repository boundary.",
+            "",
+            "## Validation",
+            f"- `{closeout}`",
+            "",
+        ]
+    )
+
+
+def cmd_plan(root: Path, args: argparse.Namespace) -> int:
+    from lib_safe_write import atomic_write_text
+
+    path = next_plan_path(root, args.goal)
+    rel = path.relative_to(root).as_posix()
+    if path.exists() and not args.force:
+        print(f"plan already exists: {rel}", file=sys.stderr)
+        return 1
+    atomic_write_text(root, rel, render_plan(args.goal))
+    payload = {"root": str(root), "goal": args.goal, "path": rel, "created": True}
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"created plan: {rel}")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1313,7 +1536,15 @@ def build_parser() -> argparse.ArgumentParser:
     closeout.add_argument("--profile", default="auto")
     closeout.add_argument("--format", choices=("text", "json"), default="text")
     closeout.add_argument("--timeout", type=int, default=120)
+    closeout.add_argument("--test-timeout", type=int, default=300)
+    closeout.add_argument("--quality-baseline", default="")
     closeout.set_defaults(func=cmd_closeout)
+
+    plan = sub.add_parser("plan", help="Create a structured active implementation plan.")
+    plan.add_argument("--goal", required=True)
+    plan.add_argument("--format", choices=("text", "json"), default="text")
+    plan.add_argument("--force", action="store_true")
+    plan.set_defaults(func=cmd_plan)
     return parser
 
 

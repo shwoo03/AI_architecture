@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import sys
@@ -156,6 +157,88 @@ def search(root: Path, query: str, limit: int) -> list[SearchHit]:
     return sorted(hits, key=lambda hit: (-hit.rrf_score, hit.path, hit.line))[:limit]
 
 
+def load_helper(root: Path, script_name: str, module_name: str):
+    path = root / "scripts" / script_name
+    if not path.exists():
+        path = repo_root() / "scripts" / script_name
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load {script_name}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def open_question_findings(root: Path) -> list[dict[str, object]]:
+    try:
+        module = load_helper(root, "list-open-questions.py", "list_open_questions_for_gap_check")
+        return list(module.scan(root))
+    except Exception as exc:
+        return [{"category": "open_question_scan_error", "detail": str(exc)}]
+
+
+def wiki_lint_findings(root: Path) -> list[dict[str, object]]:
+    knowledge = root / "knowledge"
+    if not knowledge.exists():
+        return []
+    try:
+        module = load_helper(root, "wiki-lint.py", "wiki_lint_for_gap_check")
+        raw = module.lint(knowledge, 180)
+    except Exception as exc:
+        return [{"category": "knowledge_lint_error", "detail": str(exc)}]
+    findings: list[dict[str, object]] = []
+    for category, values in raw.items():
+        if category in {"graph_gap", "bridge_candidate", "weak_link", "isolated_entry"}:
+            continue
+        for value in values:
+            findings.append({"category": "knowledge_lint", "check": category, "detail": value})
+    return findings
+
+
+def gap_check(root: Path, query: str, limit: int) -> dict[str, object]:
+    hits = search(root, query, limit)
+    findings: list[dict[str, object]] = []
+    questions = open_question_findings(root)
+    if questions:
+        findings.extend({"category": "open_question", **item} for item in questions)
+    findings.extend(wiki_lint_findings(root))
+
+    if questions:
+        status = "blocked_by_question"
+        confidence = "high"
+        next_action = "ask_user"
+    elif not hits:
+        findings.append({"category": "no_hits", "detail": "no local knowledge hit matched the query"})
+        status = "missing"
+        confidence = "low"
+        next_action = "reference_review" if any(term in tokens(query) for term in {"reference", "upgrade", "external", "opensource", "오픈소스"}) else "propose_doc_update"
+    else:
+        best = hits[0]
+        rank_sources = best.rank_sources or []
+        if len(rank_sources) < 2:
+            findings.append({"category": "weak_hits", "detail": "best hit has only one ranking signal"})
+            status = "weak"
+            confidence = "medium"
+            next_action = "propose_doc_update"
+        else:
+            status = "covered"
+            confidence = "high"
+            next_action = "use_existing"
+        if any(item.get("category") == "knowledge_lint" for item in findings) and status == "covered":
+            status = "weak"
+            confidence = "medium"
+            next_action = "propose_doc_update"
+    return {
+        "query": query,
+        "status": status,
+        "confidence": confidence,
+        "hits": [asdict(hit) for hit in hits],
+        "findings": findings,
+        "recommended_next_action": next_action,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=None)
@@ -164,20 +247,36 @@ def main() -> int:
     search_parser.add_argument("query")
     search_parser.add_argument("--limit", type=int, default=10)
     search_parser.add_argument("--format", choices=("text", "json"), default="text")
+    gap_parser = sub.add_parser("gap-check")
+    gap_parser.add_argument("query")
+    gap_parser.add_argument("--limit", type=int, default=5)
+    gap_parser.add_argument("--format", choices=("text", "json"), default="text")
+    gap_parser.add_argument("--strict", action="store_true")
     args = parser.parse_args()
     root = Path(args.root).resolve() if args.root else repo_root().resolve()
     if not root.is_dir():
         print(f"root not a directory: {root}", file=sys.stderr)
         return 2
-    hits = search(root, args.query, args.limit)
+    if args.command == "search":
+        hits = search(root, args.query, args.limit)
+        if args.format == "json":
+            print(json.dumps({"query": args.query, "hits": [asdict(hit) for hit in hits]}, ensure_ascii=False, indent=2))
+        else:
+            if not hits:
+                print("no knowledge matches.")
+            for hit in hits:
+                print(f"{hit.path}:{hit.line} score={hit.score:g} {hit.snippet}")
+        return 0
+    payload = gap_check(root, args.query, args.limit)
     if args.format == "json":
-        print(json.dumps({"query": args.query, "hits": [asdict(hit) for hit in hits]}, ensure_ascii=False, indent=2))
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
-        if not hits:
-            print("no knowledge matches.")
-        for hit in hits:
-            print(f"{hit.path}:{hit.line} score={hit.score:g} {hit.snippet}")
-    return 0
+        print(f"status: {payload['status']} confidence: {payload['confidence']}")
+        for hit in payload["hits"]:
+            print(f"{hit['path']}:{hit['line']} {hit['snippet']}")
+        for finding in payload["findings"]:
+            print(f"{finding.get('category')}: {finding.get('detail') or finding}")
+    return 1 if args.strict and payload["status"] in {"missing", "blocked_by_question"} else 0
 
 
 if __name__ == "__main__":

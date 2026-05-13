@@ -28,10 +28,109 @@ class ReferenceCandidateTests(unittest.TestCase):
         finally:
             scratch.unlink(missing_ok=True)
 
+
+class ReferenceInventoryTests(unittest.TestCase):
+    SCRIPT = SCRIPTS / "reference-inventory.py"
+
+    def test_current_reference_inventory_is_aligned(self) -> None:
+        result = _run([str(self.SCRIPT), "--root", str(REPO_ROOT), "--format", "json"], cwd=REPO_ROOT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"], payload["findings"])
+        tracked = {item["name"]: item for item in payload["tracked_repos"]}
+        for name in ("oh-my-codex", "oh-my-claudecode", "paperclip", "opencode"):
+            self.assertIn(name, tracked)
+            self.assertTrue(tracked[name]["candidate_cards"])
+
+    def test_missing_candidate_is_warn_not_default_failure(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"reference-inventory-{uuid.uuid4().hex}"
+        try:
+            (tmp / "research" / "reference-candidates").mkdir(parents=True)
+            tmp.joinpath("references.yaml").write_text(
+                "\n".join(
+                    [
+                        "repos:",
+                        "  - name: \"missing-ref\"",
+                        "    url: \"https://example.com/missing.git\"",
+                        "    local_path: \"../refs/missing\"",
+                        "    last_known_commit: \"abc\"",
+                        "    last_known_commit_date: \"not checked\"",
+                        "    why_tracked: \"test\"",
+                        "    import_targets: [\"docs/\"]",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json"])
+            strict = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", "--strict"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["ok"])
+            self.assertEqual(payload["findings"][0]["check"], "candidate_missing")
+            self.assertEqual(strict.returncode, 1)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
 class ReferenceProposalTests(unittest.TestCase):
     """Reference-adoption dry-run proposals must be reviewable before apply."""
 
     SCRIPT = SCRIPTS / "validate-reference-proposals.py"
+
+    def test_lifecycle_warns_on_accepted_proposal_without_concrete_validation(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"proposal-lifecycle-{uuid.uuid4().hex}"
+        try:
+            candidate = tmp / "research" / "reference-candidates" / "candidate.md"
+            candidate.parent.mkdir(parents=True)
+            candidate.write_text("# Candidate\n", encoding="utf-8")
+            proposal = tmp / "runtime" / "proposals" / "reference-adoption" / "refresh.md"
+            proposal.parent.mkdir(parents=True)
+            proposal.write_text(
+                "\n".join(
+                    [
+                        "# Refresh",
+                        "",
+                        "## 상태",
+                        "",
+                        "- `status`: accepted",
+                        "- `created_at`: 2026-05-13",
+                        "- `candidate_card`: research/reference-candidates/candidate.md",
+                        "- `proposal_type`: reference_refresh",
+                        "- `approval_required`: yes",
+                        "- `decision_source`: user",
+                        "- `decision`: accepted",
+                        "- `decided_at`: 2026-05-13",
+                        "- `decided_by`: tester",
+                        "- `applied_in`: not run in this turn",
+                        "- `validation_result`: not run in this turn",
+                        "",
+                        "## 한 문장 정의",
+                        "Refresh proposal.",
+                        "",
+                        "## 근거",
+                        "- source-backed",
+                        "",
+                        "## 제안 변경",
+                        "- review only",
+                        "",
+                        "## 검증 계획",
+                        "- python scripts/verify-skeleton.py",
+                        "- python scripts/validate-reference-proposals.py",
+                        "",
+                        "## 최종 결정 기록",
+                        "- accepted by tester",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--lifecycle", "--format", "json"])
+            strict = _run([str(self.SCRIPT), "--root", str(tmp), "--lifecycle", "--strict-lifecycle", "--format", "json"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["summary"]["ERROR"], 0)
+        self.assertEqual(payload["summary"]["WARN"], 2)
+        self.assertEqual(strict.returncode, 1)
 
     def test_current_reference_proposals_are_valid(self) -> None:
         result = _run([str(self.SCRIPT)], cwd=REPO_ROOT)

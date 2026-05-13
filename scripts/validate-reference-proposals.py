@@ -8,9 +8,10 @@ runtime/proposals/reference-adoption/. README.md and _template.md are skipped.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 try:
@@ -105,6 +106,7 @@ FIELD_RE = re.compile(r"^-[ \t]+`([^`]+)`:[ \t]*([^\r\n]*?)\r?$", re.MULTILINE)
 class Finding:
     path: Path
     message: str
+    severity: str = "ERROR"
 
 
 def repo_root() -> Path:
@@ -257,6 +259,46 @@ def validate(root: Path) -> tuple[list[Finding], int]:
     return findings, len(files)
 
 
+def lifecycle_warnings(root: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in proposal_files(root):
+        text = path.read_text(encoding="utf-8")
+        fields = parse_fields(text)
+        decision = clean_value(fields.get("decision", ""))
+        status = clean_value(fields.get("status", ""))
+        if decision not in {"accepted", "applied"} and status not in {"accepted", "applied"}:
+            continue
+        applied_in = clean_value(fields.get("applied_in", ""))
+        validation_result = clean_value(fields.get("validation_result", ""))
+        decided_at = clean_value(fields.get("decided_at", ""))
+        decided_by = clean_value(fields.get("decided_by", ""))
+        weak_values = {"", "-", "TBD", "todo", "TODO", "pending", "not run", "not run in this turn", "not recorded", "n/a"}
+        if applied_in.strip().lower() in weak_values:
+            findings.append(Finding(path, "accepted/applied proposal has no concrete `applied_in` evidence", "WARN"))
+        if validation_result.strip().lower() in weak_values:
+            findings.append(Finding(path, "accepted/applied proposal has no concrete `validation_result` evidence", "WARN"))
+        if decided_at.strip().lower() in weak_values or decided_by.strip().lower() in weak_values:
+            findings.append(Finding(path, "accepted/applied proposal has incomplete decision evidence", "WARN"))
+    return findings
+
+
+def finding_payload(root: Path, finding: Finding) -> dict[str, str]:
+    payload = asdict(finding)
+    payload["path"] = finding.path.relative_to(root).as_posix()
+    return payload
+
+
+def render_json(root: Path, findings: list[Finding], count: int) -> str:
+    errors = sum(1 for finding in findings if finding.severity == "ERROR")
+    warnings = sum(1 for finding in findings if finding.severity == "WARN")
+    payload = {
+        "ok": errors == 0 and warnings == 0,
+        "summary": {"ERROR": errors, "WARN": warnings, "checked": count},
+        "findings": [finding_payload(root, finding) for finding in findings],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -264,18 +306,29 @@ def main() -> int:
         default=None,
         help="Project root (defaults to this script's repository root).",
     )
+    parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument("--lifecycle", action="store_true", help="Warn about accepted/applied proposals missing application or validation evidence.")
+    parser.add_argument("--strict-lifecycle", action="store_true", help="Fail when lifecycle warnings are present.")
     args = parser.parse_args()
     root = Path(args.root).resolve() if args.root else repo_root()
     findings, count = validate(root)
-    if findings:
+    if args.lifecycle:
+        findings.extend(lifecycle_warnings(root))
+    if args.format == "json":
+        print(render_json(root, findings, count))
+    elif findings:
         print("reference proposal findings:")
         for finding in findings:
             rel = finding.path.relative_to(root).as_posix()
-            print(f"  ERROR {rel}: {finding.message}")
-        print(f"checked {count} reference proposal(s), {len(findings)} error(s)")
-        return 1
-    print(f"reference proposals OK: {count} proposal(s) checked")
-    return 0
+            print(f"  {finding.severity} {rel}: {finding.message}")
+        errors = sum(1 for finding in findings if finding.severity == "ERROR")
+        warnings = sum(1 for finding in findings if finding.severity == "WARN")
+        print(f"checked {count} reference proposal(s), {errors} error(s), {warnings} warning(s)")
+    else:
+        print(f"reference proposals OK: {count} proposal(s) checked")
+    errors = any(finding.severity == "ERROR" for finding in findings)
+    warnings = any(finding.severity == "WARN" for finding in findings)
+    return 1 if errors or (args.strict_lifecycle and warnings) else 0
 
 
 if __name__ == "__main__":
