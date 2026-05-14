@@ -1,25 +1,25 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-14T15:21:24Z",
+  "ts": "2026-05-14T16:02:32Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-14T15:20:50Z",
+    "ts": "2026-05-14T16:01:59Z",
     "phase": "session",
     "action": "handoff_saved",
-    "goal": "Phase 1e incubating delegate entrypoint",
+    "goal": "Phase 1e-followup workflow-aware completion_command",
     "status": "completed",
-    "summary": "Phase 1e delegate entrypoint complete; handoff updated after closeout."
+    "summary": "Phase 1e-followup complete; workflow-aware completion command handoff updated after closeout."
   },
   "completion_evidence_last": {
-    "ts": "2026-05-14T15:20:41Z",
-    "goal": "Phase 1e incubating delegate entrypoint",
+    "ts": "2026-05-14T16:01:45Z",
+    "goal": "Phase 1e-followup workflow-aware completion_command",
     "changed_paths": [
       "scripts/incubating/agent-flow-delegate.py",
       "docs/RUNTIME_EVENT_SCHEMA.md",
       "tests/test_validation.py",
-      "plans/active/0004-phase-1e-incubating-delegate-entrypoint.md"
+      "plans/active/0005-phase-1e-followup-workflow-aware-completion-command.md"
     ],
     "validations": [
       {

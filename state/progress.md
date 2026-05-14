@@ -1,7 +1,7 @@
 # Progress
 
 ## 현재 마일스톤
-V2 incubating runtime Phase 1e complete
+V2 incubating runtime Phase 1e-followup complete
 
 ## 완료된 작업
 - 골격 부트스트랩
@@ -28,6 +28,7 @@ V2 incubating runtime Phase 1e complete
 - Phase 1d-2 retry/idempotency: explicit `retry_of`, same-brief live-ledger lookup, duplicate run id check, retry severity validation
 - Phase 1d-3 aggregation summary: retry-aware `summary` fields for retried count, chain heads, unresolved failures
 - Phase 1e incubating delegate entrypoint: `agent-brief.py`를 재사용해 brief artifact와 실행 가능한 handoff JSON을 생성
+- Phase 1e-followup workflow-aware completion command: read-only workflow에서는 `--changed-path` placeholder를 생략하고 write workflow에서는 유지
 
 ## 다음 작업
-- Delegate 실데이터 흐름 관찰 후 routing 또는 validator-loop 슬라이스 선택
+- Write-heavy delegate cycle 1회 후 routing/validator-loop/non-terminal status 결정

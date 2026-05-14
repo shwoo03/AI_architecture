@@ -20,6 +20,8 @@ except (AttributeError, OSError):
 
 
 WRITE_POLICIES = ("manual_work_required", "read_only", "write_with_confirmation")
+# Keep in sync with scripts/incubating/agent-run.py READ_ONLY_WORKFLOWS.
+READ_ONLY_WORKFLOWS = frozenset({"manual_smoke", "dry_run"})
 
 
 def repo_root() -> Path:
@@ -62,27 +64,35 @@ def brief_command(root: Path, args: argparse.Namespace) -> list[str]:
     return command
 
 
-def completion_command(brief_path: str) -> str:
-    return (
-        "python3 scripts/incubating/agent-run.py add "
-        f'--brief "{brief_path}" '
-        "--status completed "
-        '--result-summary "<result-summary>" '
-        '--changed-path "<repo-relative-path>" '
-        "--validation manual_read=passed "
-        "--workflow manual_smoke "
-        "--agent human_operator "
-        "--created-by manual "
-        "--format json"
+def completion_command(brief_path: str, workflow: str) -> str:
+    parts = [
+        "python3 scripts/incubating/agent-run.py add",
+        f'--brief "{brief_path}"',
+        "--status completed",
+        '--result-summary "<result-summary>"',
+    ]
+    if workflow not in READ_ONLY_WORKFLOWS:
+        parts.append('--changed-path "<repo-relative-path>"')
+    parts.extend(
+        [
+            "--validation manual_read=passed",
+            f"--workflow {workflow}",
+            "--agent human_operator",
+            "--created-by manual",
+            "--format json",
+        ]
     )
+    return " ".join(parts)
 
 
-def handoff_payload(brief_path: str, brief: dict[str, object]) -> dict[str, object]:
+def handoff_payload(brief_path: str, brief: dict[str, object], workflow: str) -> dict[str, object]:
     brief_id = str(brief["brief_id"])
     next_prompt = (
         f"Read {brief_path} and execute under the listed read_scope/write_scope. "
         "On completion, run the completion_command example after replacing placeholders."
     )
+    if workflow in READ_ONLY_WORKFLOWS:
+        next_prompt += " Read-only workflow detected; --changed-path is omitted from the completion_command."
     return {
         "brief_path": brief_path,
         "brief_id": brief_id,
@@ -94,7 +104,8 @@ def handoff_payload(brief_path: str, brief: dict[str, object]) -> dict[str, obje
         "validation_hints": brief["validation_hints"],
         "goal_lineage": brief["goal_lineage"],
         "next_prompt": next_prompt,
-        "completion_command": completion_command(brief_path),
+        "completion_command": completion_command(brief_path, workflow),
+        "workflow": workflow,
         "tier": "incubating",
     }
 
@@ -113,6 +124,7 @@ def main() -> int:
     parser.add_argument("--parent-write-policy", choices=WRITE_POLICIES, default="")
     parser.add_argument("--parent-scope", action="append", default=[])
     parser.add_argument("--brief-seq", default="")
+    parser.add_argument("--workflow", default="manual_smoke")
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args()
 
@@ -136,7 +148,7 @@ def main() -> int:
         brief = brief_result["brief"]
         if not isinstance(brief, dict):
             raise ValueError("brief payload is not an object")
-        payload = handoff_payload(brief_path, brief)
+        payload = handoff_payload(brief_path, brief, args.workflow)
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         print(f"invalid agent-brief.py JSON output: {exc}", file=sys.stderr)
         return 1

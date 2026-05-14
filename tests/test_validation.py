@@ -1214,12 +1214,14 @@ class NewInternalToolTests(unittest.TestCase):
                 "goal_lineage",
                 "next_prompt",
                 "completion_command",
+                "workflow",
                 "tier",
             }
             self.assertEqual(set(payload), required)
             self.assertEqual(payload["role"], "docs-sync-auditor")
             self.assertEqual(payload["objective"], "delegate smoke test")
             self.assertEqual(payload["tier"], "incubating")
+            self.assertEqual(payload["workflow"], "manual_smoke")
             self.assertTrue((tmp / payload["brief_path"]).exists())
             self.assertEqual(json.loads((tmp / payload["brief_path"]).read_text(encoding="utf-8"))["brief_id"], payload["brief_id"])
         finally:
@@ -1242,10 +1244,150 @@ class NewInternalToolTests(unittest.TestCase):
             ])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             command = json.loads(result.stdout)["completion_command"]
-            for flag in ("--brief", "--status", "--result-summary", "--changed-path", "--validation", "--workflow", "--agent", "--created-by"):
+            for flag in ("--brief", "--status", "--result-summary", "--validation", "--workflow", "--agent", "--created-by"):
                 self.assertIn(flag, command)
+            self.assertNotIn("--changed-path", command)
             self.assertIn("scripts/incubating/agent-run.py add", command)
             self.assertIn(json.loads(result.stdout)["brief_path"], command)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_default_manual_smoke_omits_changed_path(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-default-workflow-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "delegate default workflow test",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["workflow"], "manual_smoke")
+            self.assertIn("--workflow manual_smoke", payload["completion_command"])
+            self.assertNotIn("--changed-path", payload["completion_command"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_dry_run_omits_changed_path(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-dry-run-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "delegate dry run workflow test",
+                "--workflow",
+                "dry_run",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["workflow"], "dry_run")
+            self.assertIn("--workflow dry_run", payload["completion_command"])
+            self.assertNotIn("--changed-path", payload["completion_command"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_write_workflow_keeps_changed_path_placeholder(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-write-workflow-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "build-error-resolver",
+                "--goal",
+                "delegate write workflow test",
+                "--workflow",
+                "completed_run",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["workflow"], "completed_run")
+            self.assertIn("--workflow completed_run", payload["completion_command"])
+            self.assertIn('--changed-path "<repo-relative-path>"', payload["completion_command"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_read_only_prompt_mentions_changed_path_omission(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-readonly-prompt-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "delegate prompt test",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertIn("--changed-path is omitted", payload["next_prompt"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_completion_command_omits_retry_of_by_default(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-no-retry-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "delegate retry test",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("--retry-of", json.loads(result.stdout)["completion_command"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_accepts_freeform_write_workflow(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-freeform-workflow-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "build-error-resolver",
+                "--goal",
+                "delegate freeform workflow test",
+                "--workflow",
+                "custom_write_flow",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["workflow"], "custom_write_flow")
+            self.assertIn("--workflow custom_write_flow", payload["completion_command"])
+            self.assertIn("--changed-path", payload["completion_command"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

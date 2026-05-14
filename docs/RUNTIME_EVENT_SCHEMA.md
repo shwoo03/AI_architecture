@@ -158,6 +158,8 @@ The summary command reads only `runtime/agent-runs.jsonl`. It does not read `run
 
 `scripts/incubating/agent-flow-delegate.py` is a preparation-only wrapper around `scripts/agent-brief.py`. It reuses the AgentBrief writer as the schema source of truth, writes a brief artifact under `runtime/agent-briefs/`, and returns a handoff JSON with the brief path plus an example `agent-run.py add` completion command. It does not spawn subagents, create AgentRun skeletons, read or write `runtime/agent-runs.jsonl`, or expose a `delegate` command through the stable `scripts/agent-flow.py` surface.
 
+The delegate `completion_command` is workflow-aware. For read-only workflows (`manual_smoke`, `dry_run`), it omits the `--changed-path` placeholder because the AgentRun writer allows empty `changed_paths` for those workflows. For other workflow values, it keeps `--changed-path "<repo-relative-path>"` so write-producing runs explicitly record changed paths. The delegate's read-only workflow set must stay aligned with `scripts/incubating/agent-run.py` `READ_ONLY_WORKFLOWS`.
+
 ## Adapter extension 규칙
 
 외부 SDK나 graph runtime의 provider-specific 필드는 core schema에 직접 추가하지 않습니다. 필요한 경우 `ext.<adapter_name>.*` namespace 아래에 격리합니다.
