@@ -1,37 +1,38 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-13T16:55:06Z
+2026-05-14T12:11:56Z
 
 ## Current Task
-Phase 1c AgentRun v2-only ledger migration, read-side aggregation, and all-tier quality gate integration are implemented.
+Phase 1d-2 AgentRun retry/idempotency is complete and closed out.
 
 ## Last Completed
-- Performed controlled ledger migration for `runtime/agent-runs.jsonl`.
-- Moved two pre-v2/ECC-style records into frozen archive `runtime/agent-runs.legacy.jsonl`.
-- Left `runtime/agent-runs.jsonl` as live append-only v2-only ledger with one AgentRun v1 record.
-- Documented live/frozen ledger boundary and `agent_run_id` policy in `docs/RUNTIME_EVENT_SCHEMA.md`.
-- Updated `scripts/incubating/agent-run.py` with `list`, `check`, and `summary` subcommands.
-- Updated future `agent_run_id` generation to `run-<brief_id>-<seq>` while preserving the existing 1b smoke entry id.
-- Connected `quality-gate --tier all` to the incubating AgentRun ledger check.
-- Kept `quality-gate --tier stable` unaffected; `agent-run-ledger` remains skipped by tier.
-- Closed all previously completed subagents and did not create new subagents for 1c.
+- Added optional top-level `retry_of` support to `scripts/incubating/agent-run.py`.
+- `add --retry-of` now validates live-ledger-only targets under lock before append.
+- Retry targets must exist in `runtime/agent-runs.jsonl`, share the same `brief_id`, be earlier than the new run, and have `status` `failed` or `blocked`.
+- Same-brief repeated runs are not inferred as retries without explicit `--retry-of`.
+- `check` now reports retry self-reference, brief mismatch, duplicate `agent_run_id`, ordering, and completed-target violations as ERROR.
+- `check` reports missing retry targets as WARN drift and keeps `ok=true`.
+- `runtime/agent-runs.legacy.jsonl` remains excluded from retry lookup and is covered by regression tests.
+- Documented AgentRun retry/idempotency policy in `docs/RUNTIME_EVENT_SCHEMA.md`.
+- Added retry/idempotency regression coverage in `tests/test_validation.py`.
+- Preserved the live AgentRun ledger byte-identical at `3015775437d694341861639ac20a1aa68f203e8e5f95001a7ae004ec92ed48a8`.
+- Recorded successful `agent-flow closeout` evidence for Phase 1d-2.
 
 ## Validation
-- Ledger split check passed: live=1, live_v2=1, legacy=2, legacy_v2=0.
-- `python3 scripts/incubating/agent-run.py --root . dump --tail 5 --format json` showed only the v2 record.
-- `python3 scripts/incubating/agent-run.py --root . check --format json` returned `ok: true`, `record_count: 1`, no findings.
-- `python3 scripts/incubating/agent-run.py --root . summary --format json` returned total=1 and completed/manual_smoke/human_operator counts.
-- `python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json` exited 0 and skipped `agent-run-ledger`.
-- `python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json` exited 0 and included `agent-run-ledger: OK`.
-- Focused unittest passed: `python3 -m unittest tests.test_validation.NewInternalToolTests tests.test_validation.QualityGateTests -v`, 39 tests.
-- Full unittest passed: `python3 -m unittest discover -s tests -v`, 204 tests.
+- `python3 -m unittest tests.test_validation -v` exited 0, 88 tests.
+- `python3 scripts/incubating/agent-run.py --root . check --format json` exited 0, `ok=true`, no findings.
+- `python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json` exited 0; `agent-run-ledger` stayed skipped by tier.
+- `python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json` exited 0; `agent-run-ledger` returned OK.
+- `python3 scripts/verify-skeleton.py` exited 0; final rerun after cleanup reported `skeleton OK: all checks passed`.
+- `python3 -m unittest discover -s tests -v` exited 0, 224 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/agent-flow.py closeout --goal "Phase 1d-2 retry/idempotency" ... --format json` exited 0 and recorded evidence.
 
 ## Recommended Next Step
-Decide whether to start the next v2 slice: either `agent-flow delegate` incubating entrypoint design, or richer AgentRun aggregation policy such as changed-path verification and retry/idempotency semantics.
+Start Phase 1d-3 AgentRun aggregation summary.
 
 ## Open Questions / Blockers
-None for Phase 1c.
+None for Phase 1d-2.
 
 ## Resume Prompt
-Continue from /Users/shwoo/mydir/AI/AI_architecture. Phase 1c is implemented: AgentRun ledger is v2-only, legacy records are frozen in `runtime/agent-runs.legacy.jsonl`, `agent-run.py list/check/summary` exist, and `quality-gate --tier all` validates the incubating ledger while stable gate remains unaffected. Run closeout/maintenance checks before starting a new v2 slice if needed.
+Continue from /Users/shwoo/mydir/AI/AI_architecture. Phase 1d-2 retry/idempotency is complete: AgentRun supports explicit top-level `retry_of`, add validates live-ledger same-brief failed/blocked targets under lock, check reports retry/idempotency ERROR/WARN findings, legacy ledger lookup is excluded, validation and closeout passed, and the live AgentRun ledger SHA stayed unchanged. Begin Phase 1d-3 AgentRun aggregation summary.

@@ -1,7 +1,7 @@
 # Progress
 
 ## 현재 마일스톤
-V2 incubating runtime Phase 1c complete
+V2 incubating runtime Phase 1d-2 complete
 
 ## 완료된 작업
 - 골격 부트스트랩
@@ -24,6 +24,8 @@ V2 incubating runtime Phase 1c complete
 - Phase 1c controlled migration: pre-v2 AgentRun 2건을 frozen `runtime/agent-runs.legacy.jsonl`로 분리
 - Phase 1c read-side aggregation: `agent-run.py list/check/summary` 추가
 - Phase 1c all-tier gate: `quality-gate --tier all`에서 incubating AgentRun schema check 연결
+- Phase 1d-1 changed_paths validation: AgentRun add strict path validation, historical WARN check, all-tier WARN handling
+- Phase 1d-2 retry/idempotency: explicit `retry_of`, same-brief live-ledger lookup, duplicate run id check, retry severity validation
 
 ## 다음 작업
-- 다음 v2 slice 선택: incubating `agent-flow delegate` entrypoint 설계/구현 또는 AgentRun aggregation 고도화(changed-path 검증, retry/idempotency 정책)
+- Phase 1d-3: AgentRun aggregation summary 고도화

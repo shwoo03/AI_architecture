@@ -529,6 +529,77 @@ class QualityGateTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_quality_gate_all_warns_but_does_not_fail_agent_run_missing_changed_path(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"quality-agent-run-warn-{uuid.uuid4().hex}"
+        try:
+            (tmp / "docs").mkdir(parents=True)
+            (tmp / "scripts" / "incubating").mkdir(parents=True)
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "docs" / "stable.md").write_text("# stable\n", encoding="utf-8")
+            (tmp / "docs" / "agent-run.md").write_text("# agent run\n", encoding="utf-8")
+            (tmp / "docs" / "feature-status.yaml").write_text(
+                "version: 1\n"
+                "tiers: [stable, incubating, experimental, deprecated]\n"
+                "features:\n"
+                "  - id: stable.feature\n"
+                "    tier: stable\n"
+                "    overlay_default: true\n"
+                "    docs: [docs/stable.md]\n"
+                "  - id: agent-run-ledger\n"
+                "    tier: incubating\n"
+                "    overlay_default: false\n"
+                "    docs: [docs/agent-run.md]\n",
+                encoding="utf-8",
+            )
+            agent_run_id = "run-warn-01"
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "ai-architecture.agent-run.v1",
+                        "ts": "2026-05-13T00:00:00Z",
+                        "agent_run_id": agent_run_id,
+                        "brief_id": "warn",
+                        "tier": "incubating",
+                        "agent": "human_operator",
+                        "workflow": "manual_smoke",
+                        "status": "completed",
+                        "goal_lineage": [{"type": "agent_run", "ref": f"runtime/agent-runs.jsonl#{agent_run_id}", "summary": "warn"}],
+                        "artifacts": [],
+                        "result_summary": "warn",
+                        "changed_paths": ["docs/deleted.md"],
+                        "validation": [],
+                        "created_by": "manual",
+                        "ext": {},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            for rel in ["quality-gate.py", "feature-status.py", "lib_feature_status.py", "failure-classify.py", "lib_runtime_lock.py"]:
+                shutil.copy2(SCRIPTS / rel, tmp / "scripts" / rel)
+            shutil.copy2(SCRIPTS / "incubating" / "agent-run.py", tmp / "scripts" / "incubating" / "agent-run.py")
+            result = _run(
+                [
+                    str(tmp / "scripts" / "quality-gate.py"),
+                    "--root",
+                    str(tmp),
+                    "--tier",
+                    "all",
+                    "--skip-tests",
+                    "--skip-node",
+                    "--skip-skeleton",
+                    "--format",
+                    "json",
+                ],
+                cwd=tmp,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            checks = {item["name"]: item for item in json.loads(result.stdout)["checks"]}
+            self.assertEqual(checks["agent-run-ledger"]["status"], "WARN")
+            self.assertIn("changed_paths_missing", checks["agent-run-ledger"]["detail"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_quality_gate_uses_separate_unittest_timeout(self) -> None:
         import importlib.util
 
@@ -1109,30 +1180,68 @@ class NewInternalToolTests(unittest.TestCase):
         self.assertNotIn("delegate", result.stdout.lower())
         self.assertNotIn("agent-run", result.stdout.lower())
 
+    def _write_agent_run_brief(self, root: Path) -> str:
+        result = _run([
+            str(SCRIPTS / "agent-brief.py"),
+            "--root",
+            str(root),
+            "--role",
+            "docs-sync-auditor",
+            "--goal",
+            "manual smoke",
+            "--parent-plan",
+            "plans/active/0008-agent-run.md",
+            "--parent-goal",
+            "agent run writer",
+            "--user-goal",
+            "write one manual smoke run",
+            "--write",
+            "--format",
+            "json",
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return str(root / json.loads(result.stdout)["brief_path"])
+
+    def _agent_run_record(
+        self,
+        root: Path,
+        *,
+        changed_paths: list[str],
+        workflow: str = "manual_smoke",
+        agent_run_id: str = "run-test-01",
+        brief_id: str = "test",
+        status: str = "completed",
+        retry_of: str | None = None,
+    ) -> dict[str, object]:
+        record: dict[str, object] = {
+            "schema_version": "ai-architecture.agent-run.v1",
+            "ts": "2026-05-13T00:00:00Z",
+            "agent_run_id": agent_run_id,
+            "brief_id": brief_id,
+            "tier": "incubating",
+            "agent": "human_operator",
+            "workflow": workflow,
+            "status": status,
+            "goal_lineage": [{"type": "agent_run", "ref": f"runtime/agent-runs.jsonl#{agent_run_id}", "summary": "test"}],
+            "artifacts": [],
+            "result_summary": "test",
+            "changed_paths": changed_paths,
+            "validation": [],
+            "created_by": "manual",
+            "ext": {},
+        }
+        if retry_of is not None:
+            record["retry_of"] = retry_of
+        return record
+
+    def _brief_id_from_path(self, path: str) -> str:
+        return str(json.loads(Path(path).read_text(encoding="utf-8"))["brief_id"])
+
     def test_agent_run_add_and_dump_manual_smoke_record(self) -> None:
         tmp = REPO_ROOT / "runtime" / f"agent-run-{uuid.uuid4().hex}"
         try:
             tmp.mkdir(parents=True)
-            brief_result = _run([
-                str(SCRIPTS / "agent-brief.py"),
-                "--root",
-                str(tmp),
-                "--role",
-                "docs-sync-auditor",
-                "--goal",
-                "manual smoke",
-                "--parent-plan",
-                "plans/active/0008-agent-run.md",
-                "--parent-goal",
-                "agent run writer",
-                "--user-goal",
-                "write one manual smoke run",
-                "--write",
-                "--format",
-                "json",
-            ])
-            self.assertEqual(brief_result.returncode, 0, brief_result.stdout + brief_result.stderr)
-            brief_path = json.loads(brief_result.stdout)["brief_path"]
+            brief_path = self._write_agent_run_brief(tmp)
             add_result = _run([
                 str(SCRIPTS / "incubating" / "agent-run.py"),
                 "--root",
@@ -1200,6 +1309,465 @@ class NewInternalToolTests(unittest.TestCase):
             self.assertEqual(summary["findings_count"], 0)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_rejects_changed_path_outside_root(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-path-outside-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "should reject",
+                "--changed-path",
+                str(REPO_ROOT / "AGENTS.md"),
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("outside root", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-runs.jsonl").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_rejects_missing_changed_path(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-path-missing-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "should reject",
+                "--changed-path",
+                "docs/missing.md",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("does not exist", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-runs.jsonl").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_rejects_symlink_escape_changed_path(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-path-symlink-{uuid.uuid4().hex}"
+        outside = REPO_ROOT / "runtime" / f"agent-run-path-target-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            outside.mkdir(parents=True)
+            (outside / "target.md").write_text("outside\n", encoding="utf-8")
+            os.symlink(outside, tmp / "escape")
+            brief_path = self._write_agent_run_brief(tmp)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "should reject",
+                "--changed-path",
+                "escape/target.md",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("symlink escapes root", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-runs.jsonl").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(outside, ignore_errors=True)
+
+    def test_agent_run_add_allows_empty_changed_paths_for_manual_smoke(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-path-empty-smoke-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "manual smoke passed",
+                "--workflow",
+                "manual_smoke",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(json.loads(result.stdout)["changed_paths"], [])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_requires_changed_paths_for_non_read_only_workflow(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-path-empty-write-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "should reject",
+                "--workflow",
+                "completed_run",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("changed_paths required", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-runs.jsonl").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_check_accepts_existing_changed_path(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-path-check-ok-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "docs").mkdir()
+            (tmp / "docs" / "changed.md").write_text("changed\n", encoding="utf-8")
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(self._agent_run_record(tmp, changed_paths=["docs/changed.md"], workflow="completed_run")) + "\n",
+                encoding="utf-8",
+            )
+            result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["ok"])
+            self.assertEqual(payload["findings"], [])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_check_warns_for_historical_missing_changed_path(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-path-check-warn-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(self._agent_run_record(tmp, changed_paths=["docs/deleted.md"], workflow="completed_run")) + "\n",
+                encoding="utf-8",
+            )
+            result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["ok"])
+            self.assertEqual(payload["findings"][0]["severity"], "WARN")
+            self.assertEqual(payload["findings"][0]["check"], "changed_paths_missing")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_without_retry_of_preserves_existing_append_behavior(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-none-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "no retry",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("retry_of", json.loads(result.stdout))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_rejects_missing_retry_target(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-missing-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "missing retry",
+                "--retry-of",
+                "run-missing-01",
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("retry_of target not found in live ledger", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-runs.jsonl").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_rejects_retry_self_reference(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-self-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            brief_id = self._brief_id_from_path(brief_path)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "self retry",
+                "--retry-of",
+                f"run-{brief_id}-01",
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("retry_of cannot reference self", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-runs.jsonl").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_rejects_retry_target_brief_mismatch(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-brief-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            (tmp / "runtime").mkdir(exist_ok=True)
+            target_id = "run-other-brief-01"
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(self._agent_run_record(tmp, changed_paths=[], agent_run_id=target_id, brief_id="other-brief", status="failed")) + "\n",
+                encoding="utf-8",
+            )
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "mismatch retry",
+                "--retry-of",
+                target_id,
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("retry_of target brief mismatch", result.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_rejects_retry_target_completed_status(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-completed-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            brief_id = self._brief_id_from_path(brief_path)
+            target_id = f"run-{brief_id}-01"
+            (tmp / "runtime").mkdir(exist_ok=True)
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(self._agent_run_record(tmp, changed_paths=[], agent_run_id=target_id, brief_id=brief_id, status="completed")) + "\n",
+                encoding="utf-8",
+            )
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "completed retry",
+                "--retry-of",
+                target_id,
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("retry_of target status must be failed or blocked", result.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_accepts_failed_and_blocked_retry_targets(self) -> None:
+        for status in ("failed", "blocked"):
+            with self.subTest(status=status):
+                tmp = REPO_ROOT / "runtime" / f"agent-run-retry-{status}-{uuid.uuid4().hex}"
+                try:
+                    tmp.mkdir(parents=True)
+                    brief_path = self._write_agent_run_brief(tmp)
+                    brief_id = self._brief_id_from_path(brief_path)
+                    target_id = f"run-{brief_id}-01"
+                    (tmp / "runtime").mkdir(exist_ok=True)
+                    (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                        json.dumps(self._agent_run_record(tmp, changed_paths=[], agent_run_id=target_id, brief_id=brief_id, status=status)) + "\n",
+                        encoding="utf-8",
+                    )
+                    result = _run([
+                        str(SCRIPTS / "incubating" / "agent-run.py"),
+                        "--root",
+                        str(tmp),
+                        "add",
+                        "--brief",
+                        brief_path,
+                        "--result-summary",
+                        f"{status} retry",
+                        "--retry-of",
+                        target_id,
+                        "--format",
+                        "json",
+                    ])
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    payload = json.loads(result.stdout)
+                    self.assertEqual(payload["retry_of"], target_id)
+                    self.assertEqual(payload["agent_run_id"], f"run-{brief_id}-02")
+                finally:
+                    shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_allows_read_only_workflow_retry(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-readonly-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            brief_id = self._brief_id_from_path(brief_path)
+            target_id = f"run-{brief_id}-legacy-01"
+            (tmp / "runtime").mkdir(exist_ok=True)
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(self._agent_run_record(tmp, changed_paths=[], agent_run_id=target_id, brief_id=brief_id, status="blocked")) + "\n",
+                encoding="utf-8",
+            )
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--workflow",
+                "manual_smoke",
+                "--result-summary",
+                "read-only retry",
+                "--retry-of",
+                target_id,
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(json.loads(result.stdout)["retry_of"], target_id)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_add_excludes_legacy_ledger_from_retry_lookup(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-legacy-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_path = self._write_agent_run_brief(tmp)
+            brief_id = self._brief_id_from_path(brief_path)
+            target_id = f"run-{brief_id}-legacy-01"
+            (tmp / "runtime").mkdir(exist_ok=True)
+            (tmp / "runtime" / "agent-runs.legacy.jsonl").write_text(
+                json.dumps(self._agent_run_record(tmp, changed_paths=[], agent_run_id=target_id, brief_id=brief_id, status="failed")) + "\n",
+                encoding="utf-8",
+            )
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "legacy retry",
+                "--retry-of",
+                target_id,
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("retry_of target not found in live ledger", result.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_check_accepts_valid_retry_chain(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-check-ok-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            first = self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-test-01", brief_id="test", status="failed")
+            second = self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-test-02", brief_id="test", status="completed", retry_of="run-test-01")
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(json.dumps(first) + "\n" + json.dumps(second) + "\n", encoding="utf-8")
+            result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(json.loads(result.stdout)["ok"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_check_warns_for_missing_retry_target(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-check-missing-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            record = self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-test-02", brief_id="test", status="completed", retry_of="run-missing-01")
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+            result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["ok"])
+            self.assertEqual(payload["findings"][0]["check"], "retry_target_missing")
+            self.assertEqual(payload["findings"][0]["severity"], "WARN")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_check_rejects_retry_self_reference(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-retry-check-self-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            record = self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-test-01", brief_id="test", status="failed", retry_of="run-test-01")
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+            result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(json.loads(result.stdout)["findings"][0]["check"], "retry_self_reference")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_check_rejects_retry_brief_mismatch_duplicate_ordering_and_status(self) -> None:
+        cases = {
+            "retry_brief_mismatch": [
+                self._agent_run_record(REPO_ROOT, changed_paths=[], agent_run_id="run-a-01", brief_id="a", status="failed"),
+                self._agent_run_record(REPO_ROOT, changed_paths=[], agent_run_id="run-b-01", brief_id="b", status="completed", retry_of="run-a-01"),
+            ],
+            "agent_run_id_duplicate": [
+                self._agent_run_record(REPO_ROOT, changed_paths=[], agent_run_id="run-a-01", brief_id="a", status="failed"),
+                self._agent_run_record(REPO_ROOT, changed_paths=[], agent_run_id="run-a-01", brief_id="a", status="blocked"),
+            ],
+            "retry_ordering": [
+                self._agent_run_record(REPO_ROOT, changed_paths=[], agent_run_id="run-a-02", brief_id="a", status="completed", retry_of="run-a-01"),
+                self._agent_run_record(REPO_ROOT, changed_paths=[], agent_run_id="run-a-01", brief_id="a", status="failed"),
+            ],
+            "retry_target_status": [
+                self._agent_run_record(REPO_ROOT, changed_paths=[], agent_run_id="run-a-01", brief_id="a", status="completed"),
+                self._agent_run_record(REPO_ROOT, changed_paths=[], agent_run_id="run-a-02", brief_id="a", status="completed", retry_of="run-a-01"),
+            ],
+        }
+        for expected_check, records in cases.items():
+            with self.subTest(check=expected_check):
+                tmp = REPO_ROOT / "runtime" / f"agent-run-{expected_check}-{uuid.uuid4().hex}"
+                try:
+                    (tmp / "runtime").mkdir(parents=True)
+                    (tmp / "runtime" / "agent-runs.jsonl").write_text("\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8")
+                    result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    checks = {finding["check"] for finding in json.loads(result.stdout)["findings"]}
+                    self.assertIn(expected_check, checks)
+                finally:
+                    shutil.rmtree(tmp, ignore_errors=True)
 
     def test_agent_run_check_reports_schema_findings(self) -> None:
         tmp = REPO_ROOT / "runtime" / f"agent-run-check-{uuid.uuid4().hex}"

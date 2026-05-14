@@ -160,3 +160,8 @@
 {"ts":"2026-05-13T16:55:06Z","phase":"runtime_migration","action":"agent_runs_schema_split","goal":"Phase 1c AgentRun v2-only ledger and read-side aggregation","result":"migrated","detail":{"live":"runtime/agent-runs.jsonl","legacy":"runtime/agent-runs.legacy.jsonl","legacy_records":2,"live_v2_records":1,"legacy_policy":"frozen_archive_no_append"}}
 {"ts":"2026-05-13T16:55:06Z","phase":"session","action":"handoff_saved","goal":"Phase 1c AgentRun v2-only ledger and read-side aggregation","result":"updated"}
 {"ts": "2026-05-13T17:02:49Z", "phase": "closeout", "action": "task_closeout", "goal": "Phase 1c AgentRun v2-only ledger and read-side aggregation", "result": "recording"}
+{"ts":"2026-05-14T11:33:17Z","phase":"session","action":"handoff_saved","goal":"Phase 1d-1 changed_paths validation","result":"updated"}
+{"ts": "2026-05-14T11:37:21Z", "phase": "closeout", "action": "task_closeout", "goal": "Phase 1d-1 changed_paths validation", "result": "recording"}
+{"ts":"2026-05-14T11:37:27Z","phase":"session","action":"handoff_saved","goal":"Phase 1d-1 changed_paths validation","result":"updated"}
+{"ts": "2026-05-14T12:11:45Z", "phase": "closeout", "action": "task_closeout", "goal": "Phase 1d-2 retry/idempotency", "result": "recording"}
+{"ts":"2026-05-14T12:11:56Z","phase":"session","action":"handoff_saved","project":"common-ai-architecture","goal_lineage":["Phase 1d-2 retry/idempotency","v2 incubating runtime"],"data":{"handoff":"runtime/state/session-handoff.md","next_step":"Phase 1d-3 AgentRun aggregation summary"}}

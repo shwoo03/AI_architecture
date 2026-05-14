@@ -2,7 +2,8 @@
 
 | seq | slug | status | created | replan | depends_on |
 |-----|------|--------|---------|--------|------------|
-| (비어있음 — project-scaffolder 실행 후 첫 plan 등록) |
+| 0001 | phase-1d-1-changed-paths-validation | done | 2026-05-14 | 0 | phase-1c (agent-run-ledger v2-only) |
+| 0002 | phase-1d-2-retry-idempotency | done | 2026-05-14 | 0 | phase-1d-1 (changed_paths validation) |
 
 ## 라이프사이클
 - active/  : 진행 중

@@ -327,6 +327,36 @@ def check_json_findings_tool(root: Path, script_name: str, args: list[str], time
     return GateCheck(name, "OK", "no findings", command, duration)
 
 
+def check_agent_run_ledger(root: Path, timeout: int) -> GateCheck:
+    script = root / "scripts" / "incubating" / "agent-run.py"
+    name = "agent-run-ledger"
+    if not script.exists():
+        return GateCheck(name, "SKIP", "scripts/incubating/agent-run.py not found", [], 0.0)
+    command = [sys.executable, str(script), "--root", str(root), "--format", "json", "check"]
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(command, cwd=str(root), capture_output=True, text=True, encoding="utf-8", env=command_env(), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return GateCheck(name, "FAIL", f"timed out after {timeout}s", command, round(time.monotonic() - started, 3))
+    duration = round(time.monotonic() - started, 3)
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        status = "FAIL" if completed.returncode else "WARN"
+        return GateCheck(name, status, first_lines((completed.stdout or "") + "\n" + (completed.stderr or "")), command, duration)
+    findings = payload.get("findings") if isinstance(payload, dict) else []
+    if not isinstance(findings, list):
+        findings = []
+    error_findings = [finding for finding in findings if isinstance(finding, dict) and finding.get("severity") == "ERROR"]
+    if completed.returncode != 0 and not findings:
+        return GateCheck(name, "FAIL", first_lines((completed.stdout or "") + "\n" + (completed.stderr or "")), command, duration)
+    if payload.get("ok") is False or error_findings:
+        return GateCheck(name, "FAIL", findings_detail(len(error_findings) or len(findings), error_findings or findings), command, duration)
+    if findings:
+        return GateCheck(name, "WARN", findings_detail(len(findings), findings), command, duration)
+    return GateCheck(name, "OK", "no findings", command, duration)
+
+
 def findings_detail(count: int, findings: object) -> str:
     detail = f"{count} finding(s)"
     if not isinstance(findings, list) or not findings:
@@ -670,7 +700,7 @@ def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     checks.append(check_codemap_freshness(root))
     checks.append(check_lsp_diagnostics(root, args.timeout, strict=args.strict))
     if args.tier == "all":
-        checks.append(check_json_findings_tool(root, "incubating/agent-run.py", ["check"], args.timeout, strict=True, name="agent-run-ledger"))
+        checks.append(check_agent_run_ledger(root, args.timeout))
     checks.append(check_python_syntax(root))
     if not args.skip_tests:
         checks.append(check_unittest(root, args.test_timeout))

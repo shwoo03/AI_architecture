@@ -41,7 +41,10 @@ REQUIRED_FIELDS = (
     "created_by",
     "ext",
 )
+OPTIONAL_FIELDS = ("retry_of",)
 STATUSES = {"completed", "failed", "blocked"}
+READ_ONLY_WORKFLOWS = frozenset({"manual_smoke", "dry_run"})
+RETRYABLE_STATUSES = frozenset({"failed", "blocked"})
 
 
 def utc_now() -> str:
@@ -56,6 +59,29 @@ def resolve_under_root(root: Path, value: str, *, label: str) -> Path:
     except ValueError as exc:
         raise ValueError(f"{label} outside root: {value}") from exc
     return resolved
+
+
+def validate_changed_path(root: Path, value: Any) -> tuple[str, str]:
+    if not isinstance(value, str):
+        return "invalid_type", "changed path must be a string"
+    if not value.strip():
+        return "empty", "changed path must not be empty"
+    root_lexical = root.absolute()
+    raw_path = Path(value)
+    lexical = (raw_path if raw_path.is_absolute() else root / raw_path).absolute()
+    try:
+        lexical.relative_to(root_lexical)
+    except ValueError:
+        return "outside_root", f"changed path outside root: {value}"
+    if not lexical.exists():
+        return "missing", f"changed path does not exist: {value}"
+    root_resolved = root.resolve(strict=False)
+    resolved = lexical.resolve(strict=True)
+    try:
+        resolved.relative_to(root_resolved)
+    except ValueError:
+        return "symlink_escape", f"changed path symlink escapes root: {value}"
+    return "ok", lexical.relative_to(root_lexical).as_posix()
 
 
 def rel_path(root: Path, path: Path) -> str:
@@ -130,13 +156,77 @@ def parse_validation(values: list[str]) -> list[dict[str, str]]:
     return result
 
 
-def validate_record(record: dict[str, Any]) -> None:
-    findings = record_findings(record, "<record>")
+def agent_run_id_map(records: list[dict[str, Any]]) -> dict[str, tuple[int, dict[str, Any]]]:
+    result: dict[str, tuple[int, dict[str, Any]]] = {}
+    for index, record in enumerate(records, start=1):
+        value = record.get("agent_run_id")
+        if isinstance(value, str) and value and value not in result:
+            result[value] = (index, record)
+    return result
+
+
+def validate_retry_target(records: list[dict[str, Any]], retry_of: str, *, brief_id: str, agent_run_id: str) -> None:
+    if retry_of == agent_run_id:
+        raise ValueError("retry_of cannot reference self")
+    targets = agent_run_id_map(records)
+    target_pair = targets.get(retry_of)
+    if target_pair is None:
+        raise ValueError(f"retry_of target not found in live ledger: {retry_of}")
+    _line_no, target = target_pair
+    if target.get("brief_id") != brief_id:
+        raise ValueError(f"retry_of target brief mismatch: {retry_of}")
+    status = target.get("status")
+    if status not in RETRYABLE_STATUSES:
+        raise ValueError(f"retry_of target status must be failed or blocked, got {status}")
+
+
+def retry_findings(
+    record: dict[str, Any],
+    location: str,
+    *,
+    line_no: int,
+    targets: dict[str, tuple[int, dict[str, Any]]],
+) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+    if "retry_of" not in record:
+        return findings
+    retry_of = record["retry_of"]
+    if not isinstance(retry_of, str) or not retry_of:
+        findings.append({"severity": "ERROR", "check": "field_type", "path": location, "detail": "retry_of must be non-empty string"})
+        return findings
+    agent_run_id = record.get("agent_run_id")
+    if retry_of == agent_run_id:
+        findings.append({"severity": "ERROR", "check": "retry_self_reference", "path": location, "detail": "retry_of cannot reference self"})
+        return findings
+    target_pair = targets.get(retry_of)
+    if target_pair is None:
+        findings.append({"severity": "WARN", "check": "retry_target_missing", "path": location, "detail": f"retry_of target not found in live ledger: {retry_of}"})
+        return findings
+    target_line_no, target = target_pair
+    if target_line_no >= line_no:
+        findings.append({"severity": "ERROR", "check": "retry_ordering", "path": location, "detail": "retry_of must reference an earlier live ledger record"})
+    if target.get("brief_id") != record.get("brief_id"):
+        findings.append({"severity": "ERROR", "check": "retry_brief_mismatch", "path": location, "detail": "retry_of target brief_id must match current brief_id"})
+    if target.get("status") not in RETRYABLE_STATUSES:
+        findings.append({"severity": "ERROR", "check": "retry_target_status", "path": location, "detail": "retry_of target status must be failed or blocked"})
+    return findings
+
+
+def validate_record(root: Path, record: dict[str, Any], records: list[dict[str, Any]] | None = None) -> None:
+    records = records or []
+    findings = record_findings(root, record, "<record>", line_no=len(records) + 1, targets=agent_run_id_map(records))
     if findings:
         raise ValueError(str(findings[0]["detail"]))
 
 
-def record_findings(record: dict[str, Any], location: str) -> list[dict[str, str]]:
+def record_findings(
+    root: Path,
+    record: dict[str, Any],
+    location: str,
+    *,
+    line_no: int = 1,
+    targets: dict[str, tuple[int, dict[str, Any]]] | None = None,
+) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     missing = [field for field in REQUIRED_FIELDS if field not in record]
     if missing:
@@ -164,10 +254,24 @@ def record_findings(record: dict[str, Any], location: str) -> list[dict[str, str
     for field in ("artifacts", "changed_paths", "validation"):
         if not isinstance(record[field], list):
             findings.append({"severity": "ERROR", "check": "field_type", "path": location, "detail": f"{field} must be a list"})
+    if isinstance(record["changed_paths"], list):
+        if not record["changed_paths"] and record["workflow"] not in READ_ONLY_WORKFLOWS:
+            findings.append({"severity": "ERROR", "check": "changed_paths_required", "path": location, "detail": f"changed_paths required for workflow={record['workflow']}"})
+        for index, value in enumerate(record["changed_paths"], start=1):
+            reason, detail = validate_changed_path(root, value)
+            if reason == "ok":
+                continue
+            if reason == "missing":
+                findings.append({"severity": "WARN", "check": "changed_paths_missing", "path": f"{location}:changed_paths[{index}]", "detail": detail})
+            elif reason in {"outside_root", "symlink_escape"}:
+                findings.append({"severity": "ERROR", "check": "changed_paths_escape", "path": f"{location}:changed_paths[{index}]", "detail": detail})
+            else:
+                findings.append({"severity": "ERROR", "check": "changed_paths_invalid", "path": f"{location}:changed_paths[{index}]", "detail": detail})
     if not isinstance(record["ext"], dict):
         findings.append({"severity": "ERROR", "check": "ext", "path": location, "detail": "ext must be an object"})
     if record["tier"] != "incubating":
         findings.append({"severity": "ERROR", "check": "tier", "path": location, "detail": "tier must be incubating for Phase 1c"})
+    findings.extend(retry_findings(record, location, line_no=line_no, targets=targets or {}))
     return findings
 
 
@@ -178,9 +282,19 @@ def build_record(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     records = read_ledger_strict(path)
     brief_id = str(brief["brief_id"])
     agent_run_id = next_run_id(records, brief_id)
+    if any(record.get("agent_run_id") == agent_run_id for record in records):
+        raise ValueError(f"agent_run_id collision: {agent_run_id}")
     summary = args.result_summary.strip()
     if not summary:
         raise ValueError("--result-summary is required")
+    changed_paths: list[str] = []
+    if not args.changed_path and args.workflow not in READ_ONLY_WORKFLOWS:
+        raise ValueError(f"changed_paths required for workflow={args.workflow}")
+    for value in args.changed_path:
+        reason, detail = validate_changed_path(root, value)
+        if reason != "ok":
+            raise ValueError(detail)
+        changed_paths.append(detail)
     validation = parse_validation(args.validation)
     lineage = [dict(item) for item in brief["goal_lineage"]]
     lineage.append(
@@ -202,7 +316,7 @@ def build_record(root: Path, args: argparse.Namespace) -> dict[str, Any]:
         "goal_lineage": lineage,
         "artifacts": args.artifact,
         "result_summary": summary,
-        "changed_paths": args.changed_path,
+        "changed_paths": changed_paths,
         "validation": validation,
         "created_by": args.created_by,
         "ext": {},
@@ -210,7 +324,10 @@ def build_record(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     brief_rel = rel_path(root, brief_path)
     if not any(item.get("type") == "brief" and item.get("ref") == brief_rel for item in lineage if isinstance(item, dict)):
         record["artifacts"] = [*record["artifacts"], brief_rel]
-    validate_record(record)
+    if args.retry_of:
+        validate_retry_target(records, args.retry_of, brief_id=brief_id, agent_run_id=agent_run_id)
+        record["retry_of"] = args.retry_of
+    validate_record(root, record, records)
     return record
 
 
@@ -244,10 +361,27 @@ def check_records(root: Path, _args: argparse.Namespace) -> dict[str, Any]:
     path = ledger_path(root)
     records = read_ledger_strict(path)
     findings: list[dict[str, str]] = []
+    seen: dict[str, int] = {}
+    targets = agent_run_id_map(records)
     for index, record in enumerate(records, start=1):
-        findings.extend(record_findings(record, f"runtime/agent-runs.jsonl:{index}"))
+        agent_run_id = record.get("agent_run_id")
+        if isinstance(agent_run_id, str) and agent_run_id:
+            previous = seen.get(agent_run_id)
+            if previous is not None:
+                findings.append(
+                    {
+                        "severity": "ERROR",
+                        "check": "agent_run_id_duplicate",
+                        "path": f"runtime/agent-runs.jsonl:{index}",
+                        "detail": f"duplicate agent_run_id {agent_run_id}; first seen at line {previous}",
+                    }
+                )
+            else:
+                seen[agent_run_id] = index
+        findings.extend(record_findings(root, record, f"runtime/agent-runs.jsonl:{index}", line_no=index, targets=targets))
+    has_errors = any(finding.get("severity") == "ERROR" for finding in findings)
     return {
-        "ok": not findings,
+        "ok": not has_errors,
         "record_count": len(records),
         "findings": findings,
     }
@@ -295,6 +429,7 @@ def main() -> int:
     add.add_argument("--agent", default="human_operator")
     add.add_argument("--workflow", default="manual_smoke")
     add.add_argument("--created-by", default="manual")
+    add.add_argument("--retry-of", default=None)
     add.add_argument("--format", choices=("json",), default="json")
 
     dump = sub.add_parser("dump", help="Print recent AgentRun records.")

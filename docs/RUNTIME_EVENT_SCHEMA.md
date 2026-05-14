@@ -118,6 +118,34 @@ V2 specialist runtime의 AgentRun writer는 아직 incubating입니다. Phase 1a
 
 Required fields are `schema_version`, `ts`, `agent_run_id`, `brief_id`, `tier`, `agent`, `workflow`, `status`, `goal_lineage`, `artifacts`, `result_summary`, `changed_paths`, `validation`, `created_by`, and `ext`. `tier` defaults to `incubating` for v2 manual smoke. `ext` is always present and starts as `{}`.
 
+`changed_paths` is a top-level canonical field containing repo-relative POSIX paths. The AgentRun writer validates each changed path before append: empty values, repo-outside paths, missing paths, invalid path values, and symlink escapes are rejected. Historical ledger checks are advisory for deleted paths: a missing historical path is reported as `WARN changed_paths_missing` and does not make `ok=false`. Repo-outside paths and symlink escapes are reported as `ERROR changed_paths_escape`.
+
+Empty `changed_paths` is allowed only for read-only workflows: `manual_smoke` and `dry_run`. Non-read-only workflows must record at least one changed path.
+
+`retry_of` is a top-level optional string field. It declares that the current run is an explicit retry of a previous run in the live v2 ledger.
+
+Retry policy:
+
+- Retry is declared only with `--retry-of <agent_run_id>`. A second run for the same `brief_id` is not automatically treated as a retry.
+- Retry lookup reads only `runtime/agent-runs.jsonl`, the live v2 ledger. `runtime/agent-runs.legacy.jsonl` is a frozen archive and is never used for retry resolution.
+- Retry scope is same-brief only: the target run must have the same `brief_id`.
+- Retry targets must be earlier live ledger entries. A run cannot retry itself or a later/equal line.
+- Retry targets must have `status` in `failed` or `blocked`.
+- The ledger stores only the single-step edge `retry_of`; readers reconstruct a retry chain by following `retry_of` links.
+
+Retry check severity:
+
+| Violation | Severity | Check |
+| --- | --- | --- |
+| `retry_of` equals `agent_run_id` | ERROR | `retry_self_reference` |
+| Retry target has a different `brief_id` | ERROR | `retry_brief_mismatch` |
+| Duplicate `agent_run_id` | ERROR | `agent_run_id_duplicate` |
+| Retry target is missing from the live ledger | WARN | `retry_target_missing` |
+| `retry_of` points to a later/equal line | ERROR | `retry_ordering` |
+| Retry target `status` is not `failed` or `blocked` | ERROR | `retry_target_status` |
+
+Richer aggregation counts remain deferred to the 1d-3 slice.
+
 ## Adapter extension 규칙
 
 외부 SDK나 graph runtime의 provider-specific 필드는 core schema에 직접 추가하지 않습니다. 필요한 경우 `ext.<adapter_name>.*` namespace 아래에 격리합니다.
