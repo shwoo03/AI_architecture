@@ -13,3 +13,4 @@
 - active/  : 진행 중
 - done/    : 완료
 - failed/  : 3회 재계획 실패 (회생 가능성 검토 대상)
+| 0007 | role-registry-audit | active | 2026-05-15 | 0 | 0006 (delegate abort revealing role registry gap) |
