@@ -1,37 +1,26 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-14T16:01:59Z
+2026-05-14T16:39:53Z
 
 ## Current Task
-Phase 1e-followup workflow-aware completion command is complete and closed out.
+Prepare 0007 role registry audit as the next read-only slice.
 
 ## Last Completed
-- Added `--workflow` to `scripts/incubating/agent-flow-delegate.py`, defaulting to `manual_smoke`.
-- Added delegate-local `READ_ONLY_WORKFLOWS = frozenset({"manual_smoke", "dry_run"})`, aligned with the AgentRun writer policy.
-- Delegate handoff JSON now includes `workflow`.
-- Read-only workflows omit the `--changed-path` placeholder from `completion_command`.
-- Write workflows keep `--changed-path "<repo-relative-path>"` and use the actual workflow value.
-- `--retry-of` remains excluded from the default completion template.
-- `scripts/agent-brief.py`, `scripts/agent-flow.py`, `scripts/incubating/agent-run.py`, and live/legacy AgentRun ledgers remain unchanged.
-- Documented workflow-aware completion command behavior in `docs/RUNTIME_EVENT_SCHEMA.md`.
-- Recorded successful `agent-flow closeout` evidence for Phase 1e-followup.
+- Plan 0006 delegate execution path was intentionally aborted after governance rejected broadening `docs-sync-auditor` from `read_only` to `write_with_confirmation`.
+- The abort was not bypassed and is recorded as the first governance-driven cycle abort toward the future aborted-status trigger.
+- `docs/AGENT_BRIEFS_POLICY.md` documents the `runtime/agent-briefs/` artifact policy.
+- The five existing brief artifacts were classified as Tier 1 or Tier 2; no Tier 3 validation pollution candidate remained.
+- The stated artifact-policy goal is complete via operator housekeeping, while the write-heavy delegate friction data goal remains open until after 0007 and 0008.
 
 ## Validation
-- `python3 -m unittest tests.test_validation -v` exited 0, 104 tests.
-- `python3 scripts/incubating/agent-flow-delegate.py --role docs-sync-auditor --goal "1e-followup smoke (read-only)" --write-policy read_only --format json` exited 0 and omitted `--changed-path`.
-- `python3 scripts/incubating/agent-flow-delegate.py --role build-error-resolver --goal "1e-followup smoke (write)" --workflow completed_run --format json` exited 0 and kept `--changed-path`.
-- `python3 scripts/incubating/agent-run.py --root . check --format json` exited 0, `ok=true`, no findings.
-- `python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json` exited 0.
-- `python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json` exited 0.
-- `python3 scripts/verify-skeleton.py` exited 0.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/agent-flow.py closeout --goal "Phase 1e-followup workflow-aware completion_command" ... --format json` exited 0 and recorded evidence.
+Pending validation sweep for the housekeeping commit: `verify-skeleton`, `quality-gate --tier stable/all --skip-tests`, `unittest discover`, and `agent-run.py check`.
 
 ## Recommended Next Step
-Run one write-heavy delegate cycle before choosing routing, validator-loop, or non-terminal status work. The read-only friction has been addressed; the next useful evidence should come from a write-producing handoff.
+Implement 0007 role registry audit (read-only).
 
 ## Open Questions / Blockers
-None for Phase 1e-followup.
+- Write-heavy delegate cycle should not be retried until role registry audit (0007) and minimum docs/governance write role addition (0008) provide a truthful role/write_policy path.
 
 ## Resume Prompt
-Continue from /Users/shwoo/mydir/AI/AI_architecture. Phase 1e-followup is complete: delegate completion commands are workflow-aware, read-only workflows omit `--changed-path`, write workflows keep it, core public surfaces and ledgers are unchanged, validation and closeout passed, and the next recommended step is one write-heavy delegate cycle to gather write-side friction data.
+Continue from /Users/shwoo/mydir/AI/AI_architecture. 0006 was closed as operator housekeeping: the policy document is written, the brief artifacts are classified, and the original delegate execution path was aborted because docs-sync-auditor is read-only. Do not route around this constraint. Next implement 0007 role registry audit as a read-only fact-finding slice; do not add or edit roles until 0008.

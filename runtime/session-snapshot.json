@@ -1,25 +1,25 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-14T16:02:32Z",
+  "ts": "2026-05-14T16:47:06Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-14T16:01:59Z",
-    "phase": "session",
-    "action": "handoff_saved",
-    "goal": "Phase 1e-followup workflow-aware completion_command",
-    "status": "completed",
-    "summary": "Phase 1e-followup complete; workflow-aware completion command handoff updated after closeout."
+    "ts": "2026-05-14T16:47:06Z",
+    "phase": "closeout",
+    "action": "task_closeout",
+    "goal": "Housekeeping: AgentBrief artifact policy after 0006 delegate abort",
+    "result": "recording"
   },
   "completion_evidence_last": {
-    "ts": "2026-05-14T16:01:45Z",
-    "goal": "Phase 1e-followup workflow-aware completion_command",
+    "ts": "2026-05-14T16:47:06Z",
+    "goal": "Housekeeping: AgentBrief artifact policy after 0006 delegate abort",
     "changed_paths": [
-      "scripts/incubating/agent-flow-delegate.py",
-      "docs/RUNTIME_EVENT_SCHEMA.md",
-      "tests/test_validation.py",
-      "plans/active/0005-phase-1e-followup-workflow-aware-completion-command.md"
+      "docs/AGENT_BRIEFS_POLICY.md",
+      "state/decisions.md",
+      "state/progress.md",
+      "runtime/state/session-handoff.md",
+      "plans/done/0006-write-cycle-smoke-artifact-policy.md"
     ],
     "validations": [
       {

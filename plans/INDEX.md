@@ -7,6 +7,7 @@
 | 0003 | phase-1d-3-aggregation-summary | done | 2026-05-14 | 0 | phase-1d-2 (retry/idempotency) |
 | 0004 | phase-1e-incubating-delegate-entrypoint | done | 2026-05-15 | 0 | phase-1d-3 (aggregation summary) |
 | 0005 | phase-1e-followup-workflow-aware-completion-command | done | 2026-05-15 | 0 | phase-1e (delegate entrypoint) |
+| 0006 | write-cycle-smoke-artifact-policy | done | 2026-05-15 | 0 | phase-1e-followup (workflow-aware completion_command) |
 
 ## 라이프사이클
 - active/  : 진행 중

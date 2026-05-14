@@ -1,16 +1,16 @@
 # Codemaps
 
-- `generated_at`: 2026-05-14T16:02:42Z
+- `generated_at`: 2026-05-14T16:47:06Z
 - `root`: /Users/shwoo/mydir/AI/AI_architecture
 
 | area | files | lines | navigation entry points |
 | --- | ---: | ---: | --- |
 | `agents` | 4 | 96 | - |
-| `docs` | 52 | 4261 | `AGENTS.md`, `docs/AGENTS.md` |
-| `other` | 113 | 14678 | `.agents/skills/brainstorming/SKILL.md`, `.agents/skills/code-review-expert/SKILL.md`, `.agents/skills/codex-skill-creator/SKILL.md` |
+| `docs` | 53 | 4311 | `AGENTS.md`, `docs/AGENTS.md` |
+| `other` | 114 | 14822 | `.agents/skills/brainstorming/SKILL.md`, `.agents/skills/code-review-expert/SKILL.md`, `.agents/skills/codex-skill-creator/SKILL.md` |
 | `reference` | 14 | 1255 | `references.yaml`, `research/AGENTS.md` |
 | `rules` | 25 | 1032 | `manifest.yaml` |
-| `runtime` | 22 | 1522 | `runtime/AGENTS.md` |
+| `runtime` | 20 | 1346 | `runtime/AGENTS.md` |
 | `scripts` | 82 | 21421 | `scripts/AGENTS.md`, `scripts/agent-flow.py`, `scripts/quality-gate.py` |
 | `skills` | 81 | 13224 | `skills/AGENTS.md`, `skills/_meta/project-scaffolder/SKILL.md`, `skills/_meta/reference-refresher/SKILL.md` |
 | `tests` | 12 | 6804 | - |

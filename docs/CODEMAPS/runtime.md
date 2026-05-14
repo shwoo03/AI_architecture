@@ -1,7 +1,7 @@
 # Codemap: runtime
 
-- `files`: 22
-- `line_count`: 1522
+- `files`: 20
+- `line_count`: 1346
 - `directories`: 9
 
 ## Navigation Entry Points
@@ -26,10 +26,8 @@
 - `runtime/agent-briefs/2026-05-13-phase-1a-agent-brief-docs-sync-auditor-01.json`
 - `runtime/agent-briefs/2026-05-13-phase-1a-agent-brief-docs-sync-auditor-02.json`
 - `runtime/agent-briefs/2026-05-13-phase-1b-agent-run-docs-sync-auditor-01.json`
-- `runtime/agent-briefs/2026-05-14-adhoc-build-error-resolver-01.json`
 - `runtime/agent-briefs/2026-05-14-adhoc-docs-sync-auditor-01.json`
 - `runtime/agent-briefs/2026-05-14-adhoc-docs-sync-auditor-02.json`
-- `runtime/agent-briefs/2026-05-14-adhoc-docs-sync-auditor-03.json`
 - `runtime/proposals/README.md`
 - `runtime/proposals/reference-adoption/2026-04-27-example-resume-safe-checkpoint.md`
 - `runtime/proposals/reference-adoption/2026-05-12-p0-operational-skeleton-hardening.md`

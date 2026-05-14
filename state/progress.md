@@ -1,7 +1,7 @@
 # Progress
 
 ## 현재 마일스톤
-V2 incubating runtime Phase 1e-followup complete
+0006 housekeeping complete; role-registry gap recorded
 
 ## 완료된 작업
 - 골격 부트스트랩
@@ -29,6 +29,7 @@ V2 incubating runtime Phase 1e-followup complete
 - Phase 1d-3 aggregation summary: retry-aware `summary` fields for retried count, chain heads, unresolved failures
 - Phase 1e incubating delegate entrypoint: `agent-brief.py`를 재사용해 brief artifact와 실행 가능한 handoff JSON을 생성
 - Phase 1e-followup workflow-aware completion command: read-only workflow에서는 `--changed-path` placeholder를 생략하고 write workflow에서는 유지
+- 0006 delegate cycle aborted on role-registry gap; AgentBrief artifact policy documented via operator housekeeping. Write-heavy friction goal remains OPEN, deferred to post-0008.
 
 ## 다음 작업
-- Write-heavy delegate cycle 1회 후 routing/validator-loop/non-terminal status 결정
+- 0007 role registry audit (read-only); ensures next slice has factual basis for adding write-capable docs/governance role.

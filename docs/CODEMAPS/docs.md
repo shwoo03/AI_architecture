@@ -1,7 +1,7 @@
 # Codemap: docs
 
-- `files`: 52
-- `line_count`: 4261
+- `files`: 53
+- `line_count`: 4311
 - `directories`: 8
 
 ## Navigation Entry Points
@@ -25,6 +25,7 @@
 - `AGENTS.md`
 - `README.md`
 - `docs/AGENTS.md`
+- `docs/AGENT_BRIEFS_POLICY.md`
 - `docs/AGENT_QUICKSTART.md`
 - `docs/AGENT_REGISTRY.md`
 - `docs/ARCHITECTURE.md`
