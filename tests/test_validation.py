@@ -1,3 +1,5 @@
+import hashlib
+
 from tests.test_support import *
 
 
@@ -1179,6 +1181,175 @@ class NewInternalToolTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("delegate", result.stdout.lower())
         self.assertNotIn("agent-run", result.stdout.lower())
+
+    def _sha256(self, path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def test_agent_flow_delegate_creates_brief_handoff_json(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "delegate smoke test",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            required = {
+                "brief_path",
+                "brief_id",
+                "role",
+                "objective",
+                "read_scope",
+                "write_scope",
+                "write_policy",
+                "validation_hints",
+                "goal_lineage",
+                "next_prompt",
+                "completion_command",
+                "tier",
+            }
+            self.assertEqual(set(payload), required)
+            self.assertEqual(payload["role"], "docs-sync-auditor")
+            self.assertEqual(payload["objective"], "delegate smoke test")
+            self.assertEqual(payload["tier"], "incubating")
+            self.assertTrue((tmp / payload["brief_path"]).exists())
+            self.assertEqual(json.loads((tmp / payload["brief_path"]).read_text(encoding="utf-8"))["brief_id"], payload["brief_id"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_completion_command_uses_agent_run_flags(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-command-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "delegate smoke test",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            command = json.loads(result.stdout)["completion_command"]
+            for flag in ("--brief", "--status", "--result-summary", "--changed-path", "--validation", "--workflow", "--agent", "--created-by"):
+                self.assertIn(flag, command)
+            self.assertIn("scripts/incubating/agent-run.py add", command)
+            self.assertIn(json.loads(result.stdout)["brief_path"], command)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_requires_role_and_goal(self) -> None:
+        missing_role = _run([
+            str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+            "--goal",
+            "delegate smoke test",
+            "--format",
+            "json",
+        ])
+        missing_goal = _run([
+            str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+            "--role",
+            "docs-sync-auditor",
+            "--format",
+            "json",
+        ])
+        self.assertNotEqual(missing_role.returncode, 0)
+        self.assertNotEqual(missing_goal.returncode, 0)
+
+    def test_agent_flow_delegate_forwards_scope_to_brief_writer(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-scope-{uuid.uuid4().hex}"
+        try:
+            (tmp / "config").mkdir(parents=True)
+            (tmp / "config" / "agent-team.yaml").write_text(
+                "version: 1\n"
+                "specialists:\n"
+                "  build-error-resolver:\n"
+                "    write_policy: manual_work_required\n"
+                "    default_scope: [\".\"]\n",
+                encoding="utf-8",
+            )
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "build-error-resolver",
+                "--goal",
+                "delegate scope test",
+                "--scope",
+                "docs",
+                "--write-policy",
+                "manual_work_required",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["read_scope"], ["docs"])
+            self.assertEqual(payload["write_scope"], ["docs"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_does_not_touch_ledgers(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-flow-delegate-ledger-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            live = tmp / "runtime" / "agent-runs.jsonl"
+            legacy = tmp / "runtime" / "agent-runs.legacy.jsonl"
+            live.write_text('{"live": true}\n', encoding="utf-8")
+            legacy.write_text('{"legacy": true}\n', encoding="utf-8")
+            before = (self._sha256(live), self._sha256(legacy))
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "delegate smoke test",
+                "--format",
+                "json",
+            ])
+            after = (self._sha256(live), self._sha256(legacy))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(before, after)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_flow_delegate_keeps_public_surface_unmodified(self) -> None:
+        result = _run([str(SCRIPTS / "agent-flow.py"), "--help"], cwd=REPO_ROOT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("delegate", result.stdout.lower())
+        self.assertNotIn("agent-run", result.stdout.lower())
+
+    def test_agent_flow_delegate_works_in_temp_root(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "runtime") as tmp_name:
+            tmp = Path(tmp_name)
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-flow-delegate.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "delegate temp root test",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue((tmp / payload["brief_path"]).exists())
 
     def _write_agent_run_brief(self, root: Path) -> str:
         result = _run([

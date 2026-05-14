@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 111
-- `line_count`: 14446
+- `files`: 112
+- `line_count`: 14577
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -192,6 +192,7 @@
 - `plans/done/0001-phase-1d-1-changed-paths-validation.md`
 - `plans/done/0002-phase-1d-2-retry-idempotency.md`
 - `plans/done/0003-phase-1d-3-aggregation-summary.md`
+- `plans/done/0004-phase-1e-incubating-delegate-entrypoint.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

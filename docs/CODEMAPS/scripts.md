@@ -1,7 +1,7 @@
 # Codemap: scripts
 
-- `files`: 81
-- `line_count`: 21261
+- `files`: 82
+- `line_count`: 21409
 - `directories`: 4
 
 ## Navigation Entry Points
@@ -45,6 +45,7 @@
 - `scripts/generate-codemaps.py`
 - `scripts/hooks/README.md`
 - `scripts/hooks/post-tool-use-log.py`
+- `scripts/incubating/agent-flow-delegate.py`
 - `scripts/incubating/agent-run.py`
 - `scripts/install-profiles.py`
 - `scripts/install-state.py`

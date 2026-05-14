@@ -1,31 +1,25 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-14T14:48:47Z",
+  "ts": "2026-05-14T15:21:24Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-14T14:47:59Z",
+    "ts": "2026-05-14T15:20:50Z",
     "phase": "session",
     "action": "handoff_saved",
-    "project": "common-ai-architecture",
-    "goal_lineage": [
-      "Phase 1d-3 aggregation summary",
-      "v2 incubating runtime"
-    ],
-    "data": {
-      "handoff": "runtime/state/session-handoff.md",
-      "next_step": "choose next v2 slice"
-    }
+    "goal": "Phase 1e incubating delegate entrypoint",
+    "status": "completed",
+    "summary": "Phase 1e delegate entrypoint complete; handoff updated after closeout."
   },
   "completion_evidence_last": {
-    "ts": "2026-05-14T14:47:47Z",
-    "goal": "Phase 1d-3 aggregation summary",
+    "ts": "2026-05-14T15:20:41Z",
+    "goal": "Phase 1e incubating delegate entrypoint",
     "changed_paths": [
-      "scripts/incubating/agent-run.py",
+      "scripts/incubating/agent-flow-delegate.py",
       "docs/RUNTIME_EVENT_SCHEMA.md",
       "tests/test_validation.py",
-      "plans/active/0003-phase-1d-3-aggregation-summary.md"
+      "plans/active/0004-phase-1e-incubating-delegate-entrypoint.md"
     ],
     "validations": [
       {

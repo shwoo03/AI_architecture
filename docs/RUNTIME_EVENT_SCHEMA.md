@@ -154,6 +154,10 @@ Retry check severity:
 
 The summary command reads only `runtime/agent-runs.jsonl`. It does not read `runtime/agent-runs.legacy.jsonl` to resolve missing retry targets. `stale` is not reported in Phase 1d-3 because the current AgentRun status set is terminal-oriented; stale semantics require a later non-terminal status policy.
 
+## Incubating delegate handoff
+
+`scripts/incubating/agent-flow-delegate.py` is a preparation-only wrapper around `scripts/agent-brief.py`. It reuses the AgentBrief writer as the schema source of truth, writes a brief artifact under `runtime/agent-briefs/`, and returns a handoff JSON with the brief path plus an example `agent-run.py add` completion command. It does not spawn subagents, create AgentRun skeletons, read or write `runtime/agent-runs.jsonl`, or expose a `delegate` command through the stable `scripts/agent-flow.py` surface.
+
 ## Adapter extension 규칙
 
 외부 SDK나 graph runtime의 provider-specific 필드는 core schema에 직접 추가하지 않습니다. 필요한 경우 `ext.<adapter_name>.*` namespace 아래에 격리합니다.
