@@ -21,6 +21,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib_feature_status import validate_feature_manifest
+
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -134,6 +138,8 @@ def command_name(command: list[str]) -> str:
     if not command:
         return "unknown"
     joined = " ".join(command)
+    if "feature-status.py" in joined:
+        return "feature-status"
     if "verify-skeleton.py" in joined:
         return "verify-skeleton"
     if "agent-autonomy-check.py" in joined:
@@ -205,6 +211,23 @@ def command_name(command: list[str]) -> str:
     if len(command) >= 2 and command[0] == "npm":
         return f"npm-{command[-1]}"
     return Path(command[0]).name
+
+
+def check_feature_status(root: Path, tier: str) -> GateCheck:
+    started = time.monotonic()
+    payload = validate_feature_manifest(root, profile=tier)
+    status = "OK" if payload.get("ok") else "FAIL"
+    detail = f"feature manifest {tier}: {len(payload.get('included_features', []))} included, {len(payload.get('skipped_by_tier', []))} skipped"
+    if payload.get("findings"):
+        first = payload["findings"][0]
+        detail = f"{detail}; first finding: {first.get('detail')}"
+    return GateCheck(
+        name="feature-status",
+        status=status,
+        detail=detail,
+        command=[sys.executable, str(root / "scripts" / "feature-status.py"), "check", "--tier", tier, "--format", "json"],
+        duration_s=round(time.monotonic() - started, 3),
+    )
 
 
 def check_python_syntax(root: Path) -> GateCheck:
@@ -608,6 +631,7 @@ def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     if not root.is_dir():
         raise SystemExit(f"root not a directory: {root}")
     checks: list[GateCheck] = []
+    checks.append(check_feature_status(root, args.tier))
     if not args.skip_skeleton:
         checks.append(check_verify_skeleton(root, args.timeout))
     checks.append(check_script_command(root, "agent-autonomy-check.py", ["--strict"], args.timeout))
@@ -645,6 +669,8 @@ def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     checks.append(check_portability(root, args.timeout))
     checks.append(check_codemap_freshness(root))
     checks.append(check_lsp_diagnostics(root, args.timeout, strict=args.strict))
+    if args.tier == "all":
+        checks.append(check_json_findings_tool(root, "incubating/agent-run.py", ["check"], args.timeout, strict=True, name="agent-run-ledger"))
     checks.append(check_python_syntax(root))
     if not args.skip_tests:
         checks.append(check_unittest(root, args.test_timeout))
@@ -653,11 +679,12 @@ def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     return checks
 
 
-def render_text(root: Path, checks: list[GateCheck], strict: bool) -> str:
+def render_text(root: Path, checks: list[GateCheck], strict: bool, tier: str) -> str:
     counts = Counter(check.status for check in checks)
     lines = [
         "Quality Gate",
         f"root: {root}",
+        f"tier: {tier}",
         f"summary: {counts.get('FAIL', 0)} fail, {counts.get('WARN', 0)} warn, {counts.get('OK', 0)} ok, {counts.get('SKIP', 0)} skip",
     ]
     for check in checks:
@@ -669,9 +696,20 @@ def render_text(root: Path, checks: list[GateCheck], strict: bool) -> str:
     return "\n".join(lines)
 
 
-def render_json(root: Path, checks: list[GateCheck], *, explain: bool = False) -> str:
+def render_json(root: Path, checks: list[GateCheck], *, explain: bool = False, tier: str = "stable") -> str:
+    feature_manifest = validate_feature_manifest(root, profile=tier)
     payload: dict[str, Any] = {
         "root": str(root),
+        "tier": tier,
+        "feature_manifest": {
+            "path": feature_manifest.get("path"),
+            "ok": feature_manifest.get("ok"),
+            "feature_count": feature_manifest.get("feature_count", 0),
+            "features_by_tier": feature_manifest.get("features_by_tier", {}),
+            "included_count": len(feature_manifest.get("included_features", [])),
+            "skipped_count": len(feature_manifest.get("skipped_by_tier", [])),
+        },
+        "skipped_by_tier": feature_manifest.get("skipped_by_tier", []),
         "summary": dict(sorted(Counter(check.status for check in checks).items())),
         "checks": [asdict(check) for check in checks],
     }
@@ -684,6 +722,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=None, help="Project root (default: this skeleton root).")
     parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument("--tier", choices=("stable", "all"), default="stable", help="Feature maturity tier scope for blocking checks.")
     parser.add_argument("--timeout", type=int, default=120, help="Per-command timeout in seconds.")
     parser.add_argument("--test-timeout", type=int, default=300, help="Timeout in seconds for unittest discovery.")
     parser.add_argument("--strict", action="store_true", help="Fail when warnings are present.")
@@ -699,9 +738,9 @@ def main() -> int:
         return 2
     checks = run_gate(args)
     if args.format == "json":
-        print(render_json(root, checks, explain=args.explain))
+        print(render_json(root, checks, explain=args.explain, tier=args.tier))
     else:
-        print(render_text(root, checks, args.strict))
+        print(render_text(root, checks, args.strict, args.tier))
     has_fail = any(check.status == "FAIL" for check in checks)
     has_warn = any(check.status == "WARN" for check in checks)
     return 1 if has_fail or (args.strict and has_warn) else 0

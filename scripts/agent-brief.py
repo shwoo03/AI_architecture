@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from importlib import util
+
+sys.dont_write_bytecode = True
 
 
 try:
@@ -36,20 +40,27 @@ WRITE_POLICY_RANK = {
 
 @dataclass
 class Brief:
+    schema_version: str
+    brief_id: str
+    created_at: str
+    tier: str
+    parent_plan: str
+    parent_goal: str
+    goal_lineage: list[dict[str, str | None]]
+    objective: str
+    read_scope: list[str]
+    write_scope: list[str]
+    forbidden_paths: list[str]
+    expected_output: str
+    validation_hints: list[str]
+    handoff_requirements: str
+    execution_mode: str
+    ext: dict[str, object]
     role: str
-    goal: str
-    scope: list[str]
     write_policy: str
-    parent_role: str
-    inherited_write_policy: str
-    effective_write_policy: str
-    effective_scope: list[str]
-    mission: str
-    allowed_files: list[str]
+    policy_inheritance: dict[str, object]
     forbidden_actions: list[str]
     relevant_rules: list[str]
-    recommended_checks: list[str]
-    handoff_expectation: str
     subdirectory_hints: list[dict[str, str]]
 
 
@@ -69,6 +80,65 @@ def normalize_scope(root: Path, values: list[str]) -> list[str]:
         if rel not in result:
             result.append(rel)
     return result
+
+
+def normalize_optional_repo_path(root: Path, value: str) -> str:
+    if not value:
+        return ""
+    path = Path(value)
+    resolved = path.resolve(strict=False) if path.is_absolute() else (root / path).resolve(strict=False)
+    try:
+        return resolved.relative_to(root.resolve(strict=False)).as_posix()
+    except ValueError as exc:
+        raise ValueError(f"path outside root: {value}") from exc
+
+
+def slugify(value: str, fallback: str = "adhoc") -> str:
+    lowered = value.strip().lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
+    return slug or fallback
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def next_brief_sequence(root: Path, date_part: str, plan_slug: str, role_slug: str) -> int:
+    brief_dir = root / "runtime" / "agent-briefs"
+    prefix = f"{date_part}-{plan_slug}-{role_slug}-"
+    highest = 0
+    if brief_dir.exists():
+        for path in brief_dir.glob(f"{prefix}*.json"):
+            suffix = path.stem.removeprefix(prefix)
+            if suffix.isdigit():
+                highest = max(highest, int(suffix))
+    return highest + 1
+
+
+def build_brief_id(root: Path, parent_plan: str, role: str, brief_seq: str) -> tuple[str, str]:
+    created_at = utc_now()
+    date_part = created_at[:10]
+    plan_slug = slugify(Path(parent_plan).stem if parent_plan else "adhoc")
+    role_slug = slugify(role)
+    if brief_seq:
+        try:
+            seq = int(brief_seq)
+        except ValueError as exc:
+            raise ValueError("--brief-seq must be numeric") from exc
+    else:
+        seq = next_brief_sequence(root, date_part, plan_slug, role_slug)
+    return f"{date_part}-{plan_slug}-{role_slug}-{seq:02d}", created_at
+
+
+def build_goal_lineage(user_goal: str, parent_plan: str, parent_goal: str, brief_id: str, objective: str) -> list[dict[str, str | None]]:
+    brief_ref = f"runtime/agent-briefs/{brief_id}.json"
+    lineage: list[dict[str, str | None]] = [
+        {"type": "user_goal", "ref": None, "summary": user_goal or parent_goal or objective},
+    ]
+    if parent_plan:
+        lineage.append({"type": "plan", "ref": parent_plan, "summary": parent_goal or objective})
+    lineage.append({"type": "brief", "ref": brief_ref, "summary": objective})
+    return lineage
 
 
 def is_same_or_under(child: str, parent: str) -> bool:
@@ -131,14 +201,20 @@ def load_team_registry(root: Path) -> dict[str, dict[str, object]]:
 
 def recommended_checks(role: str) -> list[str]:
     if role == "security-reviewer":
-        return ["python scripts/security-scan.py --root . --include-runtime --strict"]
+        return ["python3 scripts/security-scan.py --root . --include-runtime --strict"]
     if role == "reference-reviewer":
-        return ["python scripts/validate-reference-candidates.py --root .", "python scripts/validate-reference-proposals.py --root ."]
+        return ["python3 scripts/validate-reference-candidates.py --root .", "python3 scripts/validate-reference-proposals.py --root ."]
     if role == "docs-sync-auditor":
-        return ["python scripts/generate-codemaps.py --root . --format json", "python scripts/wiki-lint.py --root . --format json"]
+        return ["python3 scripts/generate-codemaps.py --root . --format json", "python3 scripts/wiki-lint.py --root . --format json"]
     if role == "closeout-validator":
-        return ["python scripts/verify.py --root .", "python scripts/quality-gate.py --root . --format json"]
-    return ["python -m unittest discover -s tests -v"]
+        return ["python3 scripts/verify.py --root .", "python3 scripts/quality-gate.py --root . --format json"]
+    return ["python3 -m unittest discover -s tests -v"]
+
+
+def normalize_check_command(command: str) -> str:
+    if command.startswith("python "):
+        return "python3 " + command[len("python ") :]
+    return command
 
 
 def load_subdir_hints(root: Path, scope: list[str]) -> list[dict[str, str]]:
@@ -198,43 +274,72 @@ def build_brief(root: Path, args: argparse.Namespace) -> Brief:
         forbidden.append("Do not modify files; report findings only.")
     elif write_policy == "manual_work_required":
         forbidden.append("Do not write until the planner/user has approved the implementation scope.")
+    parent_plan = normalize_optional_repo_path(root, args.parent_plan)
+    parent_goal = args.parent_goal.strip() or args.goal.strip()
+    brief_id, created_at = build_brief_id(root, parent_plan, args.role, args.brief_seq)
+    checks = [normalize_check_command(str(item)) for item in configured.get("recommended_checks", [])] if isinstance(configured.get("recommended_checks"), list) else recommended_checks(args.role)
+    handoff = "Return findings, changed files if any, checks run, residual risk, and next recommended action."
     return Brief(
+        schema_version="ai-architecture.agent-brief.v1",
+        brief_id=brief_id,
+        created_at=created_at,
+        tier="incubating",
+        parent_plan=parent_plan,
+        parent_goal=parent_goal,
+        goal_lineage=build_goal_lineage(args.user_goal.strip(), parent_plan, parent_goal, brief_id, args.goal.strip()),
+        objective=args.goal.strip(),
+        read_scope=effective_scope,
+        write_scope=[] if write_policy == "read_only" else effective_scope,
+        forbidden_paths=[],
+        expected_output=handoff,
+        validation_hints=checks,
+        handoff_requirements=handoff,
+        execution_mode="manual_human",
+        ext={},
         role=args.role,
-        goal=args.goal.strip(),
-        scope=scope,
         write_policy=write_policy,
-        parent_role=args.parent_role.strip(),
-        inherited_write_policy=inherited_policy,
-        effective_write_policy=write_policy,
-        effective_scope=effective_scope,
-        mission=str(configured.get("mission") or SPECIALISTS.get(args.role, "")),
-        allowed_files=effective_scope,
+        policy_inheritance={
+            "parent_role": args.parent_role.strip(),
+            "inherited_write_policy": inherited_policy,
+            "effective_write_policy": write_policy,
+            "effective_scope": effective_scope,
+        },
         forbidden_actions=forbidden,
         relevant_rules=["AGENTS.md", "scripts/catalog.yaml", "config/policy.yaml", "rules/common/confirmation-required.md"],
-        recommended_checks=[str(item) for item in configured.get("recommended_checks", [])] if isinstance(configured.get("recommended_checks"), list) else recommended_checks(args.role),
-        handoff_expectation="Return findings, changed files if any, checks run, residual risk, and next recommended action.",
         subdirectory_hints=load_subdir_hints(root, scope),
     )
 
 
+def write_brief(root: Path, brief: Brief) -> Path:
+    brief_dir = root / "runtime" / "agent-briefs"
+    brief_dir.mkdir(parents=True, exist_ok=True)
+    path = brief_dir / f"{brief.brief_id}.json"
+    if path.exists():
+        raise ValueError(f"brief already exists: {path.relative_to(root).as_posix()}")
+    path.write_text(json.dumps(asdict(brief), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
 def render_text(brief: Brief) -> str:
+    policy = brief.policy_inheritance
     lines = [
         f"Role: {brief.role}",
-        f"Goal: {brief.goal}",
-        f"Mission: {brief.mission}",
+        f"Objective: {brief.objective}",
         f"Write policy: {brief.write_policy}",
-        f"Parent role: {brief.parent_role or '(none)'}",
-        f"Inherited write policy: {brief.inherited_write_policy}",
-        f"Effective write policy: {brief.effective_write_policy}",
-        "Allowed files:",
-        *[f"- {item}" for item in brief.allowed_files],
+        f"Parent role: {policy.get('parent_role') or '(none)'}",
+        f"Inherited write policy: {policy.get('inherited_write_policy')}",
+        f"Effective write policy: {policy.get('effective_write_policy')}",
+        "Read scope:",
+        *[f"- {item}" for item in brief.read_scope],
+        "Write scope:",
+        *[f"- {item}" for item in brief.write_scope],
         "Forbidden actions:",
         *[f"- {item}" for item in brief.forbidden_actions],
-        "Recommended checks:",
-        *[f"- {item}" for item in brief.recommended_checks],
+        "Validation hints:",
+        *[f"- {item}" for item in brief.validation_hints],
         "Subdirectory hints:",
         *[f"- {item['path']}: {item.get('summary', '')}" for item in brief.subdirectory_hints],
-        f"Handoff: {brief.handoff_expectation}",
+        f"Handoff: {brief.handoff_requirements}",
     ]
     return "\n".join(lines)
 
@@ -249,6 +354,11 @@ def main() -> int:
     parser.add_argument("--parent-role", default="")
     parser.add_argument("--parent-write-policy", choices=sorted(WRITE_POLICIES), default="")
     parser.add_argument("--parent-scope", action="append", default=[])
+    parser.add_argument("--parent-plan", default="")
+    parser.add_argument("--parent-goal", default="")
+    parser.add_argument("--user-goal", default="")
+    parser.add_argument("--brief-seq", default="")
+    parser.add_argument("--write", action="store_true", help="Write the brief artifact under runtime/agent-briefs/.")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     args = parser.parse_args()
     root = Path(args.root).resolve() if args.root else repo_root().resolve()
@@ -257,12 +367,23 @@ def main() -> int:
         return 2
     try:
         brief = build_brief(root, args)
+        brief_path = write_brief(root, brief) if args.write else None
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
     if args.format == "json":
-        print(json.dumps(asdict(brief), ensure_ascii=False, indent=2))
+        if args.write and brief_path is not None:
+            payload = {
+                "written": True,
+                "brief_path": brief_path.relative_to(root).as_posix(),
+                "brief": asdict(brief),
+            }
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print(json.dumps(asdict(brief), ensure_ascii=False, indent=2))
     else:
+        if args.write and brief_path is not None:
+            print(f"written: {brief_path.relative_to(root).as_posix()}")
         print(render_text(brief))
     return 0
 

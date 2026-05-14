@@ -1,8 +1,8 @@
 # Codemap: scripts
 
-- `files`: 78
-- `line_count`: 20305
-- `directories`: 3
+- `files`: 81
+- `line_count`: 21077
+- `directories`: 4
 
 ## Navigation Entry Points
 
@@ -16,6 +16,7 @@
 - `scripts`
 - `scripts/bootstrap`
 - `scripts/hooks`
+- `scripts/incubating`
 
 ## Files
 
@@ -40,13 +41,16 @@
 - `scripts/eval.py`
 - `scripts/eval.sh`
 - `scripts/failure-classify.py`
+- `scripts/feature-status.py`
 - `scripts/generate-codemaps.py`
 - `scripts/hooks/README.md`
 - `scripts/hooks/post-tool-use-log.py`
+- `scripts/incubating/agent-run.py`
 - `scripts/install-profiles.py`
 - `scripts/install-state.py`
 - `scripts/knowledge-search.py`
 - `scripts/lib_catalog.py`
+- `scripts/lib_feature_status.py`
 - `scripts/lib_path_safety.py`
 - `scripts/lib_runtime_lock.py`
 - `scripts/lib_safe_write.py`

@@ -1,7 +1,7 @@
 # Codemap: tests
 
 - `files`: 12
-- `line_count`: 5352
+- `line_count`: 5864
 - `directories`: 1
 
 ## Navigation Entry Points

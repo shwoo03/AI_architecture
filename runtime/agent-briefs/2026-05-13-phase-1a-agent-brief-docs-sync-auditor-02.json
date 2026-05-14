@@ -1,0 +1,109 @@
+{
+  "schema_version": "ai-architecture.agent-brief.v1",
+  "brief_id": "2026-05-13-phase-1a-agent-brief-docs-sync-auditor-02",
+  "created_at": "2026-05-13T16:13:34Z",
+  "tier": "incubating",
+  "parent_plan": "plans/active/phase-1a-agent-brief.md",
+  "parent_goal": "Phase 1a AgentBrief boundary and creator",
+  "goal_lineage": [
+    {
+      "type": "user_goal",
+      "ref": null,
+      "summary": "Verify Phase 1a done conditions"
+    },
+    {
+      "type": "plan",
+      "ref": "plans/active/phase-1a-agent-brief.md",
+      "summary": "Phase 1a AgentBrief boundary and creator"
+    },
+    {
+      "type": "brief",
+      "ref": "runtime/agent-briefs/2026-05-13-phase-1a-agent-brief-docs-sync-auditor-02.json",
+      "summary": "Phase 1a verification smoke brief"
+    }
+  ],
+  "objective": "Phase 1a verification smoke brief",
+  "read_scope": [
+    "docs",
+    "scripts/agent-brief.py"
+  ],
+  "write_scope": [],
+  "forbidden_paths": [],
+  "expected_output": "Return findings, changed files if any, checks run, residual risk, and next recommended action.",
+  "validation_hints": [
+    "python scripts/generate-codemaps.py --root . --format json",
+    "python scripts/wiki-lint.py --root . --format json"
+  ],
+  "handoff_requirements": "Return findings, changed files if any, checks run, residual risk, and next recommended action.",
+  "execution_mode": "manual_human",
+  "ext": {},
+  "role": "docs-sync-auditor",
+  "goal": "Phase 1a verification smoke brief",
+  "scope": [
+    "docs",
+    "scripts/agent-brief.py"
+  ],
+  "write_policy": "read_only",
+  "parent_role": "",
+  "inherited_write_policy": "read_only",
+  "effective_write_policy": "read_only",
+  "effective_scope": [
+    "docs",
+    "scripts/agent-brief.py"
+  ],
+  "mission": "Check docs, catalog, codemap, wiki, and workflow drift.",
+  "allowed_files": [
+    "docs",
+    "scripts/agent-brief.py"
+  ],
+  "forbidden_actions": [
+    "Do not edit files outside allowed_files.",
+    "Do not run dependency install, git push, or destructive filesystem commands.",
+    "Do not change public command boundaries; route through scripts/agent-flow.py.",
+    "Do not expand permissions beyond the parent/session brief.",
+    "Do not modify files; report findings only."
+  ],
+  "relevant_rules": [
+    "AGENTS.md",
+    "scripts/catalog.yaml",
+    "config/policy.yaml",
+    "rules/common/confirmation-required.md"
+  ],
+  "recommended_checks": [
+    "python scripts/generate-codemaps.py --root . --format json",
+    "python scripts/wiki-lint.py --root . --format json"
+  ],
+  "handoff_expectation": "Return findings, changed files if any, checks run, residual risk, and next recommended action.",
+  "subdirectory_hints": [
+    {
+      "path": "docs/AGENTS.md",
+      "kind": "AGENTS.md",
+      "summary": "# Docs Rules | - Keep `AGENTS.md`, `scripts/catalog.yaml`, and docs command shims aligned. | - Use `python3` in examples. | - Mark generated/runtime paths as artifacts, not canonical sources. | - Command docs under `docs/commands/` require frontmatter metadata."
+    },
+    {
+      "path": "docs/README.md",
+      "kind": "README.md",
+      "summary": "# 문서 안내 | ## 한 문장 정의 | 이 문서는 공용 AI 운영 시스템의 설명 문서를 어떤 순서로 읽고, 어떤 결정을 내릴 때 어떤 문서를 봐야 하는지 알려주는 안내서입니다. | ## 무엇을 하는가 | 문서를 파일 목록으로 나열하는 대신, 사용자가 지금 내릴 결정에 맞춰 읽을 문서를 안내합니다. 목표를 정해야 하는지, 기능을 추가해야 하는지, 에이전트를 투입해야 하는지, 검증 기준이 필요한지에 따라 읽는 문서가 달라집니다."
+    },
+    {
+      "path": "AGENTS.md",
+      "kind": "AGENTS.md",
+      "summary": "# 에이전트 운영 가이드 | Codex가 이 프로젝트에서 가장 먼저 읽는 문서입니다. 목적은 모든 세션이 같은 기준으로 프로젝트를 이해하고, 작업을 나누고, 결과를 검증하고, 다음 세션으로 이어지게 만드는 것입니다. | ## 한 문장 정의 | 이 문서는 Codex가 프로젝트를 시작하거나 이어받을 때 반드시 확인해야 하는 목표, 운영 루프, 권한, 기록 규칙을 정리한 실행 진입점입니다. | ## 무엇을 하는가"
+    },
+    {
+      "path": "README.md",
+      "kind": "README.md",
+      "summary": "# 공용 AI 프로젝트 운영 시스템 | ## 한 문장 정의 | 이 저장소는 새 AI 프로젝트를 시작할 때마다 같은 방식으로 목표를 정리하고, 에이전트를 투입하고, 검증하고, 기록하고, 다음 결정을 내리게 만드는 공용 운영 시스템입니다. | ## 무엇을 하는가 | 이 시스템은 “AI에게 일을 시킨다”를 반복 가능한 운영 절차로 바꿉니다. 프로젝트 목표를 먼저 얇게 정리하고, 필요한 작업 흐름과 에이전트 역할을 고른 뒤, 작은 검증 단위로 실행 결과를 확인합니다. 실행 중 생긴 판단과 증거는 로그와 문서에 남겨 다음 세션이나 다른 에이전트가 같은 맥락을 이어받을 수 있게 합니다."
+    },
+    {
+      "path": "scripts/AGENTS.md",
+      "kind": "AGENTS.md",
+      "summary": "# Scripts Rules | - Public entrypoint stays `scripts/agent-flow.py`; all other scripts are internal tools. | - Prefer standard library implementations and avoid adding dependencies. | - Keep write operations dry-run or explicit-flag based unless called from approved closeout/decision flow. | - Update `scripts/catalog.yaml` when adding or changing an internal tool."
+    },
+    {
+      "path": "scripts/README.md",
+      "kind": "README.md",
+      "summary": "# 자동화 스크립트 안내 | ## 한 문장 정의 | 이 문서는 프로젝트 부트스트랩, 활동 로그 기록, 지식 위키 린트, 스켈레톤 검증에 사용하는 로컬 자동화 스크립트를 설명합니다. | ## Python 요구 사항 | 모든 스크립트는 **Python 3.9 이상**을 요구합니다. `Path.is_relative_to()` 같은 3.9+ API를 사용하므로 3.8 이하에서는 동작하지 않습니다."
+    }
+  ]
+}

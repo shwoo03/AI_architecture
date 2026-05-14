@@ -16,6 +16,8 @@
 
 에이전트를 반복적으로 사용하려면 먼저 역할과 책임을 정합니다. 그런 다음 읽기 범위, 쓰기 범위, 사용할 수 있는 도구, 승인 필요 조건, 실행 기록 방식을 정합니다. 실행할 때는 현재 작업이 어떤 상위 목표와 연결되는지 목표 계보를 남깁니다.
 
+Specialist team 관련 기능의 maturity tier는 `docs/feature-status.yaml`에서 관리합니다. 이 문서는 역할 책임을 설명하고 stable/incubating 상태를 중복 기재하지 않습니다.
+
 기본 역할은 사용자-facing으로 세 가지입니다. 반복 투입할 에이전트 정의의 canonical 위치는 `agents/`이며, `scripts/convert.py`가 `.codex/agents/`와 `.claude/agents/`를 재생성합니다.
 
 | 역할 | 하는 일 | 투입 기준 |

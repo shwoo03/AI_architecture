@@ -34,3 +34,9 @@ ADR이 있으면 문서 구조 변경, 자동화 도입, 검증 기준 변경처
 - 외부 사례 탐색 워크플로: `docs/REFERENCE_DISCOVERY_WORKFLOW.md`
 - 기능 결정 가이드: `docs/FEATURE_DECISION_GUIDE.md`
 - 거버넌스: `docs/GOVERNANCE.md`
+
+## 현재 주요 ADR
+
+- `docs/decisions/ADR-0001-v2-lightweight-team-runtime.md`
+- `docs/decisions/ADR-0002-sdk-adapter-not-core.md`
+- `docs/decisions/ADR-0003-jsonl-ledger-source-of-truth.md`

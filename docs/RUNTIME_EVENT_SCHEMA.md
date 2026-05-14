@@ -85,6 +85,53 @@
 }
 ```
 
+### AgentRun v2 draft
+
+V2 specialist runtime의 AgentRun writer는 아직 incubating입니다. Phase 1a에서는 writer를 구현하지 않고 첫 ledger record의 최소 계약만 고정합니다.
+
+`runtime/agent-runs.jsonl`은 live append-only ledger이며 v2 AgentRun schema entry만 포함합니다. Pre-v2/ECC-style records는 controlled migration으로 `runtime/agent-runs.legacy.jsonl`에 분리 보관합니다. `runtime/agent-runs.legacy.jsonl`은 frozen archive이며 추가 append가 없고, v2 reader/check/summary 대상에서 제외하며 audit/historical 참조 전용입니다.
+
+새 `agent_run_id`는 `run-<brief_id>-<seq>` 형식을 사용합니다. `brief_id`가 이미 UTC date, plan slug, role, brief sequence를 포함하므로 별도 date prefix를 다시 붙이지 않습니다. 마지막 `seq`는 같은 brief에 대한 run attempt sequence입니다.
+
+```json
+{
+  "schema_version": "ai-architecture.agent-run.v1",
+  "ts": "2026-05-14T00:00:00Z",
+  "agent_run_id": "run-2026-05-14-0007-v2-runtime-docs-sync-auditor-01",
+  "brief_id": "2026-05-14-0007-v2-runtime-docs-sync-auditor-01",
+  "tier": "incubating",
+  "agent": "human_operator",
+  "workflow": "manual_smoke",
+  "status": "completed",
+  "goal_lineage": [
+    {"type": "user_goal", "ref": null, "summary": "prepare v2 runtime slice"},
+    {"type": "brief", "ref": "runtime/agent-briefs/2026-05-14-0007-v2-runtime-docs-sync-auditor-01.json", "summary": "manual smoke"}
+  ],
+  "artifacts": [],
+  "result_summary": "",
+  "changed_paths": [],
+  "validation": [],
+  "created_by": "manual",
+  "ext": {}
+}
+```
+
+Required fields are `schema_version`, `ts`, `agent_run_id`, `brief_id`, `tier`, `agent`, `workflow`, `status`, `goal_lineage`, `artifacts`, `result_summary`, `changed_paths`, `validation`, `created_by`, and `ext`. `tier` defaults to `incubating` for v2 manual smoke. `ext` is always present and starts as `{}`.
+
+## Adapter extension 규칙
+
+외부 SDK나 graph runtime의 provider-specific 필드는 core schema에 직접 추가하지 않습니다. 필요한 경우 `ext.<adapter_name>.*` namespace 아래에 격리합니다.
+
+예:
+
+```json
+{"phase":"agent_run","action":"completed","agent_run_id":"run-123","ext":{"openai_agents_sdk":{"response_id":"resp_..."}}}
+```
+
+Provider credential은 `references.yaml`, `scripts/catalog.yaml`, `mcp/servers.yaml`, runtime ledger 같은 canonical config에 저장하지 않습니다. 환경변수나 user-local config만 사용합니다.
+
+SDK trace와 LangGraph trace는 부가 증거입니다. closeout, resume-readiness, source recovery의 source of truth는 로컬 JSONL ledger입니다.
+
 설치 상태 로그는 skeleton 복사와 canonical 변환 결과를 기록합니다.
 
 ```json

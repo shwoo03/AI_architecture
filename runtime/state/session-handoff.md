@@ -1,32 +1,37 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-13T08:09:20Z
+2026-05-13T16:55:06Z
 
 ## Current Task
-Reference inventory alignment plus closeout codemap/pycache hygiene is implemented.
+Phase 1c AgentRun v2-only ledger migration, read-side aggregation, and all-tier quality gate integration are implemented.
 
 ## Last Completed
-- Normalized tracked reference metadata in `references.yaml` for the 6 tracked repositories.
-- Added candidate cards for `oh-my-codex`, `oh-my-claudecode`, `paperclip`, and `opencode` without auto-generating adoption proposals.
-- Added read-only `scripts/reference-inventory.py` and wired it into `quality-gate`.
-- Added `scripts/cleanup-ephemeral.py` for repo-bounded `__pycache__` cleanup.
-- Integrated closeout maintenance actions in `task-closeout.py`: codemap refresh and pycache cleanup with JSON `maintenance_actions`.
-- Fixed task-closeout completion evidence commands so runtime snapshots do not persist machine-specific absolute Python paths.
-- Refreshed codemaps and cleaned generated `__pycache__` artifacts.
+- Performed controlled ledger migration for `runtime/agent-runs.jsonl`.
+- Moved two pre-v2/ECC-style records into frozen archive `runtime/agent-runs.legacy.jsonl`.
+- Left `runtime/agent-runs.jsonl` as live append-only v2-only ledger with one AgentRun v1 record.
+- Documented live/frozen ledger boundary and `agent_run_id` policy in `docs/RUNTIME_EVENT_SCHEMA.md`.
+- Updated `scripts/incubating/agent-run.py` with `list`, `check`, and `summary` subcommands.
+- Updated future `agent_run_id` generation to `run-<brief_id>-<seq>` while preserving the existing 1b smoke entry id.
+- Connected `quality-gate --tier all` to the incubating AgentRun ledger check.
+- Kept `quality-gate --tier stable` unaffected; `agent-run-ledger` remains skipped by tier.
+- Closed all previously completed subagents and did not create new subagents for 1c.
 
 ## Validation
-- Focused unittest: `python3 -m unittest tests.test_reference_security tests.test_validation tests.test_runtime -v` passed, 120 tests.
-- Full unittest: `python3 -m unittest discover -s tests -v` passed, 192 tests.
-- `python3 scripts/quality-gate.py --root . --test-timeout 300 --format json` passed with summary `OK 36, SKIP 2`.
-- `python3 scripts/resume-readiness.py --root . --strict --format json` passed before closeout record refresh.
-- `python3 scripts/session-snapshot.py --root . write --format json` passed after sanitizing portable validation commands.
+- Ledger split check passed: live=1, live_v2=1, legacy=2, legacy_v2=0.
+- `python3 scripts/incubating/agent-run.py --root . dump --tail 5 --format json` showed only the v2 record.
+- `python3 scripts/incubating/agent-run.py --root . check --format json` returned `ok: true`, `record_count: 1`, no findings.
+- `python3 scripts/incubating/agent-run.py --root . summary --format json` returned total=1 and completed/manual_smoke/human_operator counts.
+- `python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json` exited 0 and skipped `agent-run-ledger`.
+- `python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json` exited 0 and included `agent-run-ledger: OK`.
+- Focused unittest passed: `python3 -m unittest tests.test_validation.NewInternalToolTests tests.test_validation.QualityGateTests -v`, 39 tests.
+- Full unittest passed: `python3 -m unittest discover -s tests -v`, 204 tests.
 
 ## Recommended Next Step
-No required next implementation step for this plan. If continuing v2 work, the next natural area is specialist-agent execution policy and team orchestration.
+Decide whether to start the next v2 slice: either `agent-flow delegate` incubating entrypoint design, or richer AgentRun aggregation policy such as changed-path verification and retry/idempotency semantics.
 
 ## Open Questions / Blockers
-None for this plan.
+None for Phase 1c.
 
 ## Resume Prompt
-Continue from /Users/shwoo/mydir/AI/AI_architecture. Reference inventory, candidate cards, reference-inventory quality gate check, closeout codemap refresh, and pycache cleanup are implemented and validated. Start by checking `runtime/state/session-handoff.md`, then run `python3 scripts/resume-readiness.py --root . --strict --format json` if you need a fresh handoff check.
+Continue from /Users/shwoo/mydir/AI/AI_architecture. Phase 1c is implemented: AgentRun ledger is v2-only, legacy records are frozen in `runtime/agent-runs.legacy.jsonl`, `agent-run.py list/check/summary` exist, and `quality-gate --tier all` validates the incubating ledger while stable gate remains unaffected. Run closeout/maintenance checks before starting a new v2 slice if needed.

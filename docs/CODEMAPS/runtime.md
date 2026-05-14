@@ -1,8 +1,8 @@
 # Codemap: runtime
 
-- `files`: 15
-- `line_count`: 851
-- `directories`: 8
+- `files`: 18
+- `line_count`: 1193
+- `directories`: 9
 
 ## Navigation Entry Points
 
@@ -11,6 +11,7 @@
 ## Directories
 
 - `runtime`
+- `runtime/agent-briefs`
 - `runtime/proposals`
 - `runtime/proposals/reference-adoption`
 - `runtime/proposals/skill-lifecycle`
@@ -22,6 +23,9 @@
 ## Files
 
 - `runtime/AGENTS.md`
+- `runtime/agent-briefs/2026-05-13-phase-1a-agent-brief-docs-sync-auditor-01.json`
+- `runtime/agent-briefs/2026-05-13-phase-1a-agent-brief-docs-sync-auditor-02.json`
+- `runtime/agent-briefs/2026-05-13-phase-1b-agent-run-docs-sync-auditor-01.json`
 - `runtime/proposals/README.md`
 - `runtime/proposals/reference-adoption/2026-04-27-example-resume-safe-checkpoint.md`
 - `runtime/proposals/reference-adoption/2026-05-12-p0-operational-skeleton-hardening.md`

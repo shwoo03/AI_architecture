@@ -163,6 +163,14 @@
 
 업그레이드 원칙은 변하지 않습니다: 먼저 dry-run diff를 보고, risky 변경은 proposal/review queue로 남기며, 승인 후에만 파일을 반영합니다. 적용 뒤에는 `python3 scripts/verify.py`와 `python3 scripts/quality-gate.py --format json`을 실행합니다.
 
+### Overlay profile
+
+기본 overlay profile은 `stable`입니다. 기능별 tier와 overlay 기본값은 `docs/feature-status.yaml`이 단일 진실 소스입니다.
+
+- `stable`: `overlay_default=true`이고 `tier=stable`인 기능만 기본 추천합니다.
+- `incubating`: stable 기능과 v2 incubating 기능을 함께 보여주되, brief에 변경 가능성과 수동 검토 필요성을 표시합니다.
+- `all`: experimental adapter까지 보여줍니다. 이 profile의 experimental 항목은 승인 필요 대상으로 봅니다.
+
 ## 기능 추가/수정 판단 기준
 
 - 새 파일이 추가되면 위 세 영역 중 어디에 속하는지 분류하고 이 문서의 목록에 추가합니다.

@@ -142,12 +142,52 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertTrue(payload["dry_run"])
             brief = payload["brief"]
+            self.assertEqual(brief["profile"], "stable")
             self.assertIn("docs/REFERENCE_REVIEW.template.md", {item["path"] for item in brief["safe_additions"]})
             self.assertIn("AGENTS.md", {item["path"] for item in brief["risky_reviews"]})
+            safe_item = next(item for item in brief["safe_additions"] if item["path"] == "docs/REFERENCE_REVIEW.template.md")
+            self.assertEqual(safe_item["feature_id"], "upgrade-brief")
+            self.assertEqual(safe_item["tier"], "stable")
+            self.assertTrue(safe_item["overlay_default"])
+            self.assertFalse(safe_item["approval_required"])
             self.assertTrue(brief["approval_required"])
             self.assertIn("not approval", brief["approval_note"])
             self.assertIn("python3 scripts/quality-gate.py --format json", brief["validation_commands"])
             self.assertIn("AGENTS.md", brief["manual_merge_order"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_brief_profiles_expose_incubating_and_experimental_with_warnings(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-brief-profile")
+        try:
+            target = tmp / "proj"
+            target.mkdir(parents=True)
+            stable = _run(
+                [str(self.SCRIPT), "--target", str(target), "--brief", "--profile", "stable", "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            incubating = _run(
+                [str(self.SCRIPT), "--target", str(target), "--brief", "--profile", "incubating", "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            all_profile = _run(
+                [str(self.SCRIPT), "--target", str(target), "--brief", "--profile", "all", "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(stable.returncode, 0, stable.stdout + stable.stderr)
+            self.assertEqual(incubating.returncode, 0, incubating.stdout + incubating.stderr)
+            self.assertEqual(all_profile.returncode, 0, all_profile.stdout + all_profile.stderr)
+            stable_brief = json.loads(stable.stdout)["brief"]
+            incubating_brief = json.loads(incubating.stdout)["brief"]
+            all_brief = json.loads(all_profile.stdout)["brief"]
+            stable_tiers = {item["tier"] for bucket in ("safe_additions", "manual_reviews", "risky_reviews", "protected_skips") for item in stable_brief[bucket]}
+            incubating_items = [item for bucket in ("safe_additions", "manual_reviews", "risky_reviews", "protected_skips") for item in incubating_brief[bucket] if item["tier"] == "incubating"]
+            experimental_items = [item for bucket in ("safe_additions", "manual_reviews", "risky_reviews", "protected_skips") for item in all_brief[bucket] if item["tier"] == "experimental"]
+            self.assertEqual(stable_tiers, {"stable"})
+            self.assertTrue(incubating_items)
+            self.assertTrue(any(item["tier_warning"] for item in incubating_items))
+            self.assertTrue(experimental_items)
+            self.assertTrue(all(item["approval_required"] for item in experimental_items))
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

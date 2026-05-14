@@ -1,8 +1,8 @@
 # Codemap: docs
 
-- `files`: 46
-- `line_count`: 3872
-- `directories`: 7
+- `files`: 52
+- `line_count`: 4219
+- `directories`: 8
 
 ## Navigation Entry Points
 
@@ -15,6 +15,7 @@
 - `docs/_meta`
 - `docs/commands`
 - `docs/decisions`
+- `docs/design`
 - `docs/reference-wiki`
 - `docs/reference-wiki/wiki`
 - `docs/wiki-ops`
@@ -49,6 +50,7 @@
 - `docs/SKELETON_UPGRADE.md`
 - `docs/SKILL_DISTRIBUTION_MODEL.md`
 - `docs/THREE_LAYER_MODEL.md`
+- `docs/VERSION_ROADMAP.md`
 - `docs/WORKFLOW_CATALOG.md`
 - `docs/_meta/BEST_PRACTICE_GAP_IMPLEMENTATION_PLAN.md`
 - `docs/_meta/ECC_PAPERCLIP_PATTERNS.md`
@@ -59,7 +61,12 @@
 - `docs/commands/start.md`
 - `docs/commands/verify.md`
 - `docs/decisions/ADR-0001-reference-discovery-and-adoption.md`
+- `docs/decisions/ADR-0001-v2-lightweight-team-runtime.md`
+- `docs/decisions/ADR-0002-sdk-adapter-not-core.md`
+- `docs/decisions/ADR-0003-jsonl-ledger-source-of-truth.md`
 - `docs/decisions/README.md`
+- `docs/design/V2_SPECIALIST_TEAM_OS.md`
+- `docs/feature-status.yaml`
 - `docs/plugin-manifest-notes.md`
 - `docs/reference-wiki/README.md`
 - `docs/reference-wiki/wiki/index.md`

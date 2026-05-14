@@ -18,6 +18,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib_feature_status import feature_by_doc_path, load_feature_manifest, tiers_for_profile
+
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -305,11 +309,49 @@ def action_payload(action: Action) -> dict[str, object]:
     return asdict(action)
 
 
-def build_brief(actions: list[Action]) -> dict[str, object]:
-    safe_additions = [action for action in actions if action.action == "add" and action.safety == "safe"]
-    manual_reviews = [action for action in actions if action.action == "review" or action.safety == "manual"]
-    risky_reviews = [action for action in actions if action.safety == "risky" or action.action == "update_available"]
-    protected_skips = [action for action in actions if action.action == "skip" or action.safety == "protected"]
+def feature_payload_for_action(action: Action, features: list[dict[str, object]], profile: str) -> dict[str, object]:
+    feature = feature_by_doc_path(features, action.path)
+    if feature is None:
+        feature = {"id": "unmapped", "tier": "stable", "overlay_default": True}
+    tier = str(feature.get("tier", "stable"))
+    overlay_default = bool(feature.get("overlay_default", True))
+    approval_required = action.safety != "safe" or tier != "stable" or (profile == "all" and tier == "experimental")
+    tier_warning = ""
+    if tier == "incubating":
+        tier_warning = "incubating feature: schema and workflow may change"
+    elif tier == "experimental":
+        tier_warning = "experimental adapter/future feature: explicit approval required"
+    return {
+        "feature_id": str(feature.get("id", "unmapped")),
+        "tier": tier,
+        "overlay_default": overlay_default,
+        "approval_required": approval_required,
+        "tier_warning": tier_warning,
+    }
+
+
+def action_payload_with_feature(action: Action, features: list[dict[str, object]], profile: str) -> dict[str, object]:
+    payload = action_payload(action)
+    payload.update(feature_payload_for_action(action, features, profile))
+    return payload
+
+
+def include_action_for_profile(action: Action, features: list[dict[str, object]], profile: str) -> bool:
+    feature_meta = feature_payload_for_action(action, features, profile)
+    tier = str(feature_meta["tier"])
+    if tier not in tiers_for_profile(profile):
+        return False
+    if profile == "stable":
+        return bool(feature_meta["overlay_default"])
+    return True
+
+
+def build_brief(actions: list[Action], features: list[dict[str, object]], profile: str) -> dict[str, object]:
+    included = [action for action in actions if include_action_for_profile(action, features, profile)]
+    safe_additions = [action for action in included if action.action == "add" and action.safety == "safe"]
+    manual_reviews = [action for action in included if action.action == "review" or action.safety in {"manual", "review"}]
+    risky_reviews = [action for action in included if action.safety == "risky" or action.action == "update_available"]
+    protected_skips = [action for action in included if action.action == "skip" or action.safety == "protected"]
     review_items = manual_reviews + risky_reviews
     priority = {
         "AGENTS.md": 0,
@@ -323,10 +365,13 @@ def build_brief(actions: list[Action]) -> dict[str, object]:
         key=lambda path: (priority.get(path, 50), path),
     )
     return {
-        "safe_additions": [action_payload(action) for action in safe_additions],
-        "manual_reviews": [action_payload(action) for action in manual_reviews],
-        "risky_reviews": [action_payload(action) for action in risky_reviews],
-        "protected_skips": [action_payload(action) for action in protected_skips],
+        "profile": profile,
+        "included_tiers": sorted(tiers_for_profile(profile)),
+        "tier_warning": "stable overlay only" if profile == "stable" else "incubating/experimental items are advisory and may require manual approval",
+        "safe_additions": [action_payload_with_feature(action, features, profile) for action in safe_additions],
+        "manual_reviews": [action_payload_with_feature(action, features, profile) for action in manual_reviews],
+        "risky_reviews": [action_payload_with_feature(action, features, profile) for action in risky_reviews],
+        "protected_skips": [action_payload_with_feature(action, features, profile) for action in protected_skips],
         "recommended_next_prompt": "Review manual_merge/risky entries one by one with the user before applying changes.",
         "manual_merge_order": ordered_review_paths,
         "validation_commands": [
@@ -444,6 +489,12 @@ def main() -> int:
         action="store_true",
         help="Emit an AI-assisted dry-run upgrade brief. Incompatible with --apply.",
     )
+    parser.add_argument(
+        "--profile",
+        choices=("stable", "incubating", "all"),
+        default="stable",
+        help="Feature maturity profile for --brief output.",
+    )
     args = parser.parse_args()
 
     if args.brief and args.apply:
@@ -458,6 +509,11 @@ def main() -> int:
     source = Path(args.source).resolve() if args.source else repo_root()
     if not source.is_dir():
         raise SystemExit(f"--source is not a directory: {source}")
+    try:
+        feature_manifest = load_feature_manifest(source)
+        features = feature_manifest.get("features") or []
+    except FileNotFoundError:
+        features = []
 
     targets = [Path(item).resolve() for item in args.target]
     if args.projects_root:
@@ -501,7 +557,7 @@ def main() -> int:
             "actions": [action_payload(action) for action in all_actions],
         }
         if args.brief:
-            payload["brief"] = build_brief(all_actions)
+            payload["brief"] = build_brief(all_actions, features, args.profile)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(render_text(all_actions, dry_run=not args.apply))

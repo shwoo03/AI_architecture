@@ -17,6 +17,7 @@ import tokenize
 from dataclasses import dataclass
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib_catalog import load_catalog_modes_with_status, validate_catalog, validate_command_docs
 
@@ -92,6 +93,8 @@ REQUIRED_CORE_DOCS = [
     "docs/RUNTIME_EVENT_SCHEMA.md",
     "docs/plugin-manifest-notes.md",
     "docs/FEATURE_DECISION_GUIDE.md",
+    "docs/feature-status.yaml",
+    "docs/VERSION_ROADMAP.md",
     "docs/DOCUMENTATION_STYLE_GUIDE.md",
     "docs/NOTION_DOCUMENTATION_RULES.md",
 ]
@@ -166,6 +169,8 @@ REQUIRED_SCRIPT_PATHS = [
     "scripts/skill-stocktake.py",
     "scripts/plugin-manifest-check.py",
     "scripts/schema-check.py",
+    "scripts/feature-status.py",
+    "scripts/lib_feature_status.py",
     "scripts/markdown-sanitize.py",
     "scripts/failure-classify.py",
 ]
@@ -742,6 +747,7 @@ def check_external_validators(root: Path, findings: list[Finding]) -> None:
     commands = [
         ("plugin_manifest", "plugin-manifest-check.py", ["check"]),
         ("schema_check", "schema-check.py", ["check"]),
+        ("feature_status", "feature-status.py", ["check", "--tier", "all"]),
         ("markdown_sanitize", "markdown-sanitize.py", ["--check"]),
         ("mcp_audit", "mcp-audit.py", ["check"]),
         ("tool_health", "tool-health.py", ["check"]),

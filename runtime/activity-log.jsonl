@@ -151,3 +151,12 @@
 {"ts": "2026-05-13T08:01:57Z", "phase": "closeout", "action": "task_closeout", "goal": "Reference inventory, codemap freshness, and pycache hygiene implementation", "result": "recording"}
 {"ts":"2026-05-13T08:06:55Z","phase":"session","action":"handoff_saved","goal":"Reference inventory, codemap freshness, and pycache hygiene implementation","result":"updated"}
 {"ts": "2026-05-13T08:09:20Z", "phase": "session", "action": "handoff_saved", "goal": "Reference inventory, codemap freshness, and pycache hygiene implementation", "result": "updated"}
+{"ts": "2026-05-13T15:22:11Z", "phase": "closeout", "action": "task_closeout", "goal": "Feature maturity manifest and tier-aware v2 preparation", "result": "recording"}
+{"ts":"2026-05-13T15:23:15Z","phase":"session","action":"handoff_saved","goal":"Feature maturity manifest and tier-aware v2 preparation","result":"updated"}
+{"ts": "2026-05-13T16:09:49Z", "phase": "closeout", "action": "task_closeout", "goal": "Phase 1a AgentBrief boundary creator and AgentRun schema draft", "result": "recording"}
+{"ts":"2026-05-13T16:09:53Z","phase":"session","action":"handoff_saved","goal":"Phase 1a AgentBrief boundary creator and AgentRun schema draft","result":"updated"}
+{"ts": "2026-05-13T16:31:54Z", "phase": "closeout", "action": "task_closeout", "goal": "Phase 1b AgentRun writer dump reader and brief schema cleanup", "result": "recording"}
+{"ts":"2026-05-13T16:32:21Z","phase":"session","action":"handoff_saved","goal":"Phase 1b AgentRun writer dump reader and brief schema cleanup","result":"updated"}
+{"ts":"2026-05-13T16:55:06Z","phase":"runtime_migration","action":"agent_runs_schema_split","goal":"Phase 1c AgentRun v2-only ledger and read-side aggregation","result":"migrated","detail":{"live":"runtime/agent-runs.jsonl","legacy":"runtime/agent-runs.legacy.jsonl","legacy_records":2,"live_v2_records":1,"legacy_policy":"frozen_archive_no_append"}}
+{"ts":"2026-05-13T16:55:06Z","phase":"session","action":"handoff_saved","goal":"Phase 1c AgentRun v2-only ledger and read-side aggregation","result":"updated"}
+{"ts": "2026-05-13T17:02:49Z", "phase": "closeout", "action": "task_closeout", "goal": "Phase 1c AgentRun v2-only ledger and read-side aggregation", "result": "recording"}

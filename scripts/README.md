@@ -60,13 +60,14 @@
 - `scripts/schema-check.py`: `schemas/*.schema.json`과 runtime/config/plugin 핵심 계약을 표준 라이브러리 기반으로 검증합니다.
 - `scripts/markdown-sanitize.py`: generated Markdown의 fenced whole-document wrapper, frontmatter wrapper, BOM, final newline 문제를 preview/apply 방식으로 보수적으로 정리합니다.
 - `scripts/failure-classify.py`: validation/tool stderr·stdout을 `auth`, `quota`, `timeout`, `format`, `payload`, `policy`, `infra`, `unknown`으로 분류하고 retry 가능성과 다음 액션을 보고합니다.
+- `scripts/feature-status.py`: `docs/feature-status.yaml`의 maturity tier, overlay 기본값, 문서 경로를 검증합니다.
 - `scripts/checkpoint.py`: 긴 작업 중간 상태를 `runtime/checkpoints.jsonl`에 append-only로 남깁니다.
 - `scripts/verify-skeleton.py`: 스켈레톤 또는 부트스트랩된 프로젝트의 구조, 필수 경로, 에이전트 메타데이터, JSONL 파싱, 후보 카드, 위키 린트를 확인합니다.
 - `scripts/rotate-activity-log.py`: `runtime/activity-log.jsonl`과 `runtime/agent-runs.jsonl`이 10,000줄을 넘으면 `runtime/archive/<base>-YYYY-MM.jsonl`로 월 단위 아카이브합니다. 기본값은 dry-run이며 `--apply`로 실행합니다.
 - `scripts/search-activity-log.py`: 활동 로그를 읽어 `--since/--until/--phase/--action/--project/--tool/--contains/--sidecar-contains` 필터로 검색합니다. 긴 tool output은 sidecar 파일에 보존될 수 있으며, 기본 출력은 표, `--jsonl`로 원본 JSONL 스트림.
 - `scripts/session-recall.py`: activity log, completion evidence, decisions, skill usage를 SQLite FTS 캐시로 인덱싱하고 검색합니다. 원본 로그를 대체하지 않으며 삭제 후 `index`로 재생성할 수 있습니다.
 - `scripts/list-open-questions.py`: 프로젝트 전체 `**/*.md`를 스캔해 `[NEEDS CLARIFICATION: ...]` 마커를 집계합니다. `--count/--by-file/--json`, CI 게이트용 `--strict` 지원.
-- `scripts/quality-gate.py`: 현재 프로젝트에서 사용 가능한 검증 표면을 감지해 한 번에 실행합니다. Skeleton 검증, ledger 검사, eval-all, Python 문법 검사, unittest, `package.json`의 `npm run test/build`를 지원합니다.
+- `scripts/quality-gate.py`: 현재 프로젝트에서 사용 가능한 검증 표면을 감지해 한 번에 실행합니다. Skeleton 검증, ledger 검사, eval-all, Python 문법 검사, unittest, `package.json`의 `npm run test/build`를 지원하며 `--tier stable|all`로 stable closeout과 incubating 검증을 분리합니다.
 - `scripts/review-queue.py`: 에이전트가 혼자 결정하면 안 되는 항목을 `runtime/review-queue.jsonl`에 append-only 이벤트로 남깁니다. Notion 중복, risky upgrade, reference adoption, skill lifecycle 승인 대기 같은 항목을 `add/list/resolve/dismiss/count/sweep`으로 관리합니다. `sweep`은 기본 dry-run이며 `--apply`일 때만 정리 이벤트를 append합니다.
 - `scripts/validate-reference-candidates.py`: `research/reference-candidates/`의 실제 후보 카드가 필수 필드, 허용 값, 점수 합계, 리스트 항목을 갖췄는지 검사합니다.
 - `scripts/validate-reference-proposals.py`: `runtime/proposals/reference-adoption/`의 실제 dry-run 제안서가 필수 필드, 후보 카드 링크, 모듈형 흡수 판단, 검증 계획, 중단 조건을 갖췄는지 검사합니다.

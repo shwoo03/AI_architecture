@@ -175,7 +175,8 @@ class OperationalToolTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["role"], "security-reviewer")
-        self.assertIn("mcp-audit.py", "\n".join(payload["recommended_checks"]))
+        self.assertIn("mcp-audit.py", "\n".join(payload["validation_hints"]))
+        self.assertNotIn("recommended_checks", payload)
         self.assertIn("subdirectory_hints", payload)
 
     def test_subdir_hints_are_included_for_scoped_brief(self) -> None:

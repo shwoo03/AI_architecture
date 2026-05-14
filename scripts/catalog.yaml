@@ -133,6 +133,8 @@ internal:
       used_by: quality-gate plugin metadata validation
     - path: scripts/schema-check.py
       used_by: schema-backed contract validation
+    - path: scripts/feature-status.py
+      used_by: maturity tier manifest validation and tier-aware quality gates
     - path: scripts/markdown-sanitize.py
       used_by: generated Markdown/frontmatter drift detection
     - path: scripts/failure-classify.py
@@ -181,6 +183,9 @@ internal:
       used_by: indexed session recall
     - path: scripts/agent-brief.py
       used_by: planner delegation to specialist agents via config/agent-team.yaml
+    - path: scripts/incubating/agent-run.py
+      tier: incubating
+      used_by: incubating manual AgentRun ledger smoke records
     - path: scripts/rotate-activity-log.py
       used_by: log maintenance
 

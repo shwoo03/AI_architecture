@@ -68,6 +68,7 @@ class ScriptHelpTests(unittest.TestCase):
         "change-drift-check.py",
         "redact.py",
         "subdir-hints.py",
+        "feature-status.py",
         "operational-readiness.py",
         "safe-write.py",
         "diff-quality-gate.py",
@@ -101,6 +102,49 @@ class VerifySkeletonTests(unittest.TestCase):
             0,
             f"verify-skeleton failed:\nstdout={result.stdout}\nstderr={result.stderr}",
         )
+
+
+class FeatureStatusTests(unittest.TestCase):
+    SCRIPT = SCRIPTS / "feature-status.py"
+
+    def test_manifest_is_valid_for_all_tiers(self) -> None:
+        result = _run([str(self.SCRIPT), "--root", str(REPO_ROOT), "--format", "json", "check", "--tier", "all"], cwd=REPO_ROOT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertGreater(payload["features_by_tier"]["stable"], 0)
+        self.assertGreater(payload["features_by_tier"]["incubating"], 0)
+        self.assertGreater(payload["features_by_tier"]["experimental"], 0)
+
+    def test_stable_tier_does_not_validate_incubating_doc_paths(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"feature-status-{uuid.uuid4().hex}"
+        try:
+            (tmp / "docs").mkdir(parents=True)
+            (tmp / "docs" / "stable.md").write_text("# stable\n", encoding="utf-8")
+            (tmp / "docs" / "feature-status.yaml").write_text(
+                "version: 1\n"
+                "tiers: [stable, incubating, experimental, deprecated]\n"
+                "features:\n"
+                "  - id: stable.feature\n"
+                "    tier: stable\n"
+                "    overlay_default: true\n"
+                "    docs: [docs/stable.md]\n"
+                "  - id: incubating.feature\n"
+                "    tier: incubating\n"
+                "    overlay_default: false\n"
+                "    docs: [docs/missing.md]\n",
+                encoding="utf-8",
+            )
+            stable = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", "check", "--tier", "stable"], cwd=REPO_ROOT)
+            self.assertEqual(stable.returncode, 0, stable.stdout + stable.stderr)
+            stable_payload = json.loads(stable.stdout)
+            self.assertIn("incubating.feature", stable_payload["skipped_by_tier"])
+            all_tiers = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", "check", "--tier", "all"], cwd=REPO_ROOT)
+            self.assertNotEqual(all_tiers.returncode, 0)
+            all_payload = json.loads(all_tiers.stdout)
+            self.assertEqual(all_payload["findings"][0]["check"], "doc_exists")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class ScriptCatalogValidationTests(unittest.TestCase):
@@ -299,7 +343,11 @@ class QualityGateTests(unittest.TestCase):
         )
         payload = json.loads(result.stdout)
         self.assertEqual(payload["root"], str(REPO_ROOT.resolve()))
+        self.assertEqual(payload["tier"], "stable")
+        self.assertIn("feature_manifest", payload)
+        self.assertIn("skipped_by_tier", payload)
         names = {item["name"] for item in payload["checks"]}
+        self.assertIn("feature-status", names)
         self.assertIn("verify-skeleton", names)
         self.assertIn("resume-readiness", names)
         self.assertIn("skill-surface", names)
@@ -311,6 +359,175 @@ class QualityGateTests(unittest.TestCase):
         self.assertIn("lsp-diagnostics", names)
         self.assertIn("python-syntax", names)
         self.assertNotIn("python-unittest", names)
+
+    def test_quality_gate_stable_skips_incubating_manifest_failure(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"quality-tier-{uuid.uuid4().hex}"
+        try:
+            (tmp / "docs").mkdir(parents=True)
+            (tmp / "scripts").mkdir(parents=True)
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "docs" / "stable.md").write_text("# stable\n", encoding="utf-8")
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "ai-architecture.agent-run.v1",
+                        "ts": "2026-05-14T00:00:00Z",
+                        "agent_run_id": "run-temp",
+                        "brief_id": "2026-05-14-adhoc-human-operator-01",
+                        "tier": "incubating",
+                        "agent": "human_operator",
+                        "workflow": "manual_smoke",
+                        "status": "completed",
+                        "goal_lineage": [{"type": "brief", "ref": "runtime/agent-briefs/tmp.json", "summary": "temp"}],
+                        "artifacts": [],
+                        "result_summary": "temp",
+                        "changed_paths": [],
+                        "validation": [],
+                        "created_by": "manual",
+                        "ext": {},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (tmp / "docs" / "feature-status.yaml").write_text(
+                "version: 1\n"
+                "tiers: [stable, incubating, experimental, deprecated]\n"
+                "features:\n"
+                "  - id: stable.feature\n"
+                "    tier: stable\n"
+                "    overlay_default: true\n"
+                "    docs: [docs/stable.md]\n"
+                "  - id: incubating.feature\n"
+                "    tier: incubating\n"
+                "    overlay_default: false\n"
+                "    docs: [docs/missing.md]\n",
+                encoding="utf-8",
+            )
+            for rel in ["quality-gate.py", "feature-status.py", "lib_feature_status.py", "failure-classify.py"]:
+                shutil.copy2(SCRIPTS / rel, tmp / "scripts" / rel)
+            stable = _run(
+                [
+                    str(tmp / "scripts" / "quality-gate.py"),
+                    "--root",
+                    str(tmp),
+                    "--skip-tests",
+                    "--skip-node",
+                    "--skip-skeleton",
+                    "--format",
+                    "json",
+                ],
+                cwd=tmp,
+            )
+            self.assertEqual(stable.returncode, 0, stable.stdout + stable.stderr)
+            stable_payload = json.loads(stable.stdout)
+            self.assertEqual(stable_payload["tier"], "stable")
+            self.assertIn("incubating.feature", stable_payload["skipped_by_tier"])
+            all_tiers = _run(
+                [
+                    str(tmp / "scripts" / "quality-gate.py"),
+                    "--root",
+                    str(tmp),
+                    "--tier",
+                    "all",
+                    "--skip-tests",
+                    "--skip-node",
+                    "--skip-skeleton",
+                    "--format",
+                    "json",
+                ],
+                cwd=tmp,
+            )
+            self.assertNotEqual(all_tiers.returncode, 0, all_tiers.stdout + all_tiers.stderr)
+            all_payload = json.loads(all_tiers.stdout)
+            self.assertEqual(all_payload["tier"], "all")
+            self.assertEqual(all_payload["feature_manifest"]["ok"], False)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_quality_gate_all_blocks_broken_agent_run_ledger_but_stable_skips(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"quality-agent-run-{uuid.uuid4().hex}"
+        try:
+            (tmp / "docs").mkdir(parents=True)
+            (tmp / "scripts" / "incubating").mkdir(parents=True)
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "docs" / "stable.md").write_text("# stable\n", encoding="utf-8")
+            (tmp / "docs" / "agent-run.md").write_text("# agent run\n", encoding="utf-8")
+            (tmp / "docs" / "feature-status.yaml").write_text(
+                "version: 1\n"
+                "tiers: [stable, incubating, experimental, deprecated]\n"
+                "features:\n"
+                "  - id: stable.feature\n"
+                "    tier: stable\n"
+                "    overlay_default: true\n"
+                "    docs: [docs/stable.md]\n"
+                "  - id: agent-run-ledger\n"
+                "    tier: incubating\n"
+                "    overlay_default: false\n"
+                "    docs: [docs/agent-run.md]\n",
+                encoding="utf-8",
+            )
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "ai-architecture.agent-run.v1",
+                        "ts": "2026-05-13T00:00:00Z",
+                        "agent_run_id": "run-bad-01",
+                        "brief_id": "bad",
+                        "tier": "incubating",
+                        "agent": "human_operator",
+                        "workflow": "manual_smoke",
+                        "status": "completed",
+                        "goal_lineage": [],
+                        "artifacts": [],
+                        "result_summary": "bad",
+                        "changed_paths": [],
+                        "validation": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            for rel in ["quality-gate.py", "feature-status.py", "lib_feature_status.py", "failure-classify.py", "lib_runtime_lock.py"]:
+                shutil.copy2(SCRIPTS / rel, tmp / "scripts" / rel)
+            shutil.copy2(SCRIPTS / "incubating" / "agent-run.py", tmp / "scripts" / "incubating" / "agent-run.py")
+            stable = _run(
+                [
+                    str(tmp / "scripts" / "quality-gate.py"),
+                    "--root",
+                    str(tmp),
+                    "--tier",
+                    "stable",
+                    "--skip-tests",
+                    "--skip-node",
+                    "--skip-skeleton",
+                    "--format",
+                    "json",
+                ],
+                cwd=tmp,
+            )
+            self.assertEqual(stable.returncode, 0, stable.stdout + stable.stderr)
+            self.assertIn("agent-run-ledger", json.loads(stable.stdout)["skipped_by_tier"])
+            all_tier = _run(
+                [
+                    str(tmp / "scripts" / "quality-gate.py"),
+                    "--root",
+                    str(tmp),
+                    "--tier",
+                    "all",
+                    "--skip-tests",
+                    "--skip-node",
+                    "--skip-skeleton",
+                    "--format",
+                    "json",
+                ],
+                cwd=tmp,
+            )
+            self.assertEqual(all_tier.returncode, 1)
+            checks = {item["name"]: item for item in json.loads(all_tier.stdout)["checks"]}
+            self.assertEqual(checks["agent-run-ledger"]["status"], "FAIL")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_quality_gate_uses_separate_unittest_timeout(self) -> None:
         import importlib.util
@@ -448,7 +665,18 @@ class QualityGateTests(unittest.TestCase):
             scripts = tmp / "scripts"
             scripts.mkdir(parents=True)
             shutil.copyfile(SCRIPTS / "quality-gate.py", scripts / "quality-gate.py")
+            shutil.copyfile(SCRIPTS / "lib_feature_status.py", scripts / "lib_feature_status.py")
             shutil.copyfile(SCRIPTS / "failure-classify.py", scripts / "failure-classify.py")
+            (tmp / "docs").mkdir(parents=True)
+            (tmp / "docs" / "feature-status.yaml").write_text(
+                "version: 1\n"
+                "features:\n"
+                "  - id: stable.feature\n"
+                "    tier: stable\n"
+                "    overlay_default: true\n"
+                "    docs: [docs/feature-status.yaml]\n",
+                encoding="utf-8",
+            )
             (scripts / "eval-all.py").write_text(
                 "import json\nprint(json.dumps({'results': [{'status': 'FAIL'}]}))\n",
                 encoding="utf-8",
@@ -753,8 +981,9 @@ class NewInternalToolTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["role"], "security-reviewer")
-        self.assertEqual(payload["allowed_files"], ["scripts"])
+        self.assertEqual(payload["read_scope"], ["scripts"])
         self.assertIn("Do not modify files", "\n".join(payload["forbidden_actions"]))
+        self.assertNotIn("allowed_files", payload)
 
     def test_agent_brief_rejects_policy_broadening(self) -> None:
         result = _run([
@@ -795,8 +1024,250 @@ class NewInternalToolTests(unittest.TestCase):
         ])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["effective_scope"], ["runtime/proposals/reference-adoption"])
-        self.assertEqual(payload["inherited_write_policy"], "manual_work_required")
+        inheritance = payload["policy_inheritance"]
+        self.assertEqual(inheritance["effective_scope"], ["runtime/proposals/reference-adoption"])
+        self.assertEqual(inheritance["inherited_write_policy"], "manual_work_required")
+
+    def test_agent_brief_write_creates_manual_smoke_artifact_and_increments_seq(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-brief-write-{uuid.uuid4().hex}"
+        try:
+            (tmp / "scripts").mkdir(parents=True)
+            shutil.copyfile(SCRIPTS / "agent-brief.py", tmp / "scripts" / "agent-brief.py")
+            common = [
+                str(tmp / "scripts" / "agent-brief.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "security-reviewer",
+                "--goal",
+                "manual smoke",
+                "--parent-plan",
+                "plans/active/0007-v2-runtime.md",
+                "--parent-goal",
+                "v2 runtime",
+                "--user-goal",
+                "prepare v2 runtime slice",
+                "--write",
+                "--format",
+                "json",
+            ]
+            first = _run(common)
+            second = _run(common)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            first_payload = json.loads(first.stdout)
+            second_payload = json.loads(second.stdout)
+            first_brief = first_payload["brief"]
+            second_brief = second_payload["brief"]
+            self.assertRegex(first_brief["brief_id"], r"^\d{4}-\d{2}-\d{2}-0007-v2-runtime-security-reviewer-01$")
+            self.assertRegex(second_brief["brief_id"], r"^\d{4}-\d{2}-\d{2}-0007-v2-runtime-security-reviewer-02$")
+            self.assertTrue((tmp / first_payload["brief_path"]).exists())
+            self.assertEqual(first_brief["schema_version"], "ai-architecture.agent-brief.v1")
+            self.assertEqual(first_brief["tier"], "incubating")
+            self.assertEqual(first_brief["execution_mode"], "manual_human")
+            self.assertEqual(first_brief["ext"], {})
+            self.assertIsInstance(first_brief["goal_lineage"], list)
+            self.assertEqual(first_brief["goal_lineage"][0]["type"], "user_goal")
+            self.assertEqual(first_brief["goal_lineage"][-1]["type"], "brief")
+            self.assertTrue(all(item.startswith("python3 ") for item in first_brief["validation_hints"]))
+            for key in ("goal", "mission", "scope", "allowed_files", "handoff_expectation", "recommended_checks"):
+                self.assertNotIn(key, first_brief)
+            for key in ("parent_role", "inherited_write_policy", "effective_write_policy", "effective_scope"):
+                self.assertNotIn(key, first_brief)
+            self.assertEqual(
+                first_brief["policy_inheritance"],
+                {
+                    "parent_role": "",
+                    "inherited_write_policy": "read_only",
+                    "effective_write_policy": "read_only",
+                    "effective_scope": ["."],
+                },
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_brief_rejects_parent_plan_outside_root(self) -> None:
+        result = _run([
+            str(SCRIPTS / "agent-brief.py"),
+            "--root",
+            str(REPO_ROOT),
+            "--role",
+            "security-reviewer",
+            "--goal",
+            "review copied code",
+            "--parent-plan",
+            "/tmp/outside-plan.md",
+            "--format",
+            "json",
+        ])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("outside root", result.stderr)
+
+    def test_agent_flow_does_not_expose_delegate_command(self) -> None:
+        result = _run([str(SCRIPTS / "agent-flow.py"), "--help"], cwd=REPO_ROOT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("delegate", result.stdout.lower())
+        self.assertNotIn("agent-run", result.stdout.lower())
+
+    def test_agent_run_add_and_dump_manual_smoke_record(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            brief_result = _run([
+                str(SCRIPTS / "agent-brief.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "manual smoke",
+                "--parent-plan",
+                "plans/active/0008-agent-run.md",
+                "--parent-goal",
+                "agent run writer",
+                "--user-goal",
+                "write one manual smoke run",
+                "--write",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(brief_result.returncode, 0, brief_result.stdout + brief_result.stderr)
+            brief_path = json.loads(brief_result.stdout)["brief_path"]
+            add_result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                brief_path,
+                "--result-summary",
+                "manual smoke passed",
+                "--validation",
+                "manual_read=passed",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(add_result.returncode, 0, add_result.stdout + add_result.stderr)
+            record = json.loads(add_result.stdout)
+            required = {
+                "schema_version",
+                "ts",
+                "agent_run_id",
+                "brief_id",
+                "tier",
+                "agent",
+                "workflow",
+                "status",
+                "goal_lineage",
+                "artifacts",
+                "result_summary",
+                "changed_paths",
+                "validation",
+                "created_by",
+                "ext",
+            }
+            self.assertEqual(set(record), required)
+            self.assertEqual(record["agent_run_id"], f"run-{record['brief_id']}-01")
+            self.assertRegex(record["ts"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+            self.assertEqual(record["tier"], "incubating")
+            self.assertEqual(record["agent"], "human_operator")
+            self.assertEqual(record["validation"], [{"command": "manual_read", "status": "passed"}])
+            self.assertEqual(record["goal_lineage"][-1]["type"], "agent_run")
+            self.assertEqual(record["goal_lineage"][-1]["ref"], f"runtime/agent-runs.jsonl#{record['agent_run_id']}")
+            dump_result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "dump",
+                "--tail",
+                "5",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(dump_result.returncode, 0, dump_result.stdout + dump_result.stderr)
+            self.assertEqual(json.loads(dump_result.stdout)[-1]["agent_run_id"], record["agent_run_id"])
+            list_result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "list", "--format", "json"])
+            self.assertEqual(list_result.returncode, 0, list_result.stdout + list_result.stderr)
+            self.assertEqual(json.loads(list_result.stdout)[0]["agent_run_id"], record["agent_run_id"])
+            check_result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(check_result.returncode, 0, check_result.stdout + check_result.stderr)
+            self.assertTrue(json.loads(check_result.stdout)["ok"])
+            summary_result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "summary", "--format", "json"])
+            self.assertEqual(summary_result.returncode, 0, summary_result.stdout + summary_result.stderr)
+            summary = json.loads(summary_result.stdout)
+            self.assertEqual(summary["total"], 1)
+            self.assertEqual(summary["by_status"], {"completed": 1})
+            self.assertEqual(summary["findings_count"], 0)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_check_reports_schema_findings(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-check-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "ai-architecture.agent-run.v1",
+                        "ts": "2026-05-13T00:00:00Z",
+                        "agent_run_id": "run-bad-01",
+                        "brief_id": "bad",
+                        "tier": "incubating",
+                        "agent": "human_operator",
+                        "workflow": "manual_smoke",
+                        "status": "completed",
+                        "goal_lineage": [],
+                        "artifacts": [],
+                        "result_summary": "bad",
+                        "changed_paths": [],
+                        "validation": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["ok"])
+            self.assertIn("ext", "\n".join(item["detail"] for item in payload["findings"]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_dump_empty_and_malformed_ledgers(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-empty-{uuid.uuid4().hex}"
+        bad = REPO_ROOT / "runtime" / f"agent-run-bad-{uuid.uuid4().hex}"
+        try:
+            empty = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "dump", "--tail", "5", "--format", "json"])
+            self.assertEqual(empty.returncode, 0, empty.stdout + empty.stderr)
+            self.assertEqual(json.loads(empty.stdout), [])
+            (bad / "runtime").mkdir(parents=True)
+            (bad / "runtime" / "agent-runs.jsonl").write_text("{bad\n", encoding="utf-8")
+            malformed = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(bad), "dump", "--tail", "5", "--format", "json"])
+            self.assertEqual(malformed.returncode, 2)
+            self.assertIn("agent-runs.jsonl:1", malformed.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(bad, ignore_errors=True)
+
+    def test_agent_run_rejects_brief_outside_root_without_append(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-outside-{uuid.uuid4().hex}"
+        try:
+            result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                "/tmp/outside-brief.json",
+                "--result-summary",
+                "should not append",
+            ])
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("outside root", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-runs.jsonl").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_path_safety_denies_generated_files(self) -> None:
         for rel in (".mcp.json", "CLAUDE.md"):

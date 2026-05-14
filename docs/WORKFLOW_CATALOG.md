@@ -16,6 +16,8 @@
 
 워크플로는 먼저 초안으로 등록합니다. 트리거, 입력, 출력, 권한, 중단 조건, 검증 방법이 충분히 명확해지면 사용할 수 있습니다. 반복 투입할 에이전트가 필요하면 에이전트 레지스트리와 권한 문서도 함께 갱신합니다.
 
+기능별 maturity tier의 단일 진실 소스는 `docs/feature-status.yaml`입니다. 이 문서는 워크플로 사용법을 설명하고 tier 상태를 중복 관리하지 않습니다.
+
 현재 기본 워크플로는 다음과 같습니다.
 
 운영자는 개별 스크립트 순서를 외우지 않고 `scripts/agent-flow.py`를 먼저 사용합니다. 내부 스크립트는 유지하되, 사용자-facing 흐름은 `start`, `research`, `decide`, `closeout` 네 명령으로 압축합니다. 자연어 요청은 `agent-flow.py start --goal "<goal>"`의 `mode`, `reason`, `next_command`, `next_action_type`, `write_policy`로 번역한 뒤 진행합니다. 라우팅 선언은 `scripts/catalog.yaml`의 `routing.modes`에 두고, `agent-flow.py`는 그 선언을 읽는 실행기로 유지합니다. 쓰기 플래그가 포함된 추천은 confirmation 대상으로 취급하고, `build/maintain`은 구현 없이 closeout으로 직행하지 않습니다. `research --auto`는 `--goal`을 받아 named reference를 후보 선택까지 유지하고, build는 `build_intake`로 범위와 수용 기준을 고정한 뒤 plan을 작성합니다. reference 분석은 `runtime/reference-tasks.jsonl`에 queue record를 남길 수 있고, source-backed 후보 카드/제안서가 다음 승인 단계의 근거가 됩니다.

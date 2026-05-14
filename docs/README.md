@@ -19,6 +19,7 @@
 - 새 프로젝트를 시작한다면 새 프로젝트 체크리스트, 프로젝트 프로필 템플릿, 운영 루프를 보고, 목표가 정리되면 레퍼런스 검토 템플릿과 런타임 시작 템플릿으로 이어갑니다.
 - 기능을 추가하거나 수정할지 고민한다면 기능 결정 가이드와 문서화 스타일 가이드를 봅니다.
 - 전체 구조를 이해해야 한다면 아키텍처와 세 층 모델을 봅니다.
+- 기능이 stable/incubating/experimental 중 어디에 있는지 확인하려면 Version Roadmap과 feature status manifest를 봅니다.
 - 반복 업무를 에이전트나 스킬로 만들지 고민한다면 워크플로 카탈로그, 에이전트 레지스트리, 스킬 모델, 골든 케이스 가이드를 봅니다.
 - 검증, 승인, 로그, 피벗 기준이 필요하다면 거버넌스, 런타임 이벤트, 피벗 기준을 봅니다.
 
@@ -38,6 +39,7 @@
 | 기능을 추가할지 판단한다 | 기능 결정 가이드 | 추가, 수정, 보류, 삭제 중 하나를 고른다 |
 | 문서가 읽기 어려운지 점검한다 | 문서화 스타일 가이드, Notion 문서화 규칙 | 설명 구조를 고친다 |
 | 시스템 구조를 이해한다 | 아키텍처, 세 층 모델 | 각 책임의 위치를 판단한다 |
+| 기능 maturity와 v2 준비 상태를 확인한다 | Version Roadmap, feature status manifest, design 문서 | stable closeout과 incubating 실험 범위를 구분한다 |
 | 반복 업무를 자동화한다 | 워크플로 카탈로그, 에이전트 레지스트리 | 반복 업무의 역할과 권한을 정한다 |
 | skill 변경의 회귀 위험을 확인한다 | 골든 케이스 작성 가이드, 스킬 모델 | 작은 골든 평가셋으로 개선 여부를 비교한다 |
 | v1/v2 역할 전환을 판단한다 | 역할 전환 가이드, 역할 설정 | 역할별 실행자를 바꿀지 결정하고 `config/roles.yaml`만 수정한다 |
@@ -61,6 +63,9 @@
 - 문서화 스타일 가이드: `docs/DOCUMENTATION_STYLE_GUIDE.md`
 - 아키텍처: `docs/ARCHITECTURE.md`
 - 세 층 모델: `docs/THREE_LAYER_MODEL.md`
+- Version Roadmap: `docs/VERSION_ROADMAP.md`
+- Feature status manifest: `docs/feature-status.yaml`
+- V2 design 문서: `docs/design/V2_SPECIALIST_TEAM_OS.md`
 - 스킬 모델: `docs/SKILL_DISTRIBUTION_MODEL.md`
 - 골든 케이스 작성 가이드: `docs/GOLDEN_CASES_GUIDE.md`
 - 역할 전환 가이드: `docs/ROLE_MIGRATION.md`

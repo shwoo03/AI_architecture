@@ -35,7 +35,15 @@
       "Bash(grep -E \"\\\\.md$\")",
       "Bash(python3 -c \"import json; f=open\\('runtime/activity-log.jsonl'\\); lines=f.readlines\\(\\); print\\(f'Total lines: {len\\(lines\\)}'\\); round10=lines[35:]; print\\(f'Round 10+ lines: {len\\(round10\\)}'\\)\")",
       "Bash(python scripts/search-activity-log.py --last 3)",
-      "Bash(python scripts/search-activity-log.py --phase session --last 5)"
+      "Bash(python scripts/search-activity-log.py --phase session --last 5)",
+      "Bash(python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json)",
+      "Bash(python3 -c \"import sys, json; d=json.load\\(sys.stdin\\); print\\('exit_status:', d.get\\('status'\\)\\); print\\('summary:', d.get\\('summary'\\)\\); print\\('skipped_by_tier:', d.get\\('skipped_by_tier'\\)\\)\")",
+      "Bash(echo \"exit=$?\")",
+      "Bash(python3 scripts/agent-flow.py --help)",
+      "Bash(echo \"---grep exit $?---\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('summary:', d.get\\('summary'\\)\\); print\\('skipped_by_tier:', d.get\\('skipped_by_tier'\\)\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 scripts/incubating/agent-run.py dump --tail 5 --format json)"
     ]
   }
 }
