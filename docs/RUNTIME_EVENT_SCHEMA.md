@@ -144,7 +144,15 @@ Retry check severity:
 | `retry_of` points to a later/equal line | ERROR | `retry_ordering` |
 | Retry target `status` is not `failed` or `blocked` | ERROR | `retry_target_status` |
 
-Richer aggregation counts remain deferred to the 1d-3 slice.
+`summary --format json` includes retry-aware aggregation fields in addition to the base counts:
+
+| Field | Meaning |
+| --- | --- |
+| `retried_count` | Number of live records with a non-empty string `retry_of`. |
+| `retry_chain_heads` | Number of live records that are not referenced by another live record's `retry_of`. |
+| `unresolved_failures` | Number of retry chain heads with `status` `failed` or `blocked`. |
+
+The summary command reads only `runtime/agent-runs.jsonl`. It does not read `runtime/agent-runs.legacy.jsonl` to resolve missing retry targets. `stale` is not reported in Phase 1d-3 because the current AgentRun status set is terminal-oriented; stale semantics require a later non-terminal status policy.
 
 ## Adapter extension 규칙
 

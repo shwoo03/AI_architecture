@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 110
-- `line_count`: 14374
+- `files`: 111
+- `line_count`: 14446
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -188,9 +188,10 @@
 - `knowledge/log.md`
 - `knowledge/project-registry.md`
 - `plans/INDEX.md`
-- `plans/active/0002-phase-1d-2-retry-idempotency.md`
 - `plans/active/_template.md`
 - `plans/done/0001-phase-1d-1-changed-paths-validation.md`
+- `plans/done/0002-phase-1d-2-retry-idempotency.md`
+- `plans/done/0003-phase-1d-3-aggregation-summary.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

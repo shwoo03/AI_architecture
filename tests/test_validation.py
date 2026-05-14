@@ -1307,6 +1307,9 @@ class NewInternalToolTests(unittest.TestCase):
             self.assertEqual(summary["total"], 1)
             self.assertEqual(summary["by_status"], {"completed": 1})
             self.assertEqual(summary["findings_count"], 0)
+            self.assertEqual(summary["retried_count"], 0)
+            self.assertEqual(summary["retry_chain_heads"], 1)
+            self.assertEqual(summary["unresolved_failures"], 0)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -1707,6 +1710,62 @@ class NewInternalToolTests(unittest.TestCase):
             result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue(json.loads(result.stdout)["ok"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_summary_counts_retry_chains_and_unresolved_failures(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-summary-retry-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            records = [
+                self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-a-01", brief_id="a", status="failed"),
+                self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-a-02", brief_id="a", status="completed", retry_of="run-a-01"),
+                self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-b-01", brief_id="b", status="blocked"),
+                self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-c-01", brief_id="c", status="failed"),
+                self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-c-02", brief_id="c", status="blocked", retry_of="run-c-01"),
+            ]
+            (tmp / "runtime" / "agent-runs.jsonl").write_text("\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8")
+            result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "summary", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["retried_count"], 2)
+            self.assertEqual(payload["retry_chain_heads"], 3)
+            self.assertEqual(payload["unresolved_failures"], 2)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_summary_missing_retry_target_warns_and_counts_live_heads(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-summary-missing-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            record = self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-test-02", brief_id="test", status="completed", retry_of="run-missing-01")
+            (tmp / "runtime" / "agent-runs.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+            summary = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "summary", "--format", "json"])
+            self.assertEqual(summary.returncode, 0, summary.stdout + summary.stderr)
+            payload = json.loads(summary.stdout)
+            self.assertEqual(payload["findings_count"], 1)
+            self.assertEqual(payload["retried_count"], 1)
+            self.assertEqual(payload["retry_chain_heads"], 1)
+            self.assertEqual(payload["unresolved_failures"], 0)
+            check = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+            self.assertEqual(json.loads(check.stdout)["findings"][0]["check"], "retry_target_missing")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_summary_ignores_legacy_ledger(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-summary-legacy-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            legacy = self._agent_run_record(tmp, changed_paths=[], agent_run_id="run-legacy-01", brief_id="legacy", status="failed")
+            (tmp / "runtime" / "agent-runs.legacy.jsonl").write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+            result = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "summary", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["total"], 0)
+            self.assertEqual(payload["retried_count"], 0)
+            self.assertEqual(payload["retry_chain_heads"], 0)
+            self.assertEqual(payload["unresolved_failures"], 0)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

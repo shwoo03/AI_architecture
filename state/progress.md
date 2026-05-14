@@ -1,7 +1,7 @@
 # Progress
 
 ## 현재 마일스톤
-V2 incubating runtime Phase 1d-2 complete
+V2 incubating runtime Phase 1d-3 complete
 
 ## 완료된 작업
 - 골격 부트스트랩
@@ -26,6 +26,7 @@ V2 incubating runtime Phase 1d-2 complete
 - Phase 1c all-tier gate: `quality-gate --tier all`에서 incubating AgentRun schema check 연결
 - Phase 1d-1 changed_paths validation: AgentRun add strict path validation, historical WARN check, all-tier WARN handling
 - Phase 1d-2 retry/idempotency: explicit `retry_of`, same-brief live-ledger lookup, duplicate run id check, retry severity validation
+- Phase 1d-3 aggregation summary: retry-aware `summary` fields for retried count, chain heads, unresolved failures
 
 ## 다음 작업
-- Phase 1d-3: AgentRun aggregation summary 고도화
+- Phase 1e: delegation entrypoint 설계 또는 AgentRun aggregation 후속 slice 선정

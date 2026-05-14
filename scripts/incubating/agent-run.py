@@ -394,6 +394,8 @@ def summary_records(root: Path, _args: argparse.Namespace) -> dict[str, Any]:
     by_agent: dict[str, int] = {}
     by_workflow: dict[str, int] = {}
     latest_ts = ""
+    retry_targets: set[str] = set()
+    retried_count = 0
     for record in records:
         for key, target in (("status", by_status), ("agent", by_agent), ("workflow", by_workflow)):
             value = str(record.get(key) or "")
@@ -402,6 +404,20 @@ def summary_records(root: Path, _args: argparse.Namespace) -> dict[str, Any]:
         ts = str(record.get("ts") or "")
         if ts > latest_ts:
             latest_ts = ts
+        retry_of = record.get("retry_of")
+        if isinstance(retry_of, str) and retry_of:
+            retried_count += 1
+            retry_targets.add(retry_of)
+    retry_chain_heads = 0
+    unresolved_failures = 0
+    for record in records:
+        agent_run_id = record.get("agent_run_id")
+        is_retry_target = isinstance(agent_run_id, str) and agent_run_id in retry_targets
+        if is_retry_target:
+            continue
+        retry_chain_heads += 1
+        if record.get("status") in RETRYABLE_STATUSES:
+            unresolved_failures += 1
     return {
         "total": len(records),
         "by_status": dict(sorted(by_status.items())),
@@ -409,6 +425,9 @@ def summary_records(root: Path, _args: argparse.Namespace) -> dict[str, Any]:
         "by_workflow": dict(sorted(by_workflow.items())),
         "latest_ts": latest_ts,
         "findings_count": len(check_payload["findings"]),
+        "retried_count": retried_count,
+        "retry_chain_heads": retry_chain_heads,
+        "unresolved_failures": unresolved_failures,
     }
 
 

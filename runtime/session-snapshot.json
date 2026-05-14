@@ -1,31 +1,31 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-14T12:12:45Z",
+  "ts": "2026-05-14T14:48:47Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-14T12:11:56Z",
+    "ts": "2026-05-14T14:47:59Z",
     "phase": "session",
     "action": "handoff_saved",
     "project": "common-ai-architecture",
     "goal_lineage": [
-      "Phase 1d-2 retry/idempotency",
+      "Phase 1d-3 aggregation summary",
       "v2 incubating runtime"
     ],
     "data": {
       "handoff": "runtime/state/session-handoff.md",
-      "next_step": "Phase 1d-3 AgentRun aggregation summary"
+      "next_step": "choose next v2 slice"
     }
   },
   "completion_evidence_last": {
-    "ts": "2026-05-14T12:11:45Z",
-    "goal": "Phase 1d-2 retry/idempotency",
+    "ts": "2026-05-14T14:47:47Z",
+    "goal": "Phase 1d-3 aggregation summary",
     "changed_paths": [
       "scripts/incubating/agent-run.py",
       "docs/RUNTIME_EVENT_SCHEMA.md",
       "tests/test_validation.py",
-      "plans/active/0002-phase-1d-2-retry-idempotency.md"
+      "plans/active/0003-phase-1d-3-aggregation-summary.md"
     ],
     "validations": [
       {
