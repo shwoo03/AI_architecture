@@ -20,6 +20,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib_catalog import load_catalog_modes_with_status, validate_catalog, validate_command_docs
+import lib_ownership
 
 
 # Ensure non-ASCII output (em-dash, Korean, etc.) prints cleanly on Windows
@@ -42,6 +43,7 @@ REQUIRED_CANONICAL_TOP_LEVEL = [
     "config/policy.yaml",
     "config/agent-team.yaml",
     "config/install-profiles.yaml",
+    "config/ownership.yaml",
     "mcp/servers.yaml",
     "plans/INDEX.md",
     "state/progress.md",
@@ -97,6 +99,7 @@ REQUIRED_CORE_DOCS = [
     "docs/VERSION_ROADMAP.md",
     "docs/DOCUMENTATION_STYLE_GUIDE.md",
     "docs/NOTION_DOCUMENTATION_RULES.md",
+    "docs/OWNERSHIP_MODEL.md",
 ]
 REQUIRED_REFERENCE_DOCS = [
     "docs/REFERENCE_REVIEW.template.md",
@@ -119,6 +122,7 @@ REQUIRED_RUNTIME_DOCS = [
     "runtime/review-queue.jsonl",
     "runtime/reference-tasks.jsonl",
     "runtime/checkpoints.jsonl",
+    "runtime/ownership-classification.lock.json",
 ]
 REQUIRED_WIKI_DOCS = [
     "docs/wiki-ops/wiki-query.md",
@@ -144,6 +148,7 @@ REQUIRED_SCRIPT_PATHS = [
     "scripts/catalog.yaml",
     "scripts/lib_catalog.py",
     "scripts/lib_runtime_lock.py",
+    "scripts/lib_ownership.py",
     "scripts/redact.py",
     "scripts/subdir-hints.py",
     "scripts/change-drift-check.py",
@@ -173,6 +178,8 @@ REQUIRED_SCRIPT_PATHS = [
     "scripts/lib_feature_status.py",
     "scripts/markdown-sanitize.py",
     "scripts/failure-classify.py",
+    "scripts/ownership-lock.py",
+    "scripts/ownership-initialize.py",
 ]
 REQUIRED_DOCS = (
     REQUIRED_CORE_DOCS
@@ -515,6 +522,75 @@ def check_session_snapshot_parses(root: Path, findings: list[Finding]) -> None:
         return
     if not isinstance(value, dict):
         findings.append(Finding("error", "session_snapshot_parse", "runtime/session-snapshot.json must contain an object"))
+
+
+def check_ownership_classification(root: Path, findings: list[Finding]) -> None:
+    config_path = root / "config" / "ownership.yaml"
+    lock_path = root / "runtime" / "ownership-classification.lock.json"
+    if not config_path.is_file():
+        findings.append(
+            Finding(
+                "error",
+                "ownership_config_missing",
+                "config/ownership.yaml missing -- fix: restore from the skeleton or run upgrade-from-skeleton.py",
+            )
+        )
+        return
+    if not lock_path.is_file():
+        findings.append(
+            Finding(
+                "error",
+                "ownership_lock_missing",
+                "runtime/ownership-classification.lock.json missing -- fix: run scripts/ownership-lock.py write",
+            )
+        )
+        return
+    try:
+        config = lib_ownership.load_ownership_config(config_path)
+        report = lib_ownership.classify_self(root, config)
+    except (OSError, ValueError, lib_ownership.OwnershipConfigError) as exc:
+        findings.append(Finding("error", "ownership_classification_run", str(exc)))
+        return
+    for rel in report.unknown[:10]:
+        findings.append(
+            Finding(
+                "error",
+                "ownership_unknown_path",
+                f"{rel} has no ownership rule -- fix: update config/ownership.yaml, then run scripts/ownership-lock.py write",
+            )
+        )
+    if len(report.unknown) > 10:
+        findings.append(
+            Finding(
+                "error",
+                "ownership_unknown_path",
+                f"{len(report.unknown) - 10} more path(s) have no ownership rule",
+            )
+        )
+    try:
+        changes = lib_ownership.compare_lock(report.classifications, lib_ownership.load_lock(lock_path))
+    except (OSError, ValueError, lib_ownership.OwnershipConfigError) as exc:
+        findings.append(Finding("error", "ownership_lock_parse", str(exc)))
+        return
+    for change in changes:
+        if change.kind == "classification_drift":
+            findings.append(
+                Finding(
+                    "error",
+                    "ownership_classification_drift",
+                    f"{change.path}: {change.previous_owner}/{change.previous_action} -> {change.current_owner}/{change.current_action} -- fix: review ownership change, then run scripts/ownership-lock.py write",
+                )
+            )
+    additions = sum(1 for change in changes if change.kind == "lock_addition")
+    removals = sum(1 for change in changes if change.kind == "lock_removal")
+    if additions or removals:
+        findings.append(
+            Finding(
+                "warn",
+                "ownership_lock_refresh_needed",
+                f"{additions} lock addition(s), {removals} lock removal(s) -- run scripts/ownership-lock.py write after reviewing path ownership",
+            )
+        )
 
 
 CATALOG_PATH_RE = re.compile(r"^\s*-?\s*path:\s*(scripts/[A-Za-z0-9_./-]+)\s*$", re.MULTILINE)
@@ -1096,6 +1172,7 @@ def main() -> int:
     check_runtime_jsonl_parses(root, "runtime/skill-lifecycle.jsonl", "skill_lifecycle_parse", findings)
     check_runtime_jsonl_parses(root, "state/cost-log.jsonl", "cost_log_parse", findings)
     check_session_snapshot_parses(root, findings)
+    check_ownership_classification(root, findings)
     check_script_catalog(root, findings)
     check_portability_scan(root, findings)
     check_permission_policy(root, findings)

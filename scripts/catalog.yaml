@@ -208,6 +208,10 @@ internal:
       used_by: canonical artifact generation
     - path: scripts/upgrade-from-skeleton.py
       used_by: skeleton upgrades
+    - path: scripts/ownership-lock.py
+      used_by: ownership-aware upgrade self-classification lock generation
+    - path: scripts/ownership-initialize.py
+      used_by: ownership-aware upgrade target initialization reports
     - path: scripts/skeleton-doctor.py
       used_by: readiness diagnostics
     - path: scripts/agent-autonomy-check.py

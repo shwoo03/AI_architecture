@@ -116,8 +116,10 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
             by_path = {item["path"]: item for item in payload["actions"]}
             self.assertEqual(by_path["docs/REFERENCE_REVIEW.template.md"]["action"], "add")
             self.assertEqual(by_path["docs/REFERENCE_REVIEW.template.md"]["safety"], "safe")
-            self.assertEqual(by_path["AGENTS.md"]["action"], "update_available")
-            self.assertEqual(by_path["AGENTS.md"]["safety"], "risky")
+            self.assertEqual(by_path["AGENTS.md"]["action"], "review")
+            self.assertEqual(by_path["AGENTS.md"]["safety"], "manual")
+            self.assertEqual(by_path["AGENTS.md"]["owner"], "manual_merge")
+            self.assertEqual(by_path["AGENTS.md"]["ownership_action"], "manual_merge")
             self.assertFalse(
                 (target / "docs" / "REFERENCE_REVIEW.template.md").exists(),
                 "dry-run must not copy files",
@@ -144,7 +146,7 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
             brief = payload["brief"]
             self.assertEqual(brief["profile"], "stable")
             self.assertIn("docs/REFERENCE_REVIEW.template.md", {item["path"] for item in brief["safe_additions"]})
-            self.assertIn("AGENTS.md", {item["path"] for item in brief["risky_reviews"]})
+            self.assertIn("AGENTS.md", {item["path"] for item in brief["manual_reviews"]})
             safe_item = next(item for item in brief["safe_additions"] if item["path"] == "docs/REFERENCE_REVIEW.template.md")
             self.assertEqual(safe_item["feature_id"], "upgrade-brief")
             self.assertEqual(safe_item["tier"], "stable")
@@ -154,6 +156,31 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
             self.assertIn("not approval", brief["approval_note"])
             self.assertIn("python3 scripts/quality-gate.py --format json", brief["validation_commands"])
             self.assertIn("AGENTS.md", brief["manual_merge_order"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_ownership_aware_upgrade_classifies_system_owned_and_config_seed(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-ownership")
+        try:
+            target = tmp / "proj"
+            (target / "scripts").mkdir(parents=True)
+            (target / "scripts" / "agent-flow.py").write_text("print('local')\n", encoding="utf-8")
+
+            result = _run(
+                [str(self.SCRIPT), "--target", str(target), "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            by_path = {item["path"]: item for item in json.loads(result.stdout)["actions"]}
+            self.assertEqual(by_path["scripts/agent-flow.py"]["owner"], "system_owned")
+            self.assertEqual(by_path["scripts/agent-flow.py"]["ownership_action"], "update_system")
+            self.assertEqual(by_path["scripts/agent-flow.py"]["action"], "update_available")
+            self.assertEqual(by_path["scripts/agent-flow.py"]["safety"], "risky")
+            self.assertTrue(by_path["scripts/agent-flow.py"]["system_locked"])
+            self.assertEqual(by_path["config/ownership.yaml"]["action"], "add")
+            self.assertEqual(by_path["config/ownership.yaml"]["safety"], "safe")
+            self.assertEqual(by_path["runtime/ownership-classification.lock.json"]["action"], "add")
+            self.assertEqual(by_path["runtime/ownership-classification.lock.json"]["safety"], "safe")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

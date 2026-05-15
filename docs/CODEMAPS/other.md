@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 115
-- `line_count`: 14884
+- `files`: 120
+- `line_count`: 15213
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -196,6 +196,11 @@
 - `plans/done/0004-phase-1e-incubating-delegate-entrypoint.md`
 - `plans/done/0005-phase-1e-followup-workflow-aware-completion-command.md`
 - `plans/done/0006-write-cycle-smoke-artifact-policy.md`
+- `plans/done/0008-ownership-aware-upgrade-v1.md`
+- `plans/done/0009-ownership-classifier-synthetic-tests.md`
+- `plans/done/0010-ownership-skeleton-self-classification.md`
+- `plans/done/0011-ownership-verify-upgrade-integration.md`
+- `plans/done/0012-ownership-initialize-report.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

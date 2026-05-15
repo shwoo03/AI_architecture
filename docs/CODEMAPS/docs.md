@@ -1,7 +1,7 @@
 # Codemap: docs
 
-- `files`: 53
-- `line_count`: 4333
+- `files`: 54
+- `line_count`: 4484
 - `directories`: 8
 
 ## Navigation Entry Points
@@ -36,6 +36,7 @@
 - `docs/NEW_PROJECT_CHECKLIST.md`
 - `docs/NOTION_DOCUMENTATION_RULES.md`
 - `docs/OPERATING_LOOP.md`
+- `docs/OWNERSHIP_MODEL.md`
 - `docs/PIVOT_TRIGGERS.md`
 - `docs/PROJECT_OPERATING_PLAN.template.md`
 - `docs/PROJECT_PROFILE.md`

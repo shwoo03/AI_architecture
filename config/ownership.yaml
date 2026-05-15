@@ -1,0 +1,229 @@
+schema_version: ai-architecture.ownership.v1
+
+system_defaults:
+  skip_patterns:
+    - node_modules/**
+    - .next/**
+    - .next-quality-gate/**
+    - dist/**
+    - build/**
+    - coverage/**
+    - __pycache__/**
+    - **/__pycache__/**
+    - .pytest_cache/**
+    - .venv/**
+    - .turbo/**
+    - .cache/**
+    - playwright-report/**
+    - test-results/**
+    - .DS_Store
+    - .git/**
+
+  protected:
+    - .env*
+    - runtime/activity-log.jsonl
+    - runtime/completion-evidence.jsonl
+    - runtime/agent-runs.jsonl
+    - runtime/agent-runs.legacy.jsonl
+    - runtime/review-queue.jsonl
+    - runtime/session-snapshot.json
+    - runtime/state/session-handoff.md
+    - runtime/checkpoints.jsonl
+    - runtime/install-state.jsonl
+    - runtime/reference-copy-ledger.jsonl
+    - runtime/skill-lifecycle.jsonl
+    - runtime/skill-usage.jsonl
+    - runtime/tool-output-sidecars/**
+    - runtime/external-repos/**
+    - state/progress.md
+    - state/decisions.md
+    - state/blockers.md
+    - state/cost-log.jsonl
+    - state/failures.jsonl
+
+  system_locked:
+    - AGENTS.md
+    - CLAUDE.md
+    - scripts/agent-flow.py
+    - scripts/quality-gate.py
+    - scripts/verify-skeleton.py
+    - scripts/resume-readiness.py
+    - scripts/source-recovery.py
+    - scripts/upgrade-from-skeleton.py
+    - scripts/task-closeout.py
+    - scripts/feature-status.py
+    - scripts/lib_feature_status.py
+    - scripts/lib_ownership.py
+    - scripts/lib_runtime_lock.py
+    - scripts/ownership-lock.py
+    - scripts/ownership-initialize.py
+    - scripts/bootstrap/**
+    - scripts/incubating/**
+    - docs/OPERATING_LOOP.md
+    - docs/SESSION_CONTINUITY.md
+    - docs/RUNTIME_EVENT_SCHEMA.md
+    - docs/SKELETON_UPGRADE.md
+    - docs/WORKFLOW_CATALOG.md
+    - docs/FEATURE_DECISION_GUIDE.md
+    - docs/AGENT_REGISTRY.md
+    - docs/OWNERSHIP_MODEL.md
+    - docs/PROJECT_PROFILE.template.md
+    - docs/PROJECT_SPEC.template.md
+    - docs/PROJECT_OPERATING_PLAN.template.md
+    - docs/feature-status.yaml
+    - config/roles.yaml
+    - config/policy.yaml
+    - config/install-profiles.yaml
+    - config/agent-team.yaml
+    - schemas/**
+    - agents/**
+    - codex/**
+    - .codex/**
+    - .claude/**
+    - .codex-plugin/**
+    - .claude-plugin/**
+    - .github/**
+    - hooks/**
+    - mcp/**
+    - .mcp.json
+    - manifest.yaml
+    - .skeleton-version
+
+  rules:
+    - pattern: AGENTS.md
+      owner: manual_merge
+    - pattern: CLAUDE.md
+      owner: manual_merge
+    - pattern: README.md
+      owner: manual_merge
+    - pattern: .gitignore
+      owner: manual_merge
+    - pattern: config/ownership.yaml
+      owner: manual_merge
+    - pattern: docs/**
+      owner: manual_merge
+    - pattern: docs/OPERATING_LOOP.md
+      owner: system_owned
+    - pattern: docs/SESSION_CONTINUITY.md
+      owner: system_owned
+    - pattern: docs/RUNTIME_EVENT_SCHEMA.md
+      owner: system_owned
+    - pattern: docs/SKELETON_UPGRADE.md
+      owner: system_owned
+    - pattern: docs/WORKFLOW_CATALOG.md
+      owner: system_owned
+    - pattern: docs/FEATURE_DECISION_GUIDE.md
+      owner: system_owned
+    - pattern: docs/AGENT_REGISTRY.md
+      owner: system_owned
+    - pattern: docs/OWNERSHIP_MODEL.md
+      owner: system_owned
+    - pattern: docs/PROJECT_PROFILE.template.md
+      owner: system_owned
+    - pattern: docs/PROJECT_SPEC.template.md
+      owner: system_owned
+    - pattern: docs/PROJECT_OPERATING_PLAN.template.md
+      owner: system_owned
+    - pattern: docs/feature-status.yaml
+      owner: system_owned
+    - pattern: rules/**
+      owner: manual_merge
+    - pattern: scripts/**
+      owner: manual_merge
+    - pattern: scripts/agent-flow.py
+      owner: system_owned
+    - pattern: scripts/quality-gate.py
+      owner: system_owned
+    - pattern: scripts/verify-skeleton.py
+      owner: system_owned
+    - pattern: scripts/resume-readiness.py
+      owner: system_owned
+    - pattern: scripts/source-recovery.py
+      owner: system_owned
+    - pattern: scripts/upgrade-from-skeleton.py
+      owner: system_owned
+    - pattern: scripts/task-closeout.py
+      owner: system_owned
+    - pattern: scripts/lib_ownership.py
+      owner: system_owned
+    - pattern: scripts/ownership-lock.py
+      owner: system_owned
+    - pattern: scripts/ownership-initialize.py
+      owner: system_owned
+    - pattern: scripts/bootstrap/**
+      owner: system_owned
+    - pattern: scripts/incubating/**
+      owner: system_owned
+    - pattern: config/**
+      owner: manual_merge
+    - pattern: config/roles.yaml
+      owner: system_owned
+    - pattern: config/policy.yaml
+      owner: system_owned
+    - pattern: config/install-profiles.yaml
+      owner: system_owned
+    - pattern: config/agent-team.yaml
+      owner: system_owned
+    - pattern: schemas/**
+      owner: system_owned
+    - pattern: agents/**
+      owner: system_owned
+    - pattern: skills/**
+      owner: manual_merge
+    - pattern: codex/**
+      owner: system_owned
+    - pattern: .codex/**
+      owner: system_owned
+    - pattern: .claude/**
+      owner: system_owned
+    - pattern: .codex-plugin/**
+      owner: system_owned
+    - pattern: .claude-plugin/**
+      owner: system_owned
+    - pattern: .github/**
+      owner: system_owned
+    - pattern: hooks/**
+      owner: system_owned
+    - pattern: mcp/**
+      owner: system_owned
+    - pattern: .mcp.json
+      owner: system_owned
+    - pattern: manifest.yaml
+      owner: system_owned
+    - pattern: .skeleton-version
+      owner: system_owned
+    - pattern: tests/**
+      owner: manual_merge
+    - pattern: plans/**
+      owner: project_owned
+    - pattern: runtime/**
+      owner: project_owned
+    - pattern: state/**
+      owner: project_owned
+    - pattern: references.yaml
+      owner: manual_merge
+    - pattern: SECURITY.md
+      owner: manual_merge
+    - pattern: .editorconfig
+      owner: manual_merge
+    - pattern: .agents/**
+      owner: manual_merge
+    - pattern: examples/**
+      owner: manual_merge
+    - pattern: knowledge/**
+      owner: project_owned
+    - pattern: research/**
+      owner: project_owned
+    - pattern: research/reference-candidates/**
+      owner: project_owned
+    - pattern: runtime/external-repos/**
+      owner: project_owned
+
+project_overrides:
+  rules: []
+
+unknown_policy:
+  source_new_file: manual_approval
+  target_only_file: preserve_project
+  both_exist_differ: manual_merge
+  generated_or_cache: skip_generated

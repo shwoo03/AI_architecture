@@ -21,6 +21,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib_feature_status import feature_by_doc_path, load_feature_manifest, tiers_for_profile
+import lib_ownership
 
 
 try:
@@ -106,6 +107,7 @@ RUNTIME_TEMPLATE_ALLOWLIST = {
 SAFE_MISSING_EXACT = {
     "config/agent-team.yaml",
     "config/install-profiles.yaml",
+    "config/ownership.yaml",
     "config/policy.yaml",
     "config/roles.yaml",
     "docs/AGENT_REGISTRY.md",
@@ -131,6 +133,7 @@ SAFE_MISSING_EXACT = {
     "scripts/upgrade-from-skeleton.py",
     "scripts/verify-skeleton.py",
     "runtime/review-queue.jsonl",
+    "runtime/ownership-classification.lock.json",
 }
 
 SAFE_MISSING_PREFIXES = (
@@ -211,6 +214,10 @@ class Action:
     safety: str
     reason: str
     applied: bool = False
+    owner: str = ""
+    ownership_action: str = ""
+    matched_pattern: str = ""
+    system_locked: bool = False
 
 
 def utc_now() -> str:
@@ -328,30 +335,65 @@ def feature_for_path(features: list[dict[str, object]], rel: str) -> dict[str, o
     return feature_by_doc_path(features, rel)
 
 
-def classify_file(source_file: Path, source: Path, target: Path) -> Action:
+def action_from_classification(
+    target: Path,
+    rel: str,
+    classification: lib_ownership.Classification,
+    *,
+    target_file: Path,
+) -> Action:
+    owner = classification.owner
+    ownership_action = classification.action
+    metadata = {
+        "owner": owner,
+        "ownership_action": ownership_action,
+        "matched_pattern": classification.matched_pattern,
+        "system_locked": classification.system_locked,
+    }
+    if ownership_action == "skip_generated":
+        return Action(str(target), rel, "skip", "protected", "generated/cache path", **metadata)
+    if ownership_action == "unchanged":
+        return Action(str(target), rel, "unchanged", "safe", "same content", **metadata)
+    if ownership_action == "protected_preserve":
+        return Action(str(target), rel, "skip", "protected", "ownership protected path", **metadata)
+    if ownership_action == "preserve_project":
+        if not target_file.exists() and is_safe_missing(rel):
+            return Action(str(target), rel, "add", "safe", "missing safe template/readme", **metadata)
+        return Action(str(target), rel, "skip", "protected", "project-owned path", **metadata)
+    if target_file.exists() and target_file.is_dir():
+        return Action(str(target), rel, "review", "manual", "target path is a directory", **metadata)
+    if ownership_action == "add_system":
+        return Action(str(target), rel, "add", "safe", "missing system-owned file", **metadata)
+    if ownership_action == "update_system":
+        return Action(str(target), rel, "update_available", "risky", "target has different system-owned content", **metadata)
+    if ownership_action in {"manual_merge", "manual_approval"}:
+        if not target_file.exists() and is_safe_missing(rel):
+            return Action(str(target), rel, "add", "safe", "missing safe template/readme", **metadata)
+        return Action(str(target), rel, "review", "manual", ownership_action, **metadata)
+    return Action(str(target), rel, "review", "manual", "unknown ownership action", **metadata)
+
+
+def classify_file(source_file: Path, source: Path, target: Path, ownership_config: dict[str, object]) -> Action:
     rel = rel_posix(source_file, source)
     target_file = target / rel
+    content_equal = target_file.is_file() and filecmp.cmp(source_file, target_file, shallow=False)
+    classification = lib_ownership.classify_path(
+        rel,
+        ownership_config,
+        source_exists=True,
+        target_exists=target_file.exists(),
+        content_equal=content_equal,
+    )
+    return action_from_classification(target, rel, classification, target_file=target_file)
 
-    if rel in PROJECT_STATE_EXACT:
-        return Action(str(target), rel, "skip", "protected", "project-owned state")
-    if rel in SAFE_STATE_SEED_EXACT and target_file.exists():
-        return Action(str(target), rel, "skip", "protected", "project-owned state")
-    if rel in RUNTIME_TEMPLATE_ALLOWLIST:
-        pass
-    elif rel.startswith(PROJECT_STATE_PREFIXES) or rel.startswith(PROJECT_STATE_RUNTIME_PREFIXES):
-        return Action(str(target), rel, "skip", "protected", "runtime/project-owned path")
-    elif not is_canonical(rel):
-        return Action(str(target), rel, "review", "manual", "unclassified path")
 
-    if not target_file.exists():
-        safety = "safe" if is_safe_missing(rel) else "review"
-        reason = "missing safe template/readme" if safety == "safe" else "missing canonical file"
-        return Action(str(target), rel, "add", safety, reason)
-    if target_file.is_dir():
-        return Action(str(target), rel, "review", "manual", "target path is a directory")
-    if filecmp.cmp(source_file, target_file, shallow=False):
-        return Action(str(target), rel, "unchanged", "safe", "same content")
-    return Action(str(target), rel, "update_available", "risky", "target has different content")
+def effective_ownership_config(source: Path, target: Path) -> dict[str, object]:
+    source_config = lib_ownership.load_ownership_config(source / "config" / "ownership.yaml")
+    target_config_path = target / "config" / "ownership.yaml"
+    if target_config_path.is_file():
+        target_config = lib_ownership.load_ownership_config(target_config_path)
+        source_config["project_overrides"] = target_config.get("project_overrides", {"rules": []})
+    return source_config
 
 
 def plan_target(source: Path, target: Path, source_files: list[Path]) -> list[Action]:
@@ -375,7 +417,19 @@ def plan_target(source: Path, target: Path, source_files: list[Path]) -> list[Ac
                 "target is the skeleton or inside the skeleton",
             )
         ]
-    return [classify_file(path, source, target) for path in source_files]
+    try:
+        ownership_config = effective_ownership_config(source, target)
+    except (OSError, ValueError, lib_ownership.OwnershipConfigError) as exc:
+        return [
+            Action(
+                str(target),
+                "config/ownership.yaml",
+                "review",
+                "manual",
+                f"ownership config invalid: {exc}",
+            )
+        ]
+    return [classify_file(path, source, target, ownership_config) for path in source_files]
 
 
 def apply_actions(
@@ -484,12 +538,16 @@ def apply_profile_to_actions(actions: list[Action], features: list[dict[str, obj
         if excluded and action.action in {"add", "update_available", "review", "unchanged"}:
             filtered.append(
                 Action(
-                    action.target,
-                    action.path,
-                    "skip",
-                    "profile",
-                    f"excluded by {profile} overlay profile",
-                    action.applied,
+                    target=action.target,
+                    path=action.path,
+                    action="skip",
+                    safety="profile",
+                    reason=f"excluded by {profile} overlay profile",
+                    applied=action.applied,
+                    owner=action.owner,
+                    ownership_action=action.ownership_action,
+                    matched_pattern=action.matched_pattern,
+                    system_locked=action.system_locked,
                 )
             )
         else:

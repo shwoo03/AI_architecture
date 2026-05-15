@@ -1,27 +1,36 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-15T03:59:39Z
+2026-05-15T09:27:08Z
 
 ## Current Task
-External trigger active: apply AI_architecture stable overlay to ~/mydir/ENKI_WIKI.
+Ownership-aware upgrade v1 Slice 3.5 is complete: self-hygiene and ownership initialization report are implemented, validated, recorded in completion evidence, and moved to plans/done.
 
 ## Last Completed
-- Freeze exception accepted because ENKI_WIKI is a concrete external project target.
-- Overlay release hardening implemented for deterministic stable migration: stable profile excludes incubating actions, .agents/ is opt-in, safe-only includes the stable operating bundle, and research/reference-candidates/ is project-owned.
-- Focused overlay tests and full unittest passed before target application.
-- Stable safe-only overlay has been applied to ~/mydir/ENKI_WIKI; target validation is next.
+- Moved completed ownership plans 0008, 0009, 0010, and 0011 from plans/active to plans/done after checking their plan bodies and completion evidence.
+- Added docs/OWNERSHIP_MODEL.md to system_locked and added a self-classification assertion that it remains locked.
+- Added scripts/ownership-initialize.py as a report-only target initialization tool with text/json output and no target writes.
+- Added tests/test_ownership_initialize.py covering empty draft, depth-2 grouping, config-without-lock, and already-initialized refusal.
+- Registered ownership-initialize in scripts/catalog.yaml, tests, verify-skeleton required paths, and config/ownership.yaml.
+- Cleaned __pycache__ artifacts and regenerated runtime/ownership-classification.lock.json plus docs/CODEMAPS.
+- Left tracked .claude/settings.local.json out of this work because it is local permission state and not part of Slice 3.5 behavior.
+- Recorded Slice 3.5 closeout successfully with completion evidence at 2026-05-15T09:25:37Z.
+- Moved plan 0012 to plans/done after closeout so no completed ownership slice remains in plans/active.
 
 ## Validation
-- python3 -m unittest tests.test_bootstrap_upgrade -v: passed (13 tests).
-- python3 -m unittest discover -s tests: passed (244 tests).
-- quality-gate --tier stable/all --skip-tests: passed before closeout; expected pycache/codemap freshness warnings appeared during pre-closeout validation.
+- PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_ownership_initialize -v: passed (4 tests).
+- PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_ownership_initialize tests.test_ownership tests.test_skeleton_self_classification tests.test_bootstrap_upgrade tests.test_validation -v: passed (139 tests).
+- python3 scripts/ownership-lock.py check: passed with classification_drift=0, lock_addition=0, lock_removal=0.
+- PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify-skeleton.py: passed.
+- PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json: passed with OK=36, SKIP=2, WARN=0.
+- python3 scripts/agent-flow.py closeout --goal 'Ownership-aware upgrade v1 Slice 3.5 initialize report' ...: passed; recorded=true.
 
 ## Recommended Next Step
-Validate ~/mydir/ENKI_WIKI after stable safe-only overlay. Do not start deferred v2 work: 0007, routing, validator-loop, non-terminal status.
+Proceed to ENKI_WIKI stable overlay migration only through the ownership-aware initialize + upgrade path. Start with `scripts/ownership-initialize.py --target /Users/shwoo/mydir/Project/ENKI_WIKI --format json`, then run ownership-aware upgrade dry-run/brief and approval-gate manual_merge entries.
 
 ## Open Questions / Blockers
-- No current blocker. Do not touch ~/mydir/Project/ENKI_WIKI; target is ~/mydir/ENKI_WIKI.
+- No code blocker for Slice 3.5.
+- .claude/settings.local.json is tracked local permission state and has unrelated local edits; keep it out of ownership slice commits unless the user explicitly approves untracking or committing it.
 
 ## Resume Prompt
-Continue the ENKI_WIKI stable overlay migration from AI_architecture. Validate ~/mydir/ENKI_WIKI using its copied stable tools, inspect only safe-only overlay changes, and do not push unless the user asks.
+Resume in /Users/shwoo/mydir/AI/AI_architecture after Ownership-aware upgrade v1 Slice 3.5 completion. Next external step is ENKI_WIKI ownership initialization report and stable overlay dry-run; do not bulk-apply manual_merge entries. Current ownership plans 0008-0012 are in plans/done.

@@ -40,6 +40,8 @@ class ScriptHelpTests(unittest.TestCase):
         "quality-gate.py",
         "review-queue.py",
         "upgrade-from-skeleton.py",
+        "ownership-lock.py",
+        "ownership-initialize.py",
         "skeleton-doctor.py",
         "security-scan.py",
         "reference-copy-ledger.py",
@@ -176,6 +178,57 @@ class ScriptCatalogValidationTests(unittest.TestCase):
     def test_script_catalog_current_root_is_valid(self) -> None:
         result = _run([str(SCRIPTS / "verify-skeleton.py"), "--skip-wiki-lint"], cwd=REPO_ROOT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_current_root_ownership_check_has_no_errors(self) -> None:
+        module = self._load_verify_module()
+        findings: list[object] = []
+        module.check_ownership_classification(REPO_ROOT, findings)
+        self.assertEqual([finding.detail for finding in findings if finding.level == "error"], [])
+
+    def test_ownership_check_reports_classification_drift(self) -> None:
+        module = self._load_verify_module()
+        tmp = REPO_ROOT / "runtime" / f"ownership-drift-{uuid.uuid4().hex}"
+        try:
+            (tmp / "config").mkdir(parents=True)
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "known.txt").write_text("known\n", encoding="utf-8")
+            (tmp / "config" / "ownership.yaml").write_text(
+                "schema_version: ai-architecture.ownership.v1\n"
+                "system_defaults:\n"
+                "  skip_patterns: []\n"
+                "  protected: []\n"
+                "  system_locked: []\n"
+                "  rules:\n"
+                "    - pattern: known.txt\n"
+                "      owner: system_owned\n"
+                "project_overrides:\n"
+                "  rules: []\n"
+                "unknown_policy:\n"
+                "  source_new_file: manual_approval\n"
+                "  target_only_file: preserve_project\n"
+                "  both_exist_differ: manual_merge\n"
+                "  generated_or_cache: skip_generated\n",
+                encoding="utf-8",
+            )
+            (tmp / "runtime" / "ownership-classification.lock.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "ai-architecture.ownership.v1",
+                        "classifications": {
+                            "known.txt": {
+                                "owner": "project_owned",
+                                "action": "preserve_project",
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            findings: list[object] = []
+            module.check_ownership_classification(tmp, findings)
+            self.assertIn("ownership_classification_drift", {finding.check for finding in findings})
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_script_catalog_rejects_extra_public_command(self) -> None:
         module = self._load_verify_module()

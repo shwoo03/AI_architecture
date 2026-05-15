@@ -32,6 +32,10 @@ External trigger active: ENKI_WIKI stable overlay migration (2026-05-15)
 - 0006 delegate cycle aborted on role-registry gap; AgentBrief artifact policy documented via operator housekeeping. Write-heavy friction goal remains OPEN, deferred to post-0008.
 - 2026-05-15 freeze decision: 추가 슬라이스(0007 포함) 진행 보류. 외부 프로젝트 X 실 작업 발생 시 v1 stable overlay 시도 후 resume.
 - 2026-05-15 ENKI_WIKI external trigger: stable overlay release path hardened, with migration limited to deterministic safe-only application.
+- Ownership-aware upgrade v1 Slice 2: standalone classifier library and synthetic fixture tests implemented; closeout freshness cleanup in progress.
+- Ownership-aware upgrade v1 Slice 2.5: skeleton self-classification lock generated; ownership-lock write/check and self-classification tests pass.
+- Ownership-aware upgrade v1 Slice 3: verify-skeleton ownership gate and upgrade-from-skeleton ownership-aware planning implemented, validated, and closeout recorded.
+- Ownership-aware upgrade v1 Slice 3.5: self-hygiene completed, OWNERSHIP_MODEL locked, ownership-initialize report tool implemented, tests pass, stable quality gate is WARN 0, closeout recorded, and plan moved to done.
 
 ## 다음 작업
-- Apply stable safe-only overlay to `~/mydir/ENKI_WIKI`, validate target health, and do not start deferred v2 slices.
+- Proceed to ENKI_WIKI stable overlay migration through ownership-initialize report and ownership-aware upgrade dry-run/brief.

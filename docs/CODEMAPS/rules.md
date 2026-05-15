@@ -1,7 +1,7 @@
 # Codemap: rules
 
-- `files`: 25
-- `line_count`: 1032
+- `files`: 26
+- `line_count`: 1261
 - `directories`: 10
 
 ## Navigation Entry Points
@@ -25,6 +25,7 @@
 
 - `config/agent-team.yaml`
 - `config/install-profiles.yaml`
+- `config/ownership.yaml`
 - `config/policy.yaml`
 - `config/roles.yaml`
 - `hooks/hooks.json`

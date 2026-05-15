@@ -1,7 +1,7 @@
 # Codemap: scripts
 
-- `files`: 82
-- `line_count`: 21582
+- `files`: 85
+- `line_count`: 22390
 - `directories`: 4
 
 ## Navigation Entry Points
@@ -52,6 +52,7 @@
 - `scripts/knowledge-search.py`
 - `scripts/lib_catalog.py`
 - `scripts/lib_feature_status.py`
+- `scripts/lib_ownership.py`
 - `scripts/lib_path_safety.py`
 - `scripts/lib_runtime_lock.py`
 - `scripts/lib_safe_write.py`
@@ -61,6 +62,8 @@
 - `scripts/mcp-audit.py`
 - `scripts/notion-doc-quality-check.py`
 - `scripts/operational-readiness.py`
+- `scripts/ownership-initialize.py`
+- `scripts/ownership-lock.py`
 - `scripts/path-safety.py`
 - `scripts/permission-evaluate.py`
 - `scripts/plugin-manifest-check.py`
