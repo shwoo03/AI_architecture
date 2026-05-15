@@ -171,6 +171,28 @@
 - `incubating`: stable 기능과 v2 incubating 기능을 함께 보여주되, brief에 변경 가능성과 수동 검토 필요성을 표시합니다.
 - `all`: experimental adapter까지 보여줍니다. 이 profile의 experimental 항목은 승인 필요 대상으로 봅니다.
 
+`stable` profile은 action 단계에서도 강제됩니다. `scripts/incubating/`, `docs/design/`, incubating phase plan처럼 v2 incubating runtime에 속하는 파일은 stable overlay 후보에서 제외되고 `skip:profile`로만 보고됩니다. stable apply는 이 파일을 복사하지 않습니다.
+
+### Stable safe bundle
+
+`--apply --safe-only --profile stable`은 기존 target 파일을 덮어쓰지 않고, target에 없는 v1 운영 OS 파일만 추가합니다. safe bundle은 명시적 allowlist입니다.
+
+- Core scripts: `scripts/agent-flow.py`, `scripts/quality-gate.py`, `scripts/verify-skeleton.py`, `scripts/task-closeout.py`, `scripts/resume-readiness.py`, `scripts/source-recovery.py`, `scripts/knowledge-search.py`, `scripts/generate-codemaps.py`, `scripts/cleanup-ephemeral.py`, `scripts/upgrade-from-skeleton.py`, `scripts/search-activity-log.py`, `scripts/agent-brief.py`, `scripts/hooks/`, and top-level `scripts/*.py` that are missing in the target.
+- Core config and contracts: `config/roles.yaml`, `config/policy.yaml`, `config/agent-team.yaml`, `config/install-profiles.yaml`, `runtime/AGENTS.md`.
+- Rules and schemas: `rules/common/`, `rules/languages/`, `schemas/`.
+- Stable docs: `docs/OPERATING_LOOP.md`, `docs/SESSION_CONTINUITY.md`, `docs/RUNTIME_EVENT_SCHEMA.md`, `docs/SKELETON_UPGRADE.md`, `docs/WORKFLOW_CATALOG.md`, `docs/FEATURE_DECISION_GUIDE.md`, `docs/AGENT_REGISTRY.md`, `docs/DOCUMENTATION_STYLE_GUIDE.md`.
+- Canonical role/skill sources: `agents/`, `codex/agents/`, `codex/rules/`, `skills/`.
+
+The safe bundle is still missing-file only. Existing target files with different content remain `update_available:risky` or `review:manual` and require explicit approval.
+
+### Personal skill layer
+
+`.agents/` is treated as a user-personal/generated layer. It is skipped by default and is not part of stable overlay. Use `--include-personal-skills` only when the user explicitly wants to import the skeleton's generated plugin/skill export layer into the target project.
+
+### Reference candidate collisions
+
+`research/reference-candidates/` is project-owned research state. The overlay tool does not copy the skeleton's candidate cards into an existing project by default. If a target project needs reference candidates, create or review them in that target project rather than importing the skeleton's historical cards silently.
+
 ## 기능 추가/수정 판단 기준
 
 - 새 파일이 추가되면 위 세 영역 중 어디에 속하는지 분류하고 이 문서의 목록에 추가합니다.

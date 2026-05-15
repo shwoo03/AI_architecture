@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 114
-- `line_count`: 14822
+- `files`: 115
+- `line_count`: 14884
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -188,6 +188,7 @@
 - `knowledge/log.md`
 - `knowledge/project-registry.md`
 - `plans/INDEX.md`
+- `plans/active/0007-role-registry-audit.md`
 - `plans/active/_template.md`
 - `plans/done/0001-phase-1d-1-changed-paths-validation.md`
 - `plans/done/0002-phase-1d-2-retry-idempotency.md`

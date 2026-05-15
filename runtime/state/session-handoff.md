@@ -1,25 +1,27 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-15T01:09:00Z
+2026-05-15T03:59:39Z
 
 ## Current Task
-FROZEN pending external trigger. No active task in this repo.
+External trigger active: apply AI_architecture stable overlay to ~/mydir/ENKI_WIKI.
 
 ## Last Completed
-- Conscious decision to freeze AI_architecture repo work until a real external project requires v1 overlay or v2 use.
-- Recorded in `state/decisions.md` (2026-05-15 entry) with resume condition.
-- 0007 role registry audit plan remains in `plans/active/` but is marked `Status: Deferred` in its body. INDEX schema unchanged.
-- Prior milestone: 0006 abort + AgentBrief artifact policy documented (commit `b058e77`); 0007 plan written (commit `8e48e98`).
+- Freeze exception accepted because ENKI_WIKI is a concrete external project target.
+- Overlay release hardening implemented for deterministic stable migration: stable profile excludes incubating actions, .agents/ is opt-in, safe-only includes the stable operating bundle, and research/reference-candidates/ is project-owned.
+- Focused overlay tests and full unittest passed before target application.
+- Stable safe-only overlay has been applied to ~/mydir/ENKI_WIKI; target validation is next.
 
 ## Validation
-N/A for the freeze commit itself. The repo was clean and all gates passing prior to freeze.
+- python3 -m unittest tests.test_bootstrap_upgrade -v: passed (13 tests).
+- python3 -m unittest discover -s tests: passed (244 tests).
+- quality-gate --tier stable/all --skip-tests: passed before closeout; expected pycache/codemap freshness warnings appeared during pre-closeout validation.
 
 ## Recommended Next Step
-FROZEN. Do not start 0007 or any new slice. Do not run agent-flow on this repo for new work. Resume only when an external project requires v1/v2 overlay; see `state/decisions.md` 2026-05-15 entry for the trigger condition.
+Validate ~/mydir/ENKI_WIKI after stable safe-only overlay. Do not start deferred v2 work: 0007, routing, validator-loop, non-terminal status.
 
 ## Open Questions / Blockers
-- The only outstanding question is whether the v1 skeleton actually saves time on external real work. This cannot be answered from inside this repo; it requires use on a separate project.
+- No current blocker. Do not touch ~/mydir/Project/ENKI_WIKI; target is ~/mydir/ENKI_WIKI.
 
 ## Resume Prompt
-This repo is frozen. Do not start 0007 or any speculative slice. Resume conditions: (1) a real external project X has an active task, AND (2) v1 stable overlay is attempted on X. Friction observed during that external use can be brought back here as the next slice's input. Until then, leave this repo untouched.
+Continue the ENKI_WIKI stable overlay migration from AI_architecture. Validate ~/mydir/ENKI_WIKI using its copied stable tools, inspect only safe-only overlay changes, and do not push unless the user asks.

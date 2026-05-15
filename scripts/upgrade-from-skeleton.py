@@ -65,7 +65,13 @@ PROJECT_STATE_EXACT = {
     "knowledge/lint-report.md",
     "runtime/activity-log.jsonl",
     "runtime/agent-runs.jsonl",
+    "runtime/checkpoints.jsonl",
+    "runtime/completion-evidence.jsonl",
+    "runtime/install-state.jsonl",
     "runtime/review-queue.jsonl",
+    "runtime/session-snapshot.json",
+    "runtime/skill-lifecycle.jsonl",
+    "runtime/skill-usage.jsonl",
     "runtime/state/session-handoff.md",
 }
 
@@ -74,7 +80,13 @@ SAFE_STATE_SEED_EXACT = {
 }
 
 PROJECT_STATE_PREFIXES = (
+    "docs/CODEMAPS/",
+    "plans/active/",
+    "plans/done/",
+    "plans/failed/",
+    "research/reference-candidates/",
     "runtime/archive/",
+    "runtime/agent-briefs/",
     "runtime/external-repos/",
     "runtime/schedules/",
     "runtime/validation/",
@@ -92,20 +104,56 @@ RUNTIME_TEMPLATE_ALLOWLIST = {
 }
 
 SAFE_MISSING_EXACT = {
+    "config/agent-team.yaml",
+    "config/install-profiles.yaml",
+    "config/policy.yaml",
+    "config/roles.yaml",
+    "docs/AGENT_REGISTRY.md",
+    "docs/DOCUMENTATION_STYLE_GUIDE.md",
+    "docs/FEATURE_DECISION_GUIDE.md",
+    "docs/OPERATING_LOOP.md",
+    "docs/RUNTIME_EVENT_SCHEMA.md",
+    "docs/SESSION_CONTINUITY.md",
+    "docs/SKELETON_UPGRADE.md",
+    "docs/WORKFLOW_CATALOG.md",
+    "runtime/AGENTS.md",
+    "scripts/agent-brief.py",
+    "scripts/agent-flow.py",
+    "scripts/cleanup-ephemeral.py",
+    "scripts/generate-codemaps.py",
+    "scripts/knowledge-search.py",
     "scripts/quality-gate.py",
-    "runtime/review-queue.jsonl",
     "scripts/review-queue.py",
+    "scripts/resume-readiness.py",
     "scripts/skeleton-doctor.py",
+    "scripts/source-recovery.py",
+    "scripts/task-closeout.py",
     "scripts/upgrade-from-skeleton.py",
+    "scripts/verify-skeleton.py",
+    "runtime/review-queue.jsonl",
 }
 
+SAFE_MISSING_PREFIXES = (
+    "agents/",
+    "codex/agents/",
+    "codex/rules/",
+    "rules/common/",
+    "rules/languages/",
+    "schemas/",
+    "scripts/hooks/",
+    "skills/",
+)
+
 CANONICAL_PREFIXES = (
+    "agents/",
+    "config/",
     "docs/",
     "rules/",
+    "schemas/",
     "scripts/",
     "codex/",
     "examples/",
-    "research/reference-candidates/",
+    "skills/",
 )
 
 CANONICAL_EXACT = {
@@ -121,6 +169,38 @@ SAFE_MISSING_SUFFIXES = (
     "README.md",
     ".gitkeep",
 )
+
+PROFILE_EXCLUDED_PREFIXES = {
+    "stable": (
+        "scripts/incubating/",
+        "docs/design/",
+    ),
+    "incubating": (),
+    "all": (),
+}
+
+PROFILE_EXCLUDED_NAME_PARTS = {
+    "stable": (
+        "incubating",
+        "phase-1d",
+        "phase-1e",
+        "agent-run",
+        "agent-brief",
+        "delegate",
+    ),
+    "incubating": (),
+    "all": (),
+}
+
+PERSONAL_LAYER_PREFIXES = (
+    ".agents/",
+)
+
+STABLE_FEATURE_PATH_OVERRIDES = {
+    "docs/AGENT_REGISTRY.md",
+    "docs/RUNTIME_EVENT_SCHEMA.md",
+    "docs/WORKFLOW_CATALOG.md",
+}
 
 
 @dataclass
@@ -158,9 +238,17 @@ def rel_posix(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix()
 
 
-def should_skip_source(path: Path, source: Path, target_roots: list[Path]) -> bool:
+def should_skip_source(
+    path: Path,
+    source: Path,
+    target_roots: list[Path],
+    *,
+    include_personal_skills: bool,
+) -> bool:
     rel = rel_posix(path, source)
     if any(path == target or is_relative_to(path, target) for target in target_roots):
+        return True
+    if not include_personal_skills and rel.startswith(PERSONAL_LAYER_PREFIXES):
         return True
     if any(part in SKIP_DIR_NAMES for part in path.relative_to(source).parts):
         return True
@@ -189,10 +277,20 @@ def should_skip_source(path: Path, source: Path, target_roots: list[Path]) -> bo
     return False
 
 
-def iter_source_files(source: Path, target_roots: list[Path]) -> list[Path]:
+def iter_source_files(
+    source: Path,
+    target_roots: list[Path],
+    *,
+    include_personal_skills: bool,
+) -> list[Path]:
     files: list[Path] = []
     for path in sorted(source.rglob("*")):
-        if should_skip_source(path, source, target_roots):
+        if should_skip_source(
+            path,
+            source,
+            target_roots,
+            include_personal_skills=include_personal_skills,
+        ):
             continue
         if path.is_file():
             files.append(path)
@@ -208,8 +306,26 @@ def is_safe_missing(rel: str) -> bool:
     return (
         rel in RUNTIME_TEMPLATE_ALLOWLIST
         or rel in SAFE_MISSING_EXACT
+        or rel.startswith(SAFE_MISSING_PREFIXES)
+        or (rel.startswith("scripts/") and "/" not in rel.removeprefix("scripts/"))
         or path.name.endswith(SAFE_MISSING_SUFFIXES)
     )
+
+
+def path_profile_excluded(rel: str, profile: str) -> bool:
+    normalized = rel.replace("\\", "/")
+    if normalized.startswith(PROFILE_EXCLUDED_PREFIXES.get(profile, ())):
+        return True
+    name = Path(normalized).name
+    return any(part in name for part in PROFILE_EXCLUDED_NAME_PARTS.get(profile, ()))
+
+
+def feature_for_path(features: list[dict[str, object]], rel: str) -> dict[str, object] | None:
+    if rel in STABLE_FEATURE_PATH_OVERRIDES:
+        return {"id": "stable-overlay-bundle", "tier": "stable", "overlay_default": True}
+    if rel.startswith("scripts/incubating/") or rel.startswith("docs/design/"):
+        return {"id": "v2-incubating-runtime", "tier": "incubating", "overlay_default": False}
+    return feature_by_doc_path(features, rel)
 
 
 def classify_file(source_file: Path, source: Path, target: Path) -> Action:
@@ -310,7 +426,7 @@ def action_payload(action: Action) -> dict[str, object]:
 
 
 def feature_payload_for_action(action: Action, features: list[dict[str, object]], profile: str) -> dict[str, object]:
-    feature = feature_by_doc_path(features, action.path)
+    feature = feature_for_path(features, action.path)
     if feature is None:
         feature = {"id": "unmapped", "tier": "stable", "overlay_default": True}
     tier = str(feature.get("tier", "stable"))
@@ -337,6 +453,10 @@ def action_payload_with_feature(action: Action, features: list[dict[str, object]
 
 
 def include_action_for_profile(action: Action, features: list[dict[str, object]], profile: str) -> bool:
+    if action.safety == "profile":
+        return False
+    if path_profile_excluded(action.path, profile):
+        return False
     feature_meta = feature_payload_for_action(action, features, profile)
     tier = str(feature_meta["tier"])
     if tier not in tiers_for_profile(profile):
@@ -344,6 +464,37 @@ def include_action_for_profile(action: Action, features: list[dict[str, object]]
     if profile == "stable":
         return bool(feature_meta["overlay_default"])
     return True
+
+
+def apply_profile_to_actions(actions: list[Action], features: list[dict[str, object]], profile: str) -> list[Action]:
+    filtered: list[Action] = []
+    allowed_tiers = tiers_for_profile(profile)
+    for action in actions:
+        if action.path == ".":
+            filtered.append(action)
+            continue
+        feature_meta = feature_payload_for_action(action, features, profile)
+        tier = str(feature_meta["tier"])
+        overlay_default = bool(feature_meta["overlay_default"])
+        excluded = (
+            tier not in allowed_tiers
+            or (profile == "stable" and not overlay_default)
+            or path_profile_excluded(action.path, profile)
+        )
+        if excluded and action.action in {"add", "update_available", "review", "unchanged"}:
+            filtered.append(
+                Action(
+                    action.target,
+                    action.path,
+                    "skip",
+                    "profile",
+                    f"excluded by {profile} overlay profile",
+                    action.applied,
+                )
+            )
+        else:
+            filtered.append(action)
+    return filtered
 
 
 def build_brief(actions: list[Action], features: list[dict[str, object]], profile: str) -> dict[str, object]:
@@ -493,7 +644,12 @@ def main() -> int:
         "--profile",
         choices=("stable", "incubating", "all"),
         default="stable",
-        help="Feature maturity profile for --brief output.",
+        help="Feature maturity profile for overlay planning and --brief output.",
+    )
+    parser.add_argument(
+        "--include-personal-skills",
+        action="store_true",
+        help="Include generated/user-personal .agents skill/plugin layer. Default is to skip it.",
     )
     args = parser.parse_args()
 
@@ -530,11 +686,16 @@ def main() -> int:
     if not deduped:
         raise SystemExit("provide --target at least once or --projects-root")
 
-    source_files = iter_source_files(source, deduped)
+    source_files = iter_source_files(
+        source,
+        deduped,
+        include_personal_skills=args.include_personal_skills,
+    )
     all_actions: list[Action] = []
     by_target: dict[Path, list[Action]] = {}
     for target in deduped:
         actions = plan_target(source, target, source_files)
+        actions = apply_profile_to_actions(actions, features, args.profile)
         by_target[target] = actions
         all_actions.extend(actions)
 

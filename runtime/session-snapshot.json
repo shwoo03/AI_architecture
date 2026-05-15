@@ -1,25 +1,26 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-14T16:47:06Z",
+  "ts": "2026-05-15T04:04:59Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-14T16:47:06Z",
+    "ts": "2026-05-15T04:04:59Z",
     "phase": "closeout",
     "action": "task_closeout",
-    "goal": "Housekeeping: AgentBrief artifact policy after 0006 delegate abort",
+    "goal": "Overlay release hardening for ENKI_WIKI stable migration",
     "result": "recording"
   },
   "completion_evidence_last": {
-    "ts": "2026-05-14T16:47:06Z",
-    "goal": "Housekeeping: AgentBrief artifact policy after 0006 delegate abort",
+    "ts": "2026-05-15T04:04:59Z",
+    "goal": "Overlay release hardening for ENKI_WIKI stable migration",
     "changed_paths": [
-      "docs/AGENT_BRIEFS_POLICY.md",
+      "scripts/upgrade-from-skeleton.py",
+      "docs/SKELETON_UPGRADE.md",
+      "tests/test_bootstrap_upgrade.py",
       "state/decisions.md",
       "state/progress.md",
-      "runtime/state/session-handoff.md",
-      "plans/done/0006-write-cycle-smoke-artifact-policy.md"
+      "runtime/state/session-handoff.md"
     ],
     "validations": [
       {

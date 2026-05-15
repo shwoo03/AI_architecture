@@ -30,3 +30,13 @@
 - 따라서 결정: 이 repo에 추가 commit 하지 않음. 다음에 진짜 외부 프로젝트 X에서 작업이 발생하면 그때 v1 stable overlay 시도하고, 그 사용 중 발견한 friction만 가져와서 resume.
 - 0007 plan은 `plans/active/`에 보존되며 본문에 `Status: Deferred`로 표시. INDEX schema는 변경하지 않음.
 - 이 freeze는 "포기"가 아니라 "외부 trigger 대기". resume 조건은 외부 프로젝트 X에서의 실 작업 발생.
+
+## 2026-05-15 03:58 — Freeze exception accepted for ENKI_WIKI stable overlay migration
+- External trigger condition is now satisfied: user requested applying the AI_architecture stable system to .
+- Scope is limited to overlay release hardening required for deterministic stable migration, followed by stable safe-only application to ENKI_WIKI.
+- Deferred v2 work remains frozen: 0007 role registry audit, routing, validator-loop, non-terminal status, and delegate improvements stay out of scope.
+
+## 2026-05-15 04:02 — Correction: ENKI_WIKI freeze exception target path
+- The previous ENKI_WIKI freeze-exception entry was affected by shell command substitution while writing handoff text and lost the literal target path in one bullet.
+- Correct target path: ~/mydir/ENKI_WIKI.
+- Scope remains unchanged: stable overlay release hardening plus safe-only application; deferred v2 slices remain frozen.

@@ -191,6 +191,93 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_stable_profile_excludes_incubating_overlay_actions(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-stable-profile")
+        try:
+            target = tmp / "proj"
+            target.mkdir(parents=True)
+            result = _run(
+                [str(self.SCRIPT), "--target", str(target), "--brief", "--profile", "stable", "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            brief_paths = {
+                item["path"]
+                for bucket in ("safe_additions", "manual_reviews", "risky_reviews", "protected_skips")
+                for item in payload["brief"][bucket]
+            }
+            self.assertNotIn("scripts/incubating/agent-run.py", brief_paths)
+            self.assertNotIn("scripts/incubating/agent-flow-delegate.py", brief_paths)
+            by_path = {item["path"]: item for item in payload["actions"]}
+            self.assertEqual(by_path["scripts/incubating/agent-run.py"]["action"], "skip")
+            self.assertEqual(by_path["scripts/incubating/agent-run.py"]["safety"], "profile")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agents_layer_is_opt_in(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-agents-opt-in")
+        try:
+            target = tmp / "proj"
+            target.mkdir(parents=True)
+            default = _run(
+                [str(self.SCRIPT), "--target", str(target), "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            opt_in = _run(
+                [str(self.SCRIPT), "--target", str(target), "--include-personal-skills", "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(default.returncode, 0, default.stdout + default.stderr)
+            self.assertEqual(opt_in.returncode, 0, opt_in.stdout + opt_in.stderr)
+            default_paths = {item["path"] for item in json.loads(default.stdout)["actions"]}
+            opt_in_paths = {item["path"] for item in json.loads(opt_in.stdout)["actions"]}
+            self.assertFalse(any(path.startswith(".agents/") for path in default_paths))
+            self.assertTrue(any(path.startswith(".agents/") for path in opt_in_paths))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_safe_only_apply_copies_stable_operating_bundle(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-stable-bundle")
+        try:
+            target = tmp / "proj"
+            target.mkdir(parents=True)
+            result = _run(
+                [str(self.SCRIPT), "--target", str(target), "--apply", "--safe-only", "--profile", "stable", "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((target / "scripts" / "agent-flow.py").exists())
+            self.assertTrue((target / "scripts" / "quality-gate.py").exists())
+            self.assertTrue((target / "docs" / "OPERATING_LOOP.md").exists())
+            self.assertTrue((target / "rules" / "common" / "README.md").exists())
+            self.assertTrue((target / "schemas" / "runtime-event.schema.json").exists())
+            self.assertTrue((target / "skills" / "active" / "search-first" / "SKILL.md").exists())
+            self.assertFalse((target / "scripts" / "incubating" / "agent-run.py").exists())
+            applied_paths = {item["path"] for item in json.loads(result.stdout)["actions"] if item.get("applied")}
+            self.assertIn("scripts/agent-flow.py", applied_paths)
+            self.assertNotIn("scripts/incubating/agent-run.py", applied_paths)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_reference_candidates_are_not_overlaid(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-reference-collision")
+        try:
+            target = tmp / "proj"
+            candidate = target / "research" / "reference-candidates" / "project.md"
+            candidate.parent.mkdir(parents=True)
+            candidate.write_text("# Project candidate\n", encoding="utf-8")
+            result = _run(
+                [str(self.SCRIPT), "--target", str(target), "--format", "json"],
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            paths = {item["path"] for item in json.loads(result.stdout)["actions"]}
+            self.assertFalse(any(path.startswith("research/reference-candidates/") for path in paths))
+            self.assertEqual(candidate.read_text(encoding="utf-8"), "# Project candidate\n")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_brief_rejects_apply(self) -> None:
         tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-brief-apply")
         try:
