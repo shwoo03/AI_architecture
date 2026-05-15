@@ -50,3 +50,12 @@ python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json
 python3 -m unittest discover -s tests
 python3 scripts/agent-flow.py closeout --goal "Plan 0007 role registry audit (plan creation only)" --changed-path plans/active/0007-role-registry-audit.md --format json
 ```
+
+## Status: Deferred
+
+이 plan은 작성된 시점 직후 freeze 결정으로 **미실행 deferred** 상태로 보존된다. 자세한 결정 근거는 `state/decisions.md`의 2026-05-15 freeze entry 참조.
+
+- Deferred 이유: 외부 실사용 데이터 없이 0007을 진행하면 self-referential infra 함정에 빠질 위험이 큼. 0006 abort 직후 자동 다음 단계로 실행하면 그 패턴 그대로 반복.
+- Resume 조건: 외부 프로젝트 X에서 v1 stable overlay가 실제로 적용된 뒤, role registry coverage gap이 다시 friction으로 관찰될 때.
+- 그때까지 이 plan body는 보존된다. INDEX의 status는 `active`로 두되 본문이 진실(deferred)을 설명한다. INDEX schema 변경(`deferred` enum 추가)은 0006 abort 때와 동일한 이유로 보류.
+- 미실행 deferred는 0006 abort와 다름: 0006은 governance check가 cycle을 막은 사례, 0007 deferred는 trigger 부재로 시작 자체를 안 한 사례.

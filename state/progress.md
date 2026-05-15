@@ -1,7 +1,7 @@
 # Progress
 
 ## 현재 마일스톤
-0006 housekeeping complete; role-registry gap recorded
+Repo FROZEN pending external use trigger (2026-05-15)
 
 ## 완료된 작업
 - 골격 부트스트랩
@@ -30,6 +30,7 @@
 - Phase 1e incubating delegate entrypoint: `agent-brief.py`를 재사용해 brief artifact와 실행 가능한 handoff JSON을 생성
 - Phase 1e-followup workflow-aware completion command: read-only workflow에서는 `--changed-path` placeholder를 생략하고 write workflow에서는 유지
 - 0006 delegate cycle aborted on role-registry gap; AgentBrief artifact policy documented via operator housekeeping. Write-heavy friction goal remains OPEN, deferred to post-0008.
+- 2026-05-15 freeze decision: 추가 슬라이스(0007 포함) 진행 보류. 외부 프로젝트 X 실 작업 발생 시 v1 stable overlay 시도 후 resume.
 
 ## 다음 작업
-- 0007 role registry audit (read-only); ensures next slice has factual basis for adding write-capable docs/governance role.
+- FROZEN. 이 repo에 새 슬라이스를 시작하지 않음. 외부 프로젝트 X에서 실 작업이 발생하고 v1 overlay 시도가 시작될 때만 resume. 자세한 trigger 조건은 `state/decisions.md` 2026-05-15 entry 참조.

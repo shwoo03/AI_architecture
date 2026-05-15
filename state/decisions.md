@@ -22,3 +22,11 @@
 - INDEX schema에 `aborted` status enum 도입은 데이터가 충분히 모일 때까지 보류.
 - Trigger 정의: **governance/policy/schema constraint가 정상 작동해서 cycle을 중단시킨 사례**가 누적 2건 이상. 0006이 1건째.
 - 카운트 안 되는 것: 단순 구현 실패, 환경 문제, race condition 발견, 사용자가 마음 바꿔서 중단한 경우.
+
+## 2026-05-15 01:09 — AI_architecture repo 작업 freeze (외부 실사용 trigger 도래 시 resume)
+- v1은 운영 OS 수준까지 완성, v2는 incubating 골격까지 완성. 최근 7-8 commit이 대부분 self-referential infra 작업이었고 실사용 데이터는 read-only audit 1건뿐.
+- 0007 role registry audit은 정당한 plan이지만 "뭐라도 더 하자"의 편의 옵션이 될 위험이 큼. 외부 실데이터 없이 진행하면 또 한 라운드의 self-improvement loop.
+- 외부 프로젝트 후보(ENKI_WIKI, 0-day, ctf-forge 등)는 있으나 현재 자연 발생한 active task는 없음. "외부 적용 실험"도 active task 없이 시작하면 인위적 dogfooding.
+- 따라서 결정: 이 repo에 추가 commit 하지 않음. 다음에 진짜 외부 프로젝트 X에서 작업이 발생하면 그때 v1 stable overlay 시도하고, 그 사용 중 발견한 friction만 가져와서 resume.
+- 0007 plan은 `plans/active/`에 보존되며 본문에 `Status: Deferred`로 표시. INDEX schema는 변경하지 않음.
+- 이 freeze는 "포기"가 아니라 "외부 trigger 대기". resume 조건은 외부 프로젝트 X에서의 실 작업 발생.
