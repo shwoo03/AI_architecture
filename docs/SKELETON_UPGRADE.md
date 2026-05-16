@@ -197,6 +197,40 @@ The safe bundle is still missing-file only. Existing target files with different
 
 `research/reference-candidates/` is project-owned research state. The overlay tool does not copy the skeleton's candidate cards into an existing project by default. If a target project needs reference candidates, create or review them in that target project rather than importing the skeleton's historical cards silently.
 
+### ENKI_WIKI retrofit case study (2026-05-17)
+
+ENKI_WIKI was a retrofit target, not a fresh bootstrap. It already had app code,
+historical runtime evidence, project plans, a Node/Next CI workflow, and earlier
+safe overlay commits. The successful migration therefore treated "100% transfer"
+as preserving target-owned operating data while bringing the stable AI operating
+OS up to date.
+
+The working sequence was:
+
+1. Run `agent-flow adopt --target <target> --format json`
+   as a read-only intake. Do not start from the target directory until the
+   skeleton tools have reported the adoption state.
+2. Use `ownership-initialize.py --target <target>` to draft
+   project-specific ownership. A high candidate count is a normal stop condition,
+   not an automation failure. ENKI initially required manual grouping before
+   apply-safe could be trusted.
+3. Apply only the stable safe bundle. Missing stable operating OS files can be
+   copied, but existing runtime, state, knowledge, app, and CI files remain
+   target-owned unless the user explicitly approves a manual merge.
+4. Review manual/risky items path by path. ENKI intentionally preserved its own
+   `.github/workflows/ci.yml` and `config/ownership.yaml` instead of accepting the
+   skeleton copy, because those files encode project-specific CI and ownership
+   overrides.
+5. Re-run adoption as a read-only check. A final `needs_review` can be a healthy
+   terminal signal when all remaining items are intentional preserves or metadata
+   reviews such as an unknown target license.
+
+The reusable lesson is preserve-first adoption. Safe-only means "copy missing
+stable system assets"; it does not mean "make the target byte-for-byte identical
+to the skeleton." Intentional preserves should be named in the handoff or
+install-state evidence so later sessions do not try to "fix" them back to the
+skeleton version.
+
 ## 기능 추가/수정 판단 기준
 
 - 새 파일이 추가되면 위 세 영역 중 어디에 속하는지 분류하고 이 문서의 목록에 추가합니다.
