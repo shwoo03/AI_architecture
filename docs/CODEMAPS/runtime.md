@@ -1,7 +1,7 @@
 # Codemap: runtime
 
 - `files`: 28
-- `line_count`: 7033
+- `line_count`: 7055
 - `directories`: 9
 
 ## Navigation Entry Points

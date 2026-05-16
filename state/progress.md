@@ -1,7 +1,7 @@
 # Progress
 
 ## 현재 마일스톤
-External trigger active: ENKI_WIKI stable overlay migration (2026-05-15)
+ENKI_WIKI operating OS migration follow-up improvements completed through 0029 (2026-05-17)
 
 ## 완료된 작업
 - 골격 부트스트랩
@@ -76,9 +76,14 @@ External trigger active: ENKI_WIKI stable overlay migration (2026-05-15)
 - 2026-05-17 0027 validation passed: ENKI ownership lock drift is 0, ENKI `verify-skeleton.py` passes, ENKI `resume-readiness --strict` passes with WARN 0, ENKI stable quality gate with `--skip-tests --skip-node` passes (OK=34, SKIP=1, WARN=2), and final adoption intake reports `safe_missing=0`, `manual_merge=1`, `risky_changed=1`, `candidate_paths=0`, `target_git_clean=true`. Remaining differences are intentional preserves: ENKI `.github/workflows/ci.yml` and `config/ownership.yaml`.
 - 2026-05-17 0027 AI closeout evidence and handoff were refreshed after `agent-flow closeout`; next-session resume state points to the intentional remaining ENKI differences rather than more bulk migration work.
 - 2026-05-17 ENKI follow-up sync committed `7c64a566` (`Sync adoption intake profile check`) after the AI-side `PROJECT_PROFILE` readiness checker was narrowed to required-field placeholders only. ENKI is clean and ahead of origin by 5 local commits. Final intake now reports `project_profile_state=ready`, `safe_missing=0`, `manual_merge=1`, `risky_changed=1`, `candidate_paths=0`, `target_git_clean=true`; the remaining review signals are license unknown, already-initialized ownership, and the two intentional preserves (`.github/workflows/ci.yml`, `config/ownership.yaml`).
+- 2026-05-17 ENKI migration follow-up cleanup completed: Karpathy reference tracking, deferred 0007 closure, surgical Karpathy concept-only rule/skill absorption, and ENKI retrofit case study documentation were committed with generated/local files excluded.
+- 2026-05-17 0028 closeout wrapper timing completed in two commit boundaries. Commit A added append-only `runtime/closeout-timings.jsonl` instrumentation. Commit B rewired `agent-flow closeout` so non-`all` profiles delegate checks to `task-closeout.py` while `all`/baseline paths keep strict front checks. Measurement evidence shows docs-profile closeout P50 improved to roughly 1.6s.
+- 2026-05-17 0029 adoption semantics completed. `agent-flow adopt` now reports `review_classification.blocking` vs `non_blocking_review`, treats unknown license as non-blocking metadata review, reads old install-state records with fallback, reports previous/current skeleton source commits, and lists intentional preserve candidates without writing target files.
+- 2026-05-17 final handoff/progress refresh is in progress for the ENKI migration follow-up goal; push remains explicitly out of scope.
+- 2026-05-17 final runtime-profile closeout recorded for the ENKI migration follow-up goal. Push was not performed.
 
 ## 다음 작업
-- Use `python3 scripts/agent-flow.py adopt --target <legacy-project> --format json` before opening any external project adoption slice. Treat `stop` as a hard pause and `apply_safe_ready` as permission to plan a separate 0025 apply-safe slice, not as approval to write immediately.
+- Use `python3 scripts/agent-flow.py adopt --target <legacy-project> --format json` before opening any external project adoption slice. Treat `review_classification.blocking=[]` with non-blocking reviews as an explicit human-review state, not as a file-transfer blocker.
 - Use `python3 scripts/agent-flow.py doctor --format json` as the first single-command diagnostic before deeper manual checks. Use `--tier all` for incubating coverage and `--with-tests` for slower full validation.
 - Use the new specialist flow only on demand: propose a project specialist when a concrete blocker/trigger exists, approve it before overlay application, preview delegation first, and execute only approved plans with explicit confirmation.
 - Use `python3 scripts/agent-flow.py recall "<query>" --format json` for local session recall; source-of-truth remains Markdown/JSONL, and `runtime/session-recall.sqlite` is rebuildable cache only.

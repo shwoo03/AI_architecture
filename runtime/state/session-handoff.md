@@ -1,47 +1,43 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-16T17:22:12Z
+2026-05-16T18:48:53Z
 
 ## Current Task
-Active goal: migrate the AI_architecture operating OS into ENKI_WIKI while preserving ENKI operational data as much as possible. The latest completed slice is 0027 ENKI manual/risky system review, which applied the verified remaining system-owned operating OS updates while preserving ENKI CI, project ownership overrides, runtime ledgers, app code, and historical plan archive.
+Active goal: AI_architecture ENKI migration follow-up improvements. The implementation and closeout are complete through 0029: working-tree cleanup, deferred 0007 closure, Karpathy concept-only absorption, ENKI migration documentation, closeout timing/profile repair, and adoption review semantics/install-state UX.
 
 ## Last Completed
-- Completed plan 0027 and moved it to `plans/done/0027-enki-manual-risky-system-review.md`.
-- Wrote ENKI ownership baseline and committed it locally in ENKI as `768e3a3e` (`Add AI architecture ownership baseline`).
-- Applied only the missing safe files to ENKI and committed them locally as `a083da8f` (`Apply safe AI architecture additions`).
-- Applied the reviewed system operating OS update set to ENKI and committed it locally as `a46bc3ea` (`Update AI operating OS system files`).
-- Aligned transferred system ownership rules and committed that local follow-up as `54e8c33e` (`Align transferred system ownership rules`).
-- Synced the adoption-intake profile checker fix to ENKI and committed it locally as `7c64a566` (`Sync adoption intake profile check`).
-- ENKI is clean and ahead of origin by 5 local commits. No ENKI push was performed.
-- Final adoption intake reports `project_profile_state=ready`, `safe_missing=0`, `manual_merge=1`, `risky_changed=1`, `candidate_paths=0`, `target_git_clean=true`, and `recommendation=needs_review`.
-- Wrote `runtime/validation/0027-enki-manual-risky-system-review.md` with ENKI commits, dispositions, validations, and intentional preserves.
+- Commit `55dbffb` recorded the Karpathy guidelines reference card, `references.yaml`, and related CODEMAPS only.
+- Commit `3fc7b4c` closed deferred plan 0007 without schema expansion and refreshed the ownership lock.
+- Commit `166e477` absorbed Karpathy guidelines concept-only into canonical code-style, brainstorming, and verification-loop wording without copying skills/plugins.
+- Commit `8f3b76d` documented the ENKI retrofit adoption case study in `docs/SKELETON_UPGRADE.md`.
+- Commit `7109abd` added closeout timing instrumentation and active plan 0028.
+- Commit `36fa515` completed 0028: timing evidence, profile-aware closeout wrapper repair, plan done move, codemaps, and runtime validation evidence.
+- Commit `9f6be35` completed 0029: adopt review classification, unknown-license non-blocking metadata review, install-state fallback UX, preserve candidate reporting, plan done move, and ENKI read-only validation.
+- Generated/local `.claude/.codex` runtime surfaces were refreshed locally for parity but intentionally not committed. `.claude/settings.local.json` remains excluded.
 
 ## Validation
-- ENKI `ownership-lock.py --root /Users/shwoo/mydir/ENKI_WIKI check`: passed, classification_drift=0, lock_addition=0, lock_removal=0.
-- ENKI `verify-skeleton.py --root /Users/shwoo/mydir/ENKI_WIKI`: passed.
-- ENKI `resume-readiness.py --root /Users/shwoo/mydir/ENKI_WIKI --strict --format json`: passed with ERROR=0, WARN=0.
-- ENKI `quality-gate.py --root /Users/shwoo/mydir/ENKI_WIKI --tier stable --skip-tests --skip-node --format json`: passed with OK=34, SKIP=1, WARN=2.
-- Final ENKI adoption intake after `7c64a566`: profile ready, target clean, safe_missing=0, candidate_paths=0; remaining review signals are target license unknown, already-initialized ownership, and two intentional preserves.
-- AI focused suite `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_validation tests.test_skeleton_self_classification tests.test_ownership tests.test_ownership_initialize -v`: passed, 134 tests.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-plans.py --root . --format json`: passed, 27 plans, no findings.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/ownership-lock.py write && python3 scripts/ownership-lock.py check`: passed, 701 paths, no drift.
+- 0028 focused closeout tests passed, including full-front `all` behavior, docs-profile delegation, quality-gate explanations, and baseline diff behavior.
+- 0028 stable/all quality gates with `--skip-tests` passed after repair: stable OK=36 SKIP=2, all OK=37 SKIP=2.
+- 0029 full `tests.test_agent_flow` passed: 54 tests.
+- 0029 ENKI read-only adopt validation passed without target writes: recommendation `needs_review`, blocking reviews `0`, non-blocking reviews for unknown license, already-initialized ownership, and manual/risky items.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-plans.py --root . --format json`: passed, 29 plans, no findings.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/ownership-lock.py write && python3 scripts/ownership-lock.py check`: passed, no drift.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate-codemaps.py --write`: passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify-skeleton.py`: passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json`: passed with OK=35, SKIP=2, WARN=1 before final handoff refresh.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json`: passed with OK=36, SKIP=2, WARN=1 before final handoff refresh.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/agent-flow.py closeout --goal "0027 ENKI manual risky system review" ... --format json`: passed and recorded=true; it also ran full verify and stable quality-gate internally.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify-skeleton.py`: passed after portability path cleanup.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json`: passed with OK=36, SKIP=2.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json`: passed with OK=37, SKIP=2.
+- Final `agent-flow closeout --profile runtime` passed and recorded=true with `task-closeout` only.
 
 ## Recommended Next Step
-Treat the ENKI operating OS transfer as functionally complete under preserve-first semantics unless the user wants a legal/license decision or full app validation follow-up. The remaining file-level differences are intentional preserves: `.github/workflows/ci.yml` keeps ENKI Node CI, and `config/ownership.yaml` keeps ENKI `project_overrides`.
+No next required implementation step for this goal. Decide whether to leave generated `.claude/.codex` parity changes unstaged or handle them in a separate generated-artifacts policy pass. Do not push unless the user explicitly approves.
 
 ## Open Questions / Blockers
-- ENKI target license signal remains unknown because no `LICENSE*`/`COPYING*` file exists in the target root. Do not invent a license; ask the user before adding one.
-- ENKI reference inventory still warns that `opencode` and `paperclip` candidate cards are missing.
+- ENKI target license signal remains unknown; 0029 now classifies this as non-blocking metadata review, not legal clearance.
+- ENKI dry-run currently reports manual/risky preserve candidates for target-owned or newly changed skeleton files. Review them slice-by-slice before any future apply.
 - ENKI full app quality gate without `--skip-node` remains separate from operating OS migration.
-- Remaining adoption intake differences are intentional preserves: `.github/workflows/ci.yml` and `config/ownership.yaml`.
 - Do not touch `/Users/shwoo/mydir/Project/ENKI_WIKI`; it is not the active target.
-- Existing unrelated local/generated files remain: `.claude/settings.local.json` and generated `.claude/.codex` README changes.
+- Existing local/generated files remain unstaged: `.claude/settings.local.json` and generated `.claude/.codex` parity files.
 
 ## Resume Prompt
-Resume in `/Users/shwoo/mydir/AI/AI_architecture` with active goal "ENKI_WIKI 운영 데이터를 최대한 보존한 상태로 AI_architecture 운영 OS를 100% 이전한다." Plans 0013 and 0023-0027 are done. ENKI has five unpushed local commits: `768e3a3e`, `a083da8f`, `a46bc3ea`, `54e8c33e`, and `7c64a566`. Start by running `python3 scripts/agent-flow.py adopt --target /Users/shwoo/mydir/ENKI_WIKI --format json` and confirm only intentional preserve/licensing review signals remain. Do not push ENKI unless explicitly requested.
+Resume in `/Users/shwoo/mydir/AI/AI_architecture` with active goal "AI_architecture ENKI 이전 후속 개선을 완료하라." Plans 0028 and 0029 are done, committed, and closeout-recorded. Start with `git status --short`, `python3 scripts/agent-flow.py doctor --format json`, and `python3 scripts/resume-readiness.py --strict --format json`. Push remains out of scope until explicitly approved.

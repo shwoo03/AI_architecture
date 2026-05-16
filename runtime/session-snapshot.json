@@ -1,21 +1,43 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-16T18:40:19Z",
+  "ts": "2026-05-16T18:49:55Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-16T18:40:18Z",
-    "phase": "closeout",
-    "action": "task_closeout",
-    "goal": "0028 repair smoke docs after effective profile",
-    "result": "recording"
+    "ts": "2026-05-16T18:48:53Z",
+    "phase": "session",
+    "action": "handoff_saved",
+    "project": "AI_architecture",
+    "goal_lineage": [
+      "AI_architecture ENKI 이전 후속 개선"
+    ],
+    "tool_call": {
+      "tool": "codex",
+      "status": "success",
+      "normalized_status": "success",
+      "failure_type": "",
+      "empty_output": false,
+      "duration_ms": null,
+      "summary": "Final handoff refreshed after closeout for 0028/0029 ENKI migration follow-up improvements; push not performed."
+    },
+    "data": {
+      "closeout": "recorded",
+      "push": "not_performed"
+    }
   },
   "completion_evidence_last": {
-    "ts": "2026-05-16T18:40:19Z",
-    "goal": "0028 repair smoke docs after effective profile",
+    "ts": "2026-05-16T18:48:45Z",
+    "goal": "AI_architecture ENKI migration follow-up improvements",
     "changed_paths": [
-      "docs/SKELETON_UPGRADE.md"
+      "state/progress.md",
+      "runtime/state/session-handoff.md",
+      "runtime/validation/0028-closeout-timing-measurement.md",
+      "runtime/validation/0029-adoption-semantics-install-state.md",
+      "plans/done/0028-closeout-wrapper-timing.md",
+      "plans/done/0029-adoption-semantics-install-state.md",
+      "scripts/agent-flow.py",
+      "tests/test_agent_flow.py"
     ],
     "validations": [
       {
@@ -23,14 +45,28 @@
         "command": "python3 scripts/verify-skeleton.py --root .",
         "status": "OK",
         "exit_code": 0,
-        "detail": "skeleton findings: | WARN  [ownership_lock_refresh_needed] 3 lock addition(s), 0 lock removal(s) -- run scripts/ownership-lock.py write after reviewing path ownership | total: 0 error(s), 1 warning(s), 0 info"
+        "detail": "skeleton OK: all checks passed"
       },
       {
-        "name": "agent-autonomy-check",
-        "command": "python3 scripts/agent-autonomy-check.py --root . --strict",
+        "name": "completion-evidence",
+        "command": "python3 scripts/completion-evidence.py --root . check",
         "status": "OK",
         "exit_code": 0,
-        "detail": "Agent Autonomy Check | root: /Users/shwoo/mydir/AI/AI_architecture | summary: error=0, warn=0, info=0 | scanned_files: 87"
+        "detail": "completion evidence OK: 51 record(s) checked"
+      },
+      {
+        "name": "resume-readiness",
+        "command": "python3 scripts/resume-readiness.py --root . --strict",
+        "status": "OK",
+        "exit_code": 0,
+        "detail": "Resume Readiness | root: /Users/shwoo/mydir/AI/AI_architecture | summary: error=0, warn=0, info=0 | OK next agent can resume from current handoff and ledgers"
+      },
+      {
+        "name": "skill-surface",
+        "command": "python3 scripts/skill-surface-check.py --root . --strict",
+        "status": "OK",
+        "exit_code": 0,
+        "detail": "Skill Surface Check | root: /Users/shwoo/mydir/AI/AI_architecture | summary: error=0, warn=0, info=0 | active_skills: 13"
       }
     ],
     "outcome": "genuine_success",
