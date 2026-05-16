@@ -13,7 +13,7 @@
 - active/  : 진행 중
 - done/    : 완료
 - failed/  : 3회 재계획 실패 (회생 가능성 검토 대상)
-| 0007 | role-registry-audit | active | 2026-05-15 | 0 | 0006 (delegate abort revealing role registry gap) |
+| 0007 | role-registry-audit | done | 2026-05-15 | 0 | closed deferred_unimplemented; see plan body |
 | 0008 | ownership-aware-upgrade-v1 | done | 2026-05-15 | 0 | external overlay correctness / ENKI migration readiness |
 | 0009 | ownership-classifier-synthetic-tests | done | 2026-05-15 | 0 | 0008 (ownership model spec and default map) |
 | 0010 | ownership-skeleton-self-classification | done | 2026-05-15 | 0 | 0009 (classifier library and synthetic tests) |

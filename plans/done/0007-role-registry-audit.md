@@ -51,11 +51,12 @@ python3 -m unittest discover -s tests
 python3 scripts/agent-flow.py closeout --goal "Plan 0007 role registry audit (plan creation only)" --changed-path plans/active/0007-role-registry-audit.md --format json
 ```
 
-## Status: Deferred
+## Status: Deferred Unimplemented Close
 
-이 plan은 작성된 시점 직후 freeze 결정으로 **미실행 deferred** 상태로 보존된다. 자세한 결정 근거는 `state/decisions.md`의 2026-05-15 freeze entry 참조.
+이 plan은 작성된 시점 직후 freeze 결정으로 **미실행 deferred** 상태가 되었고, 2026-05-17에 active queue 오해를 줄이기 위해 schema 확장 없이 `plans/done/`으로 닫았다. 실행 산출물은 없으며, 이 파일은 deferred decision evidence로 보존된다. 자세한 결정 근거는 `state/decisions.md`의 2026-05-15 freeze entry 참조.
 
 - Deferred 이유: 외부 실사용 데이터 없이 0007을 진행하면 self-referential infra 함정에 빠질 위험이 큼. 0006 abort 직후 자동 다음 단계로 실행하면 그 패턴 그대로 반복.
 - Resume 조건: 외부 프로젝트 X에서 v1 stable overlay가 실제로 적용된 뒤, role registry coverage gap이 다시 friction으로 관찰될 때.
-- 그때까지 이 plan body는 보존된다. INDEX의 status는 `active`로 두되 본문이 진실(deferred)을 설명한다. INDEX schema 변경(`deferred` enum 추가)은 0006 abort 때와 동일한 이유로 보류.
+- INDEX schema 변경(`deferred` enum 추가)은 0006 abort 때와 동일한 이유로 계속 보류한다. `done`은 여기서 구현 완료가 아니라 **deferred_unimplemented close**를 뜻한다.
 - 미실행 deferred는 0006 abort와 다름: 0006은 governance check가 cycle을 막은 사례, 0007 deferred는 trigger 부재로 시작 자체를 안 한 사례.
+- 재개 조건이 다시 충족되면 새 plan 번호로 role registry audit을 연다. 이 0007 파일은 재사용하지 않는다.

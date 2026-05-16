@@ -2765,13 +2765,6 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
-    "plans/active/0007-role-registry-audit.md": {
-      "action": "preserve_project",
-      "matched_pattern": "plans/**",
-      "owner": "project_owned",
-      "reason": "system_defaults.rules",
-      "system_locked": false
-    },
     "plans/active/_template.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -2822,6 +2815,13 @@
       "system_locked": false
     },
     "plans/done/0006-write-cycle-smoke-artifact-policy.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0007-role-registry-audit.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
       "owner": "project_owned",
