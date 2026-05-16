@@ -56,3 +56,12 @@ repos:
     last_checked: null
     why_tracked: "AI agent 제품 구조, evals, skills 패턴 참고"
     import_targets: ["skills/", "docs/", "rules/common/"]
+
+  - name: "andrej-karpathy-skills"
+    url: "https://github.com/multica-ai/andrej-karpathy-skills.git"
+    local_path: "../AI_architecture_references/andrej-karpathy-skills"
+    last_known_commit: "2c606141936f1eeef17fa3043a72095b4765b9c2"
+    last_known_commit_date: "2026-04-20T18:05:04+08:00"
+    last_checked: null
+    why_tracked: "Karpathy 4원칙(Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution)을 압축한 외부 행동지침. concept-only 참조."
+    import_targets: ["rules/common/", "skills/", "docs/"]

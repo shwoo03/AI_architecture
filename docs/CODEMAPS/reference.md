@@ -1,7 +1,7 @@
 # Codemap: reference
 
-- `files`: 14
-- `line_count`: 1255
+- `files`: 15
+- `line_count`: 1388
 - `directories`: 3
 
 ## Navigation Entry Points
@@ -29,5 +29,6 @@
 - `research/reference-candidates/2026-05-13-oh-my-codex.md`
 - `research/reference-candidates/2026-05-13-opencode.md`
 - `research/reference-candidates/2026-05-13-paperclip.md`
+- `research/reference-candidates/2026-05-17-andrej-karpathy-skills.md`
 - `research/reference-candidates/README.md`
 - `research/reference-candidates/_template.md`
