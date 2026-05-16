@@ -1,10 +1,10 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-16T18:48:53Z
+2026-05-16T19:03:10Z
 
 ## Current Task
-Active goal: AI_architecture ENKI migration follow-up improvements. The implementation and closeout are complete through 0029: working-tree cleanup, deferred 0007 closure, Karpathy concept-only absorption, ENKI migration documentation, closeout timing/profile repair, and adoption review semantics/install-state UX.
+Active goal: generated/local dirty policy cleanup. The policy cleanup is implemented and validated: canonical sources remain tracked, generated `.claude/`, `.codex/`, `.mcp.json`, `CLAUDE.md`, and local runtime configs are removed from git tracking while remaining present locally through `scripts/convert.py`.
 
 ## Last Completed
 - Commit `55dbffb` recorded the Karpathy guidelines reference card, `references.yaml`, and related CODEMAPS only.
@@ -14,7 +14,9 @@ Active goal: AI_architecture ENKI migration follow-up improvements. The implemen
 - Commit `7109abd` added closeout timing instrumentation and active plan 0028.
 - Commit `36fa515` completed 0028: timing evidence, profile-aware closeout wrapper repair, plan done move, codemaps, and runtime validation evidence.
 - Commit `9f6be35` completed 0029: adopt review classification, unknown-license non-blocking metadata review, install-state fallback UX, preserve candidate reporting, plan done move, and ENKI read-only validation.
-- Generated/local `.claude/.codex` runtime surfaces were refreshed locally for parity but intentionally not committed. `.claude/settings.local.json` remains excluded.
+- Generated/local policy cleanup removed tracked `.claude/`, `.codex/`, `.mcp.json`, and `CLAUDE.md` artifacts from the git index without deleting local files.
+- `.gitignore`, `README.md`, `rules/common/git-hygiene.md`, `docs/NEW_PROJECT_CHECKLIST.md`, and `scripts/README.md` now state the canonical-only tracking policy.
+- `scripts/convert.py --root .` refreshed local generated surfaces and appended install-state evidence; ownership lock was rewritten to remove generated artifacts from the tracked path baseline.
 
 ## Validation
 - 0028 focused closeout tests passed, including full-front `all` behavior, docs-profile delegation, quality-gate explanations, and baseline diff behavior.
@@ -28,16 +30,17 @@ Active goal: AI_architecture ENKI migration follow-up improvements. The implemen
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json`: passed with OK=36, SKIP=2.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json`: passed with OK=37, SKIP=2.
 - Final `agent-flow closeout --profile runtime` passed and recorded=true with `task-closeout` only.
+- Generated/local policy validation passed: `verify-parity --brief`, `ownership-lock check`, `verify-skeleton`, `quality-gate --tier stable --skip-tests`, `quality-gate --tier all --skip-tests`, and `agent-flow doctor --format json` all completed with OK status.
 
 ## Recommended Next Step
-No next required implementation step for this goal. Decide whether to leave generated `.claude/.codex` parity changes unstaged or handle them in a separate generated-artifacts policy pass. Do not push unless the user explicitly approves.
+Commit the generated/local policy cleanup if the staged boundary looks acceptable. Do not push unless the user explicitly approves.
 
 ## Open Questions / Blockers
 - ENKI target license signal remains unknown; 0029 now classifies this as non-blocking metadata review, not legal clearance.
 - ENKI dry-run currently reports manual/risky preserve candidates for target-owned or newly changed skeleton files. Review them slice-by-slice before any future apply.
 - ENKI full app quality gate without `--skip-node` remains separate from operating OS migration.
 - Do not touch `/Users/shwoo/mydir/Project/ENKI_WIKI`; it is not the active target.
-- Existing local/generated files remain unstaged: `.claude/settings.local.json` and generated `.claude/.codex` parity files.
+- Generated/local files remain present on disk but ignored by git. If a fresh clone lacks them, run `python3 scripts/convert.py --root .` and `python3 scripts/verify-parity.py --root . --brief`.
 
 ## Resume Prompt
-Resume in `/Users/shwoo/mydir/AI/AI_architecture` with active goal "AI_architecture ENKI 이전 후속 개선을 완료하라." Plans 0028 and 0029 are done, committed, and closeout-recorded. Start with `git status --short`, `python3 scripts/agent-flow.py doctor --format json`, and `python3 scripts/resume-readiness.py --strict --format json`. Push remains out of scope until explicitly approved.
+Resume in `/Users/shwoo/mydir/AI/AI_architecture` with active goal "generated/local dirty policy cleanup." The cleanup has been implemented and validated; inspect `git status --short`, commit if acceptable, then run `python3 scripts/resume-readiness.py --strict --format json`. Push remains out of scope until explicitly approved.

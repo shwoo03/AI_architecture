@@ -76,6 +76,7 @@ python3 scripts/verify-parity.py
 운영이 시작되면 다음 불변 조건을 유지합니다.
 
 - `.codex/`, `.claude/`, `.mcp.json`은 generated artifact입니다.
+- generated artifact와 local runtime config는 git에 커밋하지 않습니다.
 - canonical source 변경 후에는 `scripts/convert.py`와 `scripts/verify-parity.py`를 실행합니다.
 - skill 변경 후에는 `scripts/eval.py <skill-name>`로 골든 케이스를 확인합니다.
 - 세션 종료 전 `state/progress.md`와 `runtime/state/session-handoff.md`를 갱신합니다.

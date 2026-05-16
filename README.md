@@ -79,6 +79,8 @@ python scripts/bootstrap/new-project.py --name <name> --target <path> --domain <
 3. Claude Code는 `CLAUDE.md`를, Codex는 `AGENTS.md`를 진입 문서로 씁니다. 에이전트가 한두 가지씩 질문해 `docs/PROJECT_PROFILE.md`를 함께 채웁니다.
 4. 첫 프롬프트 예시: "이 프로젝트는 <목표> 해. PROJECT_PROFILE 같이 채워줘."
 5. canonical source를 런타임 산출물로 갱신할 때는 에이전트가 `python scripts/convert.py`와 `python scripts/verify-parity.py`를 실행합니다.
+   `.codex/`, `.claude/`, `.mcp.json`, `CLAUDE.md`는 git에 커밋하지 않는 generated/local surface입니다.
+   새 clone이나 외부 프로젝트 adoption 후 해당 파일이 없으면 canonical source에서 다시 생성합니다.
 
 모르는 사실은 추측하지 않고 `[NEEDS CLARIFICATION: <질문>]` 또는 `TBD`로 명시적으로 보류합니다. 표시 규칙의 canonical 정의는 `rules/common/README.md`의 "모르는 사실 표시 규칙" 섹션입니다.
 

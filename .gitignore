@@ -1,6 +1,7 @@
 # Build artifacts (canonical에서 변환됨)
 .codex/
 .claude/
+.mcp.json
 
 # Symlink (생성됨)
 CLAUDE.md
