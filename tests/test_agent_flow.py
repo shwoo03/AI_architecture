@@ -1183,6 +1183,13 @@ class AgentFlowTests(unittest.TestCase):
             self.assertFalse(payload["recovery_packet"]["mutates_files"])
             self.assertEqual(payload["recovery_packet"]["failed_command"]["name"], "verify")
             self.assertIn("failure_classification", payload["recovery_packet"])
+            timing_path = tmp / payload["timing_log"]
+            self.assertTrue(timing_path.is_file())
+            timing_records = [json.loads(line) for line in timing_path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([record["phase"] for record in timing_records], ["verify"])
+            self.assertEqual(timing_records[0]["profile"], "auto")
+            self.assertEqual(timing_records[0]["exit_status"], 1)
+            self.assertIsInstance(timing_records[0]["duration_ms"], int)
             self.assertFalse((tmp / "called-task-closeout").exists())
             self.assertFalse((tmp / "runtime" / "completion-evidence.jsonl").exists())
         finally:
@@ -1246,8 +1253,14 @@ class AgentFlowTests(unittest.TestCase):
                 ]
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
             self.assertEqual((tmp / "strict-seen").read_text(encoding="utf-8"), "True")
             self.assertEqual((tmp / "explain-seen").read_text(encoding="utf-8"), "True")
+            timing_path = tmp / payload["timing_log"]
+            timing_records = [json.loads(line) for line in timing_path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([record["phase"] for record in timing_records], ["verify", "quality-gate", "task-closeout"])
+            self.assertTrue(all(record["schema_version"] == "ai-architecture.closeout-timing.v1" for record in timing_records))
+            self.assertTrue(all(isinstance(record["duration_ms"], int) for record in timing_records))
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

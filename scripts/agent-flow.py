@@ -15,6 +15,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from importlib import util
@@ -38,6 +39,7 @@ MODES = {"decide", "research", "build", "maintain", "closeout"}
 SPECIALIST_SCHEMA = "ai-architecture.specialist-proposal.v1"
 DELEGATION_PLAN_SCHEMA = "ai-architecture.delegation-plan.v1"
 SPECIALIST_USAGE_SCHEMA = "ai-architecture.specialist-usage.v1"
+CLOSEOUT_TIMING_SCHEMA = "ai-architecture.closeout-timing.v1"
 SPAWN_PACKET_SCHEMA = "ai-architecture.spawn-ready-packet.v1"
 SPECIALIST_STATUSES = {"draft", "approved", "rejected"}
 WRITE_POLICIES = {"read_only", "manual_work_required", "write_with_confirmation"}
@@ -173,6 +175,7 @@ class CommandResult:
     exit_code: int
     stdout: str
     stderr: str
+    duration_ms: int = 0
 
     @property
     def ok(self) -> bool:
@@ -209,6 +212,7 @@ def rel_to_root(root: Path, path: Path) -> str:
 
 
 def run_command(root: Path, name: str, command: list[str], timeout: int) -> CommandResult:
+    started = time.perf_counter()
     try:
         result = subprocess.run(
             command,
@@ -219,11 +223,13 @@ def run_command(root: Path, name: str, command: list[str], timeout: int) -> Comm
             env=command_env(),
             timeout=timeout,
         )
-        return CommandResult(name, command, result.returncode, result.stdout, result.stderr)
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        return CommandResult(name, command, result.returncode, result.stdout, result.stderr, duration_ms)
     except subprocess.TimeoutExpired as exc:
+        duration_ms = int((time.perf_counter() - started) * 1000)
         stdout = exc.stdout if isinstance(exc.stdout, str) else ""
         stderr = exc.stderr if isinstance(exc.stderr, str) else ""
-        return CommandResult(name, command, 124, stdout, stderr or f"timed out after {timeout}s")
+        return CommandResult(name, command, 124, stdout, stderr or f"timed out after {timeout}s", duration_ms)
 
 
 def compact_output(value: str, *, max_chars: int = 800) -> str:
@@ -246,6 +252,7 @@ def result_payload(result: CommandResult) -> dict[str, Any]:
         "name": result.name,
         "exit_code": result.exit_code,
         "ok": result.ok,
+        "duration_ms": result.duration_ms,
         "stdout": compact_output(result.stdout),
         "stderr": compact_output(result.stderr),
     }
@@ -266,6 +273,30 @@ def prevalidated_check_payload(result: CommandResult) -> str:
         },
         ensure_ascii=False,
     )
+
+
+def append_closeout_timings(root: Path, goal: str, profile: str, commands: list[CommandResult]) -> str:
+    path = root / "runtime" / "closeout-timings.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for result in commands:
+        rows.append(
+            redact_json(
+                {
+                    "schema_version": CLOSEOUT_TIMING_SCHEMA,
+                    "ts": utc_now(),
+                    "goal": goal,
+                    "profile": profile,
+                    "phase": result.name,
+                    "duration_ms": result.duration_ms,
+                    "exit_status": result.exit_code,
+                }
+            )
+        )
+    with path.open("a", encoding="utf-8") as fh:
+        for row in rows:
+            fh.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+    return rel_to_root(root, path)
 
 
 def read_json_stdout(result: CommandResult, fallback: Any) -> Any:
@@ -1586,11 +1617,13 @@ def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
         commands.append(closeout_result)
         recorded = closeout_result.ok
     failure_name = next((result.name for result in commands if not result.ok), "")
+    timing_log = append_closeout_timings(root, args.goal, args.profile, commands)
     payload = {
         "root": str(root),
         "goal": args.goal,
         "recorded": recorded,
         "skipped_record_reason": "" if recorded else ("verify_or_quality_gate_failed" if not checks_ok else "task_closeout_failed"),
+        "timing_log": timing_log,
         "commands": [result_payload(result) for result in commands],
     }
     if failure_name:
