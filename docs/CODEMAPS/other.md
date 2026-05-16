@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 135
-- `line_count`: 16306
+- `files`: 136
+- `line_count`: 16402
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -188,7 +188,6 @@
 - `knowledge/log.md`
 - `knowledge/project-registry.md`
 - `plans/INDEX.md`
-- `plans/active/0007-role-registry-audit.md`
 - `plans/active/_template.md`
 - `plans/done/0001-phase-1d-1-changed-paths-validation.md`
 - `plans/done/0002-phase-1d-2-retry-idempotency.md`
@@ -196,6 +195,7 @@
 - `plans/done/0004-phase-1e-incubating-delegate-entrypoint.md`
 - `plans/done/0005-phase-1e-followup-workflow-aware-completion-command.md`
 - `plans/done/0006-write-cycle-smoke-artifact-policy.md`
+- `plans/done/0007-role-registry-audit.md`
 - `plans/done/0008-ownership-aware-upgrade-v1.md`
 - `plans/done/0009-ownership-classifier-synthetic-tests.md`
 - `plans/done/0010-ownership-skeleton-self-classification.md`
@@ -216,6 +216,7 @@
 - `plans/done/0025-enki-ownership-classification.md`
 - `plans/done/0026-enki-ownership-baseline-and-safe-apply.md`
 - `plans/done/0027-enki-manual-risky-system-review.md`
+- `plans/done/0028-closeout-wrapper-timing.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

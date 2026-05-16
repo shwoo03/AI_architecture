@@ -1553,19 +1553,39 @@ def cmd_decide(root: Path, args: argparse.Namespace) -> int:
     return 0 if all(result.ok for result in commands) else 1
 
 
+def infer_closeout_profile(paths: list[str]) -> str:
+    if not paths or paths == ["."]:
+        return "all"
+    if any(path.startswith("scripts/") or path.startswith("tests/") for path in paths):
+        return "scripts"
+    if any(path.startswith("research/reference-candidates/") for path in paths):
+        return "reference"
+    if any(path.startswith("runtime/proposals/reference-adoption/") or path == "runtime/reference-copy-ledger.jsonl" for path in paths):
+        return "copy"
+    if any(path.startswith("runtime/") for path in paths):
+        return "runtime"
+    if any(path.endswith(".md") or path.startswith("docs/") or path.startswith("rules/") for path in paths):
+        return "docs"
+    return "all"
+
+
 def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
-    commands = [
-        run_command(root, "verify", [sys.executable, str(root / "scripts" / "verify.py"), "--root", str(root)], args.timeout),
-    ]
-    if commands[-1].ok:
+    effective_profile = infer_closeout_profile(args.changed_path or ["."]) if args.profile == "auto" else args.profile
+    front_checks_required = effective_profile == "all" or bool(args.quality_baseline)
+    commands: list[CommandResult] = []
+    if front_checks_required:
         commands.append(
-            run_command(
-                root,
-                "quality-gate",
-                [sys.executable, str(root / "scripts" / "quality-gate.py"), "--root", str(root), "--format", "json", "--strict", "--explain", "--test-timeout", str(args.test_timeout)],
-                args.timeout,
-            )
+            run_command(root, "verify", [sys.executable, str(root / "scripts" / "verify.py"), "--root", str(root)], args.timeout)
         )
+        if commands[-1].ok:
+            commands.append(
+                run_command(
+                    root,
+                    "quality-gate",
+                    [sys.executable, str(root / "scripts" / "quality-gate.py"), "--root", str(root), "--format", "json", "--strict", "--explain", "--test-timeout", str(args.test_timeout)],
+                    args.timeout,
+                )
+            )
     if args.quality_baseline and commands[-1].name == "quality-gate":
         current_path = root / "runtime" / "quality-gate-current.json"
         try:
@@ -1623,6 +1643,8 @@ def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
         "goal": args.goal,
         "recorded": recorded,
         "skipped_record_reason": "" if recorded else ("verify_or_quality_gate_failed" if not checks_ok else "task_closeout_failed"),
+        "effective_profile": effective_profile,
+        "front_checks_required": front_checks_required,
         "timing_log": timing_log,
         "commands": [result_payload(result) for result in commands],
     }

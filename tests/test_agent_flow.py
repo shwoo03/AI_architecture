@@ -1168,6 +1168,8 @@ class AgentFlowTests(unittest.TestCase):
                     "forced failure",
                     "--changed-path",
                     "docs/example.md",
+                    "--profile",
+                    "all",
                     "--format",
                     "json",
                 ]
@@ -1187,7 +1189,7 @@ class AgentFlowTests(unittest.TestCase):
             self.assertTrue(timing_path.is_file())
             timing_records = [json.loads(line) for line in timing_path.read_text(encoding="utf-8").splitlines()]
             self.assertEqual([record["phase"] for record in timing_records], ["verify"])
-            self.assertEqual(timing_records[0]["profile"], "auto")
+            self.assertEqual(timing_records[0]["profile"], "all")
             self.assertEqual(timing_records[0]["exit_status"], 1)
             self.assertIsInstance(timing_records[0]["duration_ms"], int)
             self.assertFalse((tmp / "called-task-closeout").exists())
@@ -1248,6 +1250,8 @@ class AgentFlowTests(unittest.TestCase):
                     "strict closeout",
                     "--changed-path",
                     "docs/example.md",
+                    "--profile",
+                    "all",
                     "--format",
                     "json",
                 ]
@@ -1287,6 +1291,8 @@ class AgentFlowTests(unittest.TestCase):
                     "quality gate failure",
                     "--changed-path",
                     "docs/example.md",
+                    "--profile",
+                    "all",
                     "--format",
                     "json",
                 ]
@@ -1297,6 +1303,87 @@ class AgentFlowTests(unittest.TestCase):
             self.assertEqual(payload["quality_gate_explanations"][0]["classification"], "stale_docs")
             self.assertTrue(payload["quality_gate_explanations"][0]["mutates_files"])
             self.assertFalse((tmp / "called-task-closeout").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_closeout_docs_profile_delegates_checks_to_task_closeout(self) -> None:
+        tmp = self._tmp_root("closeout-docs-profile")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "verify.py").write_text(
+                "from pathlib import Path\nPath('called-verify').write_text('called', encoding='utf-8')\nraise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            (scripts / "quality-gate.py").write_text(
+                "from pathlib import Path\nPath('called-quality').write_text('called', encoding='utf-8')\nraise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            (scripts / "task-closeout.py").write_text(
+                "import json, sys\n"
+                "from pathlib import Path\n"
+                "Path('task-argv.json').write_text(json.dumps(sys.argv), encoding='utf-8')\n"
+                "print('{\"recorded\": true}')\n"
+                "raise SystemExit(0)\n",
+                encoding="utf-8",
+            )
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "closeout",
+                    "--goal",
+                    "docs profile closeout",
+                    "--changed-path",
+                    "docs/example.md",
+                    "--profile",
+                    "docs",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["front_checks_required"])
+            self.assertEqual(payload["effective_profile"], "docs")
+            self.assertEqual([item["name"] for item in payload["commands"]], ["task-closeout"])
+            task_argv = json.loads((tmp / "task-argv.json").read_text(encoding="utf-8"))
+            self.assertIn("--profile", task_argv)
+            self.assertIn("docs", task_argv)
+            self.assertNotIn("--prevalidated-check", task_argv)
+            self.assertFalse((tmp / "called-verify").exists())
+            self.assertFalse((tmp / "called-quality").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_closeout_auto_dot_keeps_full_front_checks(self) -> None:
+        tmp = self._tmp_root("closeout-auto-dot")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "verify.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+            (scripts / "quality-gate.py").write_text("import sys\nprint('{\"checks\": []}')\nsys.exit(0)\n", encoding="utf-8")
+            (scripts / "task-closeout.py").write_text("import sys\nprint('{\"recorded\": true}')\nsys.exit(0)\n", encoding="utf-8")
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "closeout",
+                    "--goal",
+                    "auto dot closeout",
+                    "--changed-path",
+                    ".",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["front_checks_required"])
+            self.assertEqual(payload["effective_profile"], "all")
+            self.assertEqual([item["name"] for item in payload["commands"]], ["verify", "quality-gate", "task-closeout"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

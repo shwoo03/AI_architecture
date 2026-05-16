@@ -2975,6 +2975,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "plans/done/0028-closeout-wrapper-timing.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "plans/failed/.gitkeep": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -3297,6 +3304,13 @@
       "reason": "protected",
       "system_locked": false
     },
+    "runtime/closeout-timings.jsonl": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "runtime/completion-evidence.jsonl": {
       "action": "protected_preserve",
       "matched_pattern": "runtime/completion-evidence.jsonl",
@@ -3473,6 +3487,13 @@
       "system_locked": false
     },
     "runtime/validation/0027-enki-manual-risky-system-review.md": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "runtime/validation/0028-closeout-timing-measurement.md": {
       "action": "preserve_project",
       "matched_pattern": "runtime/**",
       "owner": "project_owned",
@@ -4917,5 +4938,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 702
+  "total": 705
 }
