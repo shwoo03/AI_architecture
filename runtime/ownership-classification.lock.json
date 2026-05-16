@@ -2919,6 +2919,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "plans/done/0021-closeout-validator-loop-extension.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "plans/failed/.gitkeep": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -4833,5 +4840,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 690
+  "total": 691
 }

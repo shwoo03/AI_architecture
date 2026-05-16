@@ -55,6 +55,7 @@
 - `scripts/knowledge-search.py`: `knowledge/`, `docs/wiki-ops/`, `docs/CODEMAPS/`를 stdlib rank-fusion 검색으로 찾습니다. 원본 지식 파일을 수정하지 않습니다.
 - `scripts/portability-scan.py`: 복사 가능한 골격에 머신 전용 절대경로가 섞였는지 검사합니다. `runtime/`, generated artifacts, tests는 기본 제외합니다.
 - `scripts/agent-brief.py`: planner가 specialist subagent에게 넘길 역할, 범위, 금지사항, 추천 검증을 짧은 brief로 생성합니다.
+- `scripts/incubating/agent-run.py validate`: `closeout-validator` brief로 기존 AgentRun을 검증한 verdict record를 append합니다. 기존 AgentRun record는 수정하지 않으며 verdict metadata는 `ext.validator`에 보관합니다.
 - `scripts/tool-health.py`: `runtime/activity-log.jsonl`의 tool 결과를 표준 상태로 집계하고 sidecar/상태 드리프트를 검사합니다.
 - `scripts/tool-guardrail.py`: 같은 tool/resource/failure 조합이 반복될 때 warn/block/halt 등급으로 보고해 같은 실패를 계속 반복하지 않게 합니다.
 - `scripts/mcp-audit.py`: `mcp/servers.yaml`에서 MCP package metadata와 audit 필드를 네트워크 없이 dry-run 검사합니다.

@@ -1703,13 +1703,13 @@ class NewInternalToolTests(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertTrue((tmp / payload["brief_path"]).exists())
 
-    def _write_agent_run_brief(self, root: Path) -> str:
+    def _write_agent_run_brief(self, root: Path, role: str = "docs-sync-auditor") -> str:
         result = _run([
             str(SCRIPTS / "agent-brief.py"),
             "--root",
             str(root),
             "--role",
-            "docs-sync-auditor",
+            role,
             "--goal",
             "manual smoke",
             "--parent-plan",
@@ -1833,6 +1833,151 @@ class NewInternalToolTests(unittest.TestCase):
             self.assertEqual(summary["retried_count"], 0)
             self.assertEqual(summary["retry_chain_heads"], 1)
             self.assertEqual(summary["unresolved_failures"], 0)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_validate_appends_closeout_validator_verdict_record(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-validator-pass-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            target_brief = self._write_agent_run_brief(tmp)
+            add_result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                target_brief,
+                "--result-summary",
+                "specialist work completed",
+                "--validation",
+                "manual_read=passed",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(add_result.returncode, 0, add_result.stdout + add_result.stderr)
+            target = json.loads(add_result.stdout)
+            validator_brief = self._write_agent_run_brief(tmp, role="closeout-validator")
+            validate_result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "validate",
+                "--brief",
+                validator_brief,
+                "--target-run-id",
+                target["agent_run_id"],
+                "--verdict",
+                "pass",
+                "--reason",
+                "verify and quality gate evidence passed",
+                "--validation",
+                "verify=passed",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
+            record = json.loads(validate_result.stdout)
+            self.assertEqual(record["agent"], "closeout-validator")
+            self.assertEqual(record["workflow"], "validator_loop")
+            self.assertEqual(record["status"], "completed")
+            self.assertEqual(record["ext"]["validator"]["target_run_id"], target["agent_run_id"])
+            self.assertEqual(record["ext"]["validator"]["verdict"], "pass")
+            self.assertEqual(record["ext"]["validator"]["next_status"], "completed")
+            self.assertEqual(record["goal_lineage"][-2]["ref"], f"runtime/agent-runs.jsonl#{target['agent_run_id']}")
+            self.assertEqual(record["goal_lineage"][-1]["ref"], f"runtime/agent-runs.jsonl#{record['agent_run_id']}")
+            check = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+            self.assertTrue(json.loads(check.stdout)["ok"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_validate_needs_human_maps_to_paused_status(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-validator-paused-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            target_brief = self._write_agent_run_brief(tmp)
+            target_result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                target_brief,
+                "--result-summary",
+                "specialist needs independent review",
+                "--validation",
+                "manual_read=passed",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(target_result.returncode, 0, target_result.stdout + target_result.stderr)
+            target = json.loads(target_result.stdout)
+            validator_brief = self._write_agent_run_brief(tmp, role="closeout-validator")
+            validate_result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "validate",
+                "--brief",
+                validator_brief,
+                "--target-run-id",
+                target["agent_run_id"],
+                "--verdict",
+                "needs_human",
+                "--reason",
+                "requires human decision before continuing",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
+            record = json.loads(validate_result.stdout)
+            self.assertEqual(record["status"], "paused")
+            self.assertTrue(record["ext"]["validator"]["needs_human"])
+            summary = _run([str(SCRIPTS / "incubating" / "agent-run.py"), "--root", str(tmp), "summary", "--format", "json"])
+            self.assertEqual(summary.returncode, 0, summary.stdout + summary.stderr)
+            payload = json.loads(summary.stdout)
+            self.assertEqual(payload["by_status"]["paused"], 1)
+            self.assertEqual(payload["unresolved_failures"], 1)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_run_validate_requires_closeout_validator_brief(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"agent-run-validator-role-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            target_brief = self._write_agent_run_brief(tmp)
+            target_result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "add",
+                "--brief",
+                target_brief,
+                "--result-summary",
+                "target completed",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(target_result.returncode, 0, target_result.stdout + target_result.stderr)
+            target = json.loads(target_result.stdout)
+            wrong_brief = self._write_agent_run_brief(tmp, role="docs-sync-auditor")
+            validate_result = _run([
+                str(SCRIPTS / "incubating" / "agent-run.py"),
+                "--root",
+                str(tmp),
+                "validate",
+                "--brief",
+                wrong_brief,
+                "--target-run-id",
+                target["agent_run_id"],
+                "--verdict",
+                "pass",
+                "--reason",
+                "should reject",
+            ])
+            self.assertEqual(validate_result.returncode, 1)
+            self.assertIn("closeout-validator brief", validate_result.stderr)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

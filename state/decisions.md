@@ -63,3 +63,9 @@
 - The implementation must preserve 0015 additive-only overlay safety: project specialists may be added, base specialists may be narrowed, and permission broadening remains rejected by `agent-brief.py`.
 - Execution remains approval-gated. `agent-flow specialist execute` may prepare existing incubating delegate handoffs only for an approved `DelegationPlan` with explicit `--confirm`; it must not auto-spawn agents or create a second execution loop.
 - Generated `.codex/` and `.claude/` agent surfaces remain out of scope.
+
+## 2026-05-16 23:20 — Implementation exception: closeout-validator loop extension (0021)
+- The user explicitly requested implementing 0021 immediately after 0020 instead of waiting for the preferred 20+ real-use evidence threshold.
+- Exception scope is limited to extending the existing `closeout-validator` and `runtime/agent-runs.jsonl` append-only ledger with validator verdict records.
+- The implementation must not create a new validator agent, new execution loop, automatic specialist spawn, automatic specialist selection, or stable promotion.
+- Existing AgentRun records remain immutable. New status values and validator metadata are additive-only and apply only to newly appended records.

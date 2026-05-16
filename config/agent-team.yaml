@@ -36,7 +36,7 @@ specialists:
     default_scope: ["docs/", "knowledge/", "scripts/catalog.yaml"]
     recommended_checks: ["python scripts/generate-codemaps.py --root . --format json", "python scripts/wiki-lint.py --root . --format json"]
   closeout-validator:
-    mission: "Independently inspect verify, quality-gate, session snapshot, and completion evidence."
+    mission: "Independently inspect verify, quality-gate, session snapshot, completion evidence, and specialist AgentRun verdicts."
     write_policy: read_only
     default_scope: ["scripts/", "tests/", "runtime/", "state/"]
-    recommended_checks: ["python scripts/verify.py --root .", "python scripts/quality-gate.py --root . --format json"]
+    recommended_checks: ["python scripts/verify.py --root .", "python scripts/quality-gate.py --root . --format json", "python scripts/incubating/agent-run.py --root . check --format json"]

@@ -27,3 +27,4 @@
 | 0018 | execution-loop | done | 2026-05-16 | 0 | 0017 DelegationPlan interface |
 | 0019 | session-recall-hardening | done | 2026-05-16 | 0 | existing session-recall operational tool |
 | 0020 | specialist-usage-evidence-ledger | done | 2026-05-16 | 0 | 0017 DelegationPlan + 0018 execute boundary |
+| 0021 | closeout-validator-loop-extension | done | 2026-05-16 | 0 | 0020 usage evidence + explicit user implementation exception |

@@ -42,9 +42,17 @@ REQUIRED_FIELDS = (
     "ext",
 )
 OPTIONAL_FIELDS = ("retry_of",)
-STATUSES = {"completed", "failed", "blocked"}
-READ_ONLY_WORKFLOWS = frozenset({"manual_smoke", "dry_run"})
-RETRYABLE_STATUSES = frozenset({"failed", "blocked"})
+STATUSES = {"completed", "failed", "blocked", "paused", "aborted", "partial"}
+READ_ONLY_WORKFLOWS = frozenset({"manual_smoke", "dry_run", "validator_loop"})
+RETRYABLE_STATUSES = frozenset({"failed", "blocked", "aborted", "partial"})
+UNRESOLVED_STATUSES = frozenset({"failed", "blocked", "paused", "aborted", "partial"})
+VALIDATOR_VERDICTS = {"pass", "warn", "fail", "needs_human"}
+VERDICT_STATUS = {
+    "pass": "completed",
+    "warn": "partial",
+    "fail": "failed",
+    "needs_human": "paused",
+}
 
 
 def utc_now() -> str:
@@ -109,6 +117,13 @@ def load_brief(root: Path, value: str) -> tuple[Path, dict[str, Any]]:
     if not isinstance(lineage, list) or not all(isinstance(item, dict) for item in lineage):
         raise ValueError("brief missing object-array goal_lineage")
     return path, data
+
+
+def find_record(records: list[dict[str, Any]], agent_run_id: str) -> dict[str, Any] | None:
+    for record in records:
+        if record.get("agent_run_id") == agent_run_id:
+            return record
+    return None
 
 
 def read_ledger_strict(path: Path) -> list[dict[str, Any]]:
@@ -236,6 +251,8 @@ def record_findings(
     for field in string_fields:
         if not isinstance(record[field], str) or not record[field]:
             findings.append({"severity": "ERROR", "check": "field_type", "path": location, "detail": f"{field} must be non-empty string"})
+    if record.get("status") not in STATUSES:
+        findings.append({"severity": "ERROR", "check": "status", "path": location, "detail": "unsupported status"})
     if record["schema_version"] != "ai-architecture.agent-run.v1":
         findings.append({"severity": "ERROR", "check": "schema_version", "path": location, "detail": "unsupported schema_version"})
     if not re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", record["ts"]):
@@ -269,6 +286,25 @@ def record_findings(
                 findings.append({"severity": "ERROR", "check": "changed_paths_invalid", "path": f"{location}:changed_paths[{index}]", "detail": detail})
     if not isinstance(record["ext"], dict):
         findings.append({"severity": "ERROR", "check": "ext", "path": location, "detail": "ext must be an object"})
+    elif record.get("workflow") == "validator_loop":
+        validator = record["ext"].get("validator")
+        if not isinstance(validator, dict):
+            findings.append({"severity": "ERROR", "check": "validator_ext", "path": location, "detail": "validator_loop records require ext.validator"})
+        else:
+            target_run_id = validator.get("target_run_id")
+            verdict = validator.get("verdict")
+            next_status = validator.get("next_status")
+            reason = validator.get("reason")
+            if not isinstance(target_run_id, str) or not target_run_id:
+                findings.append({"severity": "ERROR", "check": "validator_target", "path": location, "detail": "ext.validator.target_run_id must be non-empty string"})
+            elif targets is not None and target_run_id not in targets:
+                findings.append({"severity": "WARN", "check": "validator_target_missing", "path": location, "detail": f"validator target not found in live ledger: {target_run_id}"})
+            if verdict not in VALIDATOR_VERDICTS:
+                findings.append({"severity": "ERROR", "check": "validator_verdict", "path": location, "detail": "ext.validator.verdict is unsupported"})
+            if isinstance(verdict, str) and next_status != VERDICT_STATUS.get(verdict):
+                findings.append({"severity": "ERROR", "check": "validator_next_status", "path": location, "detail": "ext.validator.next_status must match verdict mapping"})
+            if not isinstance(reason, str) or not reason:
+                findings.append({"severity": "ERROR", "check": "validator_reason", "path": location, "detail": "ext.validator.reason must be non-empty string"})
     if record["tier"] != "incubating":
         findings.append({"severity": "ERROR", "check": "tier", "path": location, "detail": "tier must be incubating for Phase 1c"})
     findings.extend(retry_findings(record, location, line_no=line_no, targets=targets or {}))
@@ -331,11 +367,82 @@ def build_record(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     return record
 
 
+def build_validator_record(root: Path, args: argparse.Namespace) -> dict[str, Any]:
+    brief_path, brief = load_brief(root, args.brief)
+    if brief.get("role") != "closeout-validator":
+        raise ValueError("validator loop requires a closeout-validator brief")
+    path = ledger_path(root)
+    records = read_ledger_strict(path)
+    target = find_record(records, args.target_run_id)
+    if target is None:
+        raise ValueError(f"target agent_run_id not found in live ledger: {args.target_run_id}")
+    reason = args.reason.strip()
+    if not reason:
+        raise ValueError("--reason is required")
+    verdict = args.verdict
+    status = VERDICT_STATUS[verdict]
+    brief_id = str(brief["brief_id"])
+    agent_run_id = next_run_id(records, brief_id)
+    summary = args.result_summary.strip() or f"{verdict}: {reason}"
+    lineage = [dict(item) for item in brief["goal_lineage"]]
+    lineage.append(
+        {
+            "type": "agent_run",
+            "ref": f"runtime/agent-runs.jsonl#{args.target_run_id}",
+            "summary": "validator target",
+        }
+    )
+    lineage.append(
+        {
+            "type": "agent_run",
+            "ref": f"runtime/agent-runs.jsonl#{agent_run_id}",
+            "summary": summary,
+        }
+    )
+    record = {
+        "schema_version": "ai-architecture.agent-run.v1",
+        "ts": utc_now(),
+        "agent_run_id": agent_run_id,
+        "brief_id": brief_id,
+        "tier": args.tier,
+        "agent": "closeout-validator",
+        "workflow": "validator_loop",
+        "status": status,
+        "goal_lineage": lineage,
+        "artifacts": [*args.artifact, rel_path(root, brief_path)],
+        "result_summary": summary,
+        "changed_paths": [],
+        "validation": parse_validation(args.validation),
+        "created_by": args.created_by,
+        "ext": {
+            "validator": {
+                "target_run_id": args.target_run_id,
+                "verdict": verdict,
+                "reason": reason,
+                "next_status": status,
+                "needs_human": verdict == "needs_human",
+            }
+        },
+    }
+    validate_record(root, record, records)
+    return record
+
+
 def add_record(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     path = ledger_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with runtime_lock(root, "agent-runs"):
         record = build_record(root, args)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    return record
+
+
+def validate_record_command(root: Path, args: argparse.Namespace) -> dict[str, Any]:
+    path = ledger_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with runtime_lock(root, "agent-runs"):
+        record = build_validator_record(root, args)
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
     return record
@@ -416,7 +523,7 @@ def summary_records(root: Path, _args: argparse.Namespace) -> dict[str, Any]:
         if is_retry_target:
             continue
         retry_chain_heads += 1
-        if record.get("status") in RETRYABLE_STATUSES:
+        if record.get("status") in UNRESOLVED_STATUSES:
             unresolved_failures += 1
     return {
         "total": len(records),
@@ -451,6 +558,18 @@ def main() -> int:
     add.add_argument("--retry-of", default=None)
     add.add_argument("--format", choices=("json",), default="json")
 
+    validate = sub.add_parser("validate", help="Append a closeout-validator verdict record for an AgentRun.")
+    validate.add_argument("--brief", required=True)
+    validate.add_argument("--target-run-id", required=True)
+    validate.add_argument("--verdict", choices=sorted(VALIDATOR_VERDICTS), required=True)
+    validate.add_argument("--reason", required=True)
+    validate.add_argument("--result-summary", default="")
+    validate.add_argument("--validation", action="append", default=[])
+    validate.add_argument("--artifact", action="append", default=[])
+    validate.add_argument("--tier", default="incubating")
+    validate.add_argument("--created-by", default="closeout-validator")
+    validate.add_argument("--format", choices=("json",), default="json")
+
     dump = sub.add_parser("dump", help="Print recent AgentRun records.")
     dump.add_argument("--tail", type=int, default=5)
     dump.add_argument("--format", choices=("json",), default="json")
@@ -471,6 +590,8 @@ def main() -> int:
     try:
         if args.command == "add":
             payload: Any = add_record(root, args)
+        elif args.command == "validate":
+            payload = validate_record_command(root, args)
         elif args.command == "dump":
             payload = dump_records(root, args)
         elif args.command == "list":

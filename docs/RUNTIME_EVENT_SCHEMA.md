@@ -91,6 +91,8 @@ V2 specialist runtime의 AgentRun writer는 아직 incubating입니다. Phase 1a
 
 `runtime/agent-runs.jsonl`은 live append-only ledger이며 v2 AgentRun schema entry만 포함합니다. Pre-v2/ECC-style records는 controlled migration으로 `runtime/agent-runs.legacy.jsonl`에 분리 보관합니다. `runtime/agent-runs.legacy.jsonl`은 frozen archive이며 추가 append가 없고, v2 reader/check/summary 대상에서 제외하며 audit/historical 참조 전용입니다.
 
+AgentRun `status` values are additive. Current values are `completed`, `failed`, `blocked`, `paused`, `aborted`, and `partial`. `paused` represents a non-terminal human-input state, `partial` represents a warning or incomplete validation state, and `aborted` represents an explicitly stopped run. Existing records are not migrated when new status values are introduced.
+
 새 `agent_run_id`는 `run-<brief_id>-<seq>` 형식을 사용합니다. `brief_id`가 이미 UTC date, plan slug, role, brief sequence를 포함하므로 별도 date prefix를 다시 붙이지 않습니다. 마지막 `seq`는 같은 brief에 대한 run attempt sequence입니다.
 
 ```json
@@ -120,7 +122,7 @@ Required fields are `schema_version`, `ts`, `agent_run_id`, `brief_id`, `tier`, 
 
 `changed_paths` is a top-level canonical field containing repo-relative POSIX paths. The AgentRun writer validates each changed path before append: empty values, repo-outside paths, missing paths, invalid path values, and symlink escapes are rejected. Historical ledger checks are advisory for deleted paths: a missing historical path is reported as `WARN changed_paths_missing` and does not make `ok=false`. Repo-outside paths and symlink escapes are reported as `ERROR changed_paths_escape`.
 
-Empty `changed_paths` is allowed only for read-only workflows: `manual_smoke` and `dry_run`. Non-read-only workflows must record at least one changed path.
+Empty `changed_paths` is allowed only for read-only workflows: `manual_smoke`, `dry_run`, and `validator_loop`. Non-read-only workflows must record at least one changed path.
 
 `retry_of` is a top-level optional string field. It declares that the current run is an explicit retry of a previous run in the live v2 ledger.
 
@@ -130,7 +132,7 @@ Retry policy:
 - Retry lookup reads only `runtime/agent-runs.jsonl`, the live v2 ledger. `runtime/agent-runs.legacy.jsonl` is a frozen archive and is never used for retry resolution.
 - Retry scope is same-brief only: the target run must have the same `brief_id`.
 - Retry targets must be earlier live ledger entries. A run cannot retry itself or a later/equal line.
-- Retry targets must have `status` in `failed` or `blocked`.
+- Retry targets must have `status` in `failed`, `blocked`, `aborted`, or `partial`.
 - The ledger stores only the single-step edge `retry_of`; readers reconstruct a retry chain by following `retry_of` links.
 
 Retry check severity:
@@ -142,7 +144,7 @@ Retry check severity:
 | Duplicate `agent_run_id` | ERROR | `agent_run_id_duplicate` |
 | Retry target is missing from the live ledger | WARN | `retry_target_missing` |
 | `retry_of` points to a later/equal line | ERROR | `retry_ordering` |
-| Retry target `status` is not `failed` or `blocked` | ERROR | `retry_target_status` |
+| Retry target `status` is not `failed`, `blocked`, `aborted`, or `partial` | ERROR | `retry_target_status` |
 
 `summary --format json` includes retry-aware aggregation fields in addition to the base counts:
 
@@ -150,9 +152,11 @@ Retry check severity:
 | --- | --- |
 | `retried_count` | Number of live records with a non-empty string `retry_of`. |
 | `retry_chain_heads` | Number of live records that are not referenced by another live record's `retry_of`. |
-| `unresolved_failures` | Number of retry chain heads with `status` `failed` or `blocked`. |
+| `unresolved_failures` | Number of retry chain heads with `status` `failed`, `blocked`, `paused`, `aborted`, or `partial`. |
 
 The summary command reads only `runtime/agent-runs.jsonl`. It does not read `runtime/agent-runs.legacy.jsonl` to resolve missing retry targets. `stale` is not reported in Phase 1d-3 because the current AgentRun status set is terminal-oriented; stale semantics require a later non-terminal status policy.
+
+`scripts/incubating/agent-run.py validate` appends a `closeout-validator` AgentRun record for a target AgentRun. It requires a brief whose role is `closeout-validator`, never edits the target record, and stores verdict metadata under `ext.validator`. Verdict mappings are `pass -> completed`, `warn -> partial`, `fail -> failed`, and `needs_human -> paused`. Required `ext.validator` fields are `target_run_id`, `verdict`, `reason`, `next_status`, and `needs_human`. This is the 0021 validator-loop boundary: it records independent verdict evidence but does not auto-spawn agents, auto-select specialists, or promote validator-loop to stable.
 
 ## Incubating delegate handoff
 
