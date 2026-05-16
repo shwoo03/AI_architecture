@@ -5,7 +5,7 @@
 - `name`: andrej-karpathy-skills
 - `url`: https://github.com/multica-ai/andrej-karpathy-skills.git
 - `source_type`: repository
-- `status`: reviewing
+- `status`: adopted
 - `searched_for`: LLM coding behavior guidelines, anti-overcomplication checklist, surgical-edit principles, goal-driven verification framing
 - `created_at`: 2026-05-17
 - `reviewed_at`: 2026-05-17
@@ -116,9 +116,11 @@
 
 ## 최종 기록
 
-- `final_status`: reviewing
+- `final_status`: concept_only
 - `implemented_in`:
-  - not implemented
-- `validation_result`: candidate card only
+  - `rules/common/code-style.md`
+  - `skills/active/brainstorming/SKILL.md`
+  - `skills/active/verification-loop/SKILL.md`
+- `validation_result`: concept-only absorption; no direct file copy
 - `activity_log_entry`: not recorded
-- `notes`: Concept-only reference. No code copied. Repo root has no LICENSE file; MIT relied on SKILL.md frontmatter. Absorption decisions intentionally deferred to a separate dry-run proposal to avoid duplicating existing rules/skills.
+- `notes`: Concept-only reference. No code copied. Repo root has no LICENSE file; MIT relied on SKILL.md frontmatter. Absorption was limited to surgical wording in existing rules/skills to avoid duplicating existing rules/skills.

@@ -70,6 +70,7 @@ digraph brainstorming {
 **Understanding the idea:**
 
 - Check out the current project state first (files, docs, recent commits)
+- State assumptions, possible interpretations, and trade-offs before proposing a design; do not silently pick one reading of an ambiguous request.
 - Before asking detailed questions, assess scope: if the request describes multiple independent subsystems (e.g., "build a platform with chat, file storage, billing, and analytics"), flag this immediately. Don't spend questions refining details of a project that needs to be decomposed first.
 - If the project is too large for a single spec, help the user decompose into sub-projects: what are the independent pieces, how do they relate, what order should they be built? Then brainstorm the first sub-project through the normal design flow. Each sub-project gets its own spec → plan → implementation cycle.
 - For appropriately-scoped projects, ask questions one at a time to refine the idea

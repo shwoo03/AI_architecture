@@ -25,11 +25,12 @@ Do not use when:
 
 ## Workflow
 
-1. List expected outputs.
-2. Check that required files or artifacts exist.
-3. Parse structured files.
-4. Run available tests or checks.
-5. Report what passed and what could not be verified.
+1. State the verifiable success criteria before running checks.
+2. List expected outputs.
+3. Check that required files or artifacts exist.
+4. Parse structured files.
+5. Run available tests or checks.
+6. Report what passed and what could not be verified.
 
 ## Verification Matrix
 
