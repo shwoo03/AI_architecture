@@ -97,6 +97,7 @@ def handoff_payload(brief_path: str, brief: dict[str, object], workflow: str) ->
         "brief_path": brief_path,
         "brief_id": brief_id,
         "role": brief["role"],
+        "role_source": brief["role_source"],
         "objective": brief["objective"],
         "read_scope": brief["read_scope"],
         "write_scope": brief["write_scope"],

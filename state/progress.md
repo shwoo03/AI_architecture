@@ -36,6 +36,19 @@ External trigger active: ENKI_WIKI stable overlay migration (2026-05-15)
 - Ownership-aware upgrade v1 Slice 2.5: skeleton self-classification lock generated; ownership-lock write/check and self-classification tests pass.
 - Ownership-aware upgrade v1 Slice 3: verify-skeleton ownership gate and upgrade-from-skeleton ownership-aware planning implemented, validated, and closeout recorded.
 - Ownership-aware upgrade v1 Slice 3.5: self-hygiene completed, OWNERSHIP_MODEL locked, ownership-initialize report tool implemented, tests pass, stable quality gate is WARN 0, closeout recorded, and plan moved to done.
+- Slice 4 ENKI_WIKI initialize dry-run started with plan 0013. Read-only `ownership-initialize.py --target ~/mydir/ENKI_WIKI --format json` completed with status=draft, analyzed_paths=957, candidate_paths=261, and stop condition hit because candidates exceed 20. No ENKI target files were written.
+- Slice 4 handoff/activity-log timestamp sync recorded after the initialize stop condition.
+- Slice 4 first-milestone closeout recorded at 2026-05-15T12:36:45Z; next action remains manual review of the 261-path initialize draft before any ENKI target write.
+- 2026-05-16 v2 specialist overlay exception recorded for 0014+0015 only; plan 0014 specialist-overlay-audit is active, while 0016-0018 remain frozen until external usage signals appear.
+- 2026-05-16 handoff/activity-log/session-snapshot refreshed after 0014 setup closeout.
+- 2026-05-16 plan 0014 specialist overlay audit executed. `docs/_meta/SPECIALIST_OVERLAY_AUDIT.md` records current registry, brief, delegate, generated-agent, future 0017/0018 hook, and privilege-safety findings.
+- 2026-05-16 plan 0014 moved to done and plan 0015 specialist-overlay-loader prepared as the active additive-only loader implementation slice.
+- 2026-05-16 closeout for 0014 execution and 0015 preparation recorded successfully; validate-plans, verify-skeleton, ownership-lock check, stable quality gate, all-tier quality gate, and agent-flow closeout passed.
+- 2026-05-16 0015 implementation prep recorded in `runtime/validation/0015-specialist-overlay-loader-prep.md`: exact code path, merge semantics, tests, docs, and security boundary are fixed before behavior changes.
+- 2026-05-16 0015 implementation prep closeout recorded and handoff/session snapshot refreshed.
+- 2026-05-16 0015 specialist overlay loader implemented: `agent-brief.py` reads optional `config/agent-team-overrides.yaml`, supports overlay-only project specialists, emits `role_source`, allows base narrowing, rejects base broadening, and delegate handoff carries role provenance.
+- 2026-05-16 0015 specialist overlay loader closeout recorded successfully and plan moved to done.
 
 ## 다음 작업
-- Proceed to ENKI_WIKI stable overlay migration through ownership-initialize report and ownership-aware upgrade dry-run/brief.
+- Keep 0016 specialist proposal/add, 0017 orchestration preview, and 0018 execution loop frozen until external usage evidence appears.
+- Slice 4 ENKI remains blocked on manual review of the 261-path initialize draft before any target write.

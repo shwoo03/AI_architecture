@@ -36,6 +36,7 @@ WRITE_POLICY_RANK = {
     "manual_work_required": 1,
     "write_with_confirmation": 2,
 }
+REGISTRY_FIELDS = {"mission", "write_policy", "default_scope", "recommended_checks"}
 
 
 @dataclass
@@ -57,6 +58,7 @@ class Brief:
     execution_mode: str
     ext: dict[str, object]
     role: str
+    role_source: str
     write_policy: str
     policy_inheritance: dict[str, object]
     forbidden_actions: list[str]
@@ -169,8 +171,7 @@ def parse_inline_list(value: str) -> list[str]:
     return [item.strip().strip('"').strip("'") for item in value[1:-1].split(",") if item.strip()]
 
 
-def load_team_registry(root: Path) -> dict[str, dict[str, object]]:
-    path = root / "config" / "agent-team.yaml"
+def load_specialist_registry_file(path: Path, *, strict_top_level: bool) -> dict[str, dict[str, object]]:
     if not path.exists():
         return {}
     entries: dict[str, dict[str, object]] = {}
@@ -182,6 +183,8 @@ def load_team_registry(root: Path) -> dict[str, dict[str, object]]:
         indent = len(raw) - len(raw.lstrip(" "))
         stripped = raw.strip()
         if indent == 0:
+            if strict_top_level and stripped != "specialists:":
+                raise ValueError(f"{path.name} has unsupported top-level key: {stripped.rstrip(':')}")
             in_specialists = stripped == "specialists:"
             current = ""
             continue
@@ -194,9 +197,58 @@ def load_team_registry(root: Path) -> dict[str, dict[str, object]]:
         if current and indent == 4 and ":" in stripped:
             key, value = stripped.split(":", 1)
             key = key.strip()
+            if key not in REGISTRY_FIELDS:
+                raise ValueError(f"{path.name} specialist {current} has unsupported field: {key}")
             value = value.strip()
             entries[current][key] = parse_inline_list(value) if value.startswith("[") else value.strip('"').strip("'")
+            continue
+        if strict_top_level:
+            raise ValueError(f"{path.name} has unsupported specialist shape near: {stripped}")
     return entries
+
+
+def normalized_registry_scope(root: Path, role: str, value: object) -> list[str]:
+    if value is None:
+        return ["."]
+    if not isinstance(value, list):
+        raise ValueError(f"specialist {role} default_scope must be an inline list")
+    return normalize_scope(root, [str(item) for item in value] or ["."])
+
+
+def overlay_scope_narrows(root: Path, role: str, base_scope: object, overlay_scope: object) -> bool:
+    base = normalized_registry_scope(root, role, base_scope)
+    overlay = normalized_registry_scope(root, role, overlay_scope)
+    return all(any(is_same_or_under(item, parent) for parent in base) for item in overlay)
+
+
+def merge_specialist_overlay(root: Path, base: dict[str, dict[str, object]], overlay: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:
+    merged: dict[str, dict[str, object]] = {role: {**entry, "role_source": "base"} for role, entry in base.items()}
+    for role in SPECIALISTS:
+        merged.setdefault(role, {"role_source": "base"})
+    for role, overlay_entry in overlay.items():
+        if role not in merged:
+            merged[role] = {**overlay_entry, "role_source": "project"}
+            continue
+        base_entry = merged[role]
+        if "write_policy" in overlay_entry:
+            base_policy = str(base_entry.get("write_policy") or "read_only")
+            overlay_policy = str(overlay_entry.get("write_policy") or "read_only")
+            if base_policy not in WRITE_POLICIES:
+                raise ValueError(f"invalid base specialist write_policy for {role}: {base_policy}")
+            if overlay_policy not in WRITE_POLICIES:
+                raise ValueError(f"invalid overlay specialist write_policy for {role}: {overlay_policy}")
+            if WRITE_POLICY_RANK[overlay_policy] > WRITE_POLICY_RANK[base_policy]:
+                raise ValueError(f"overlay for {role} broadens base specialist write_policy {base_policy} -> {overlay_policy}")
+        if "default_scope" in overlay_entry and not overlay_scope_narrows(root, role, base_entry.get("default_scope"), overlay_entry.get("default_scope")):
+            raise ValueError(f"overlay for {role} broadens base specialist default_scope")
+        merged[role] = {**base_entry, **overlay_entry, "role_source": "base"}
+    return merged
+
+
+def load_team_registry(root: Path) -> dict[str, dict[str, object]]:
+    base = load_specialist_registry_file(root / "config" / "agent-team.yaml", strict_top_level=False)
+    overlay = load_specialist_registry_file(root / "config" / "agent-team-overrides.yaml", strict_top_level=True)
+    return merge_specialist_overlay(root, base, overlay)
 
 
 def recommended_checks(role: str) -> list[str]:
@@ -243,6 +295,9 @@ def build_brief(root: Path, args: argparse.Namespace) -> Brief:
     if args.role not in known_roles:
         raise ValueError(f"unknown specialist role: {args.role}")
     configured = registry.get(args.role, {})
+    role_source = str(configured.get("role_source") or "base")
+    if role_source not in {"base", "project"}:
+        raise ValueError(f"invalid role source: {role_source}")
     configured_policy = str(configured.get("write_policy") or "read_only")
     if configured_policy not in WRITE_POLICIES:
         raise ValueError(f"invalid configured write policy: {configured_policy}")
@@ -297,6 +352,7 @@ def build_brief(root: Path, args: argparse.Namespace) -> Brief:
         execution_mode="manual_human",
         ext={},
         role=args.role,
+        role_source=role_source,
         write_policy=write_policy,
         policy_inheritance={
             "parent_role": args.parent_role.strip(),
@@ -324,6 +380,7 @@ def render_text(brief: Brief) -> str:
     policy = brief.policy_inheritance
     lines = [
         f"Role: {brief.role}",
+        f"Role source: {brief.role_source}",
         f"Objective: {brief.objective}",
         f"Write policy: {brief.write_policy}",
         f"Parent role: {policy.get('parent_role') or '(none)'}",

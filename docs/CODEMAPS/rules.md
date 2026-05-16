@@ -1,7 +1,7 @@
 # Codemap: rules
 
-- `files`: 26
-- `line_count`: 1261
+- `files`: 27
+- `line_count`: 1338
 - `directories`: 10
 
 ## Navigation Entry Points
@@ -32,6 +32,7 @@
 - `manifest.yaml`
 - `rules/common/README.md`
 - `rules/common/code-style.md`
+- `rules/common/communication-style.md`
 - `rules/common/confirmation-required.md`
 - `rules/common/directory-layout.md`
 - `rules/common/ephemeral-files.md`

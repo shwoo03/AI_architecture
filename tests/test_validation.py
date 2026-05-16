@@ -1088,6 +1088,19 @@ class NewInternalToolTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def _agent_brief_overlay_root(self, name: str) -> Path:
+        tmp = REPO_ROOT / "runtime" / f"agent-brief-overlay-{name}-{uuid.uuid4().hex}"
+        (tmp / "scripts").mkdir(parents=True)
+        (tmp / "config").mkdir()
+        shutil.copyfile(SCRIPTS / "agent-brief.py", tmp / "scripts" / "agent-brief.py")
+        return tmp
+
+    def _write_agent_team(self, root: Path, body: str) -> None:
+        (root / "config" / "agent-team.yaml").write_text(body, encoding="utf-8")
+
+    def _write_agent_team_overlay(self, root: Path, body: str) -> None:
+        (root / "config" / "agent-team-overrides.yaml").write_text(body, encoding="utf-8")
+
     def test_agent_brief_reports_scope_and_policy(self) -> None:
         result = _run([
             str(SCRIPTS / "agent-brief.py"),
@@ -1107,9 +1120,151 @@ class NewInternalToolTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["role"], "security-reviewer")
+        self.assertEqual(payload["role_source"], "base")
         self.assertEqual(payload["read_scope"], ["scripts"])
         self.assertIn("Do not modify files", "\n".join(payload["forbidden_actions"]))
         self.assertNotIn("allowed_files", payload)
+
+    def test_agent_brief_accepts_overlay_only_specialist(self) -> None:
+        tmp = self._agent_brief_overlay_root("project-only")
+        try:
+            self._write_agent_team(tmp, "specialists:\n")
+            self._write_agent_team_overlay(
+                tmp,
+                "specialists:\n"
+                "  docs-migration-specialist:\n"
+                "    mission: migrate docs\n"
+                "    write_policy: read_only\n"
+                "    default_scope: [\"docs/\"]\n"
+                "    recommended_checks: [\"python scripts/verify-skeleton.py\"]\n",
+            )
+            (tmp / "docs").mkdir()
+            result = _run([
+                str(tmp / "scripts" / "agent-brief.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-migration-specialist",
+                "--goal",
+                "review docs migration",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["role"], "docs-migration-specialist")
+            self.assertEqual(payload["role_source"], "project")
+            self.assertEqual(payload["read_scope"], ["docs"])
+            self.assertEqual(payload["write_scope"], [])
+            self.assertIn("python3 scripts/verify-skeleton.py", payload["validation_hints"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_brief_allows_overlay_narrowing(self) -> None:
+        tmp = self._agent_brief_overlay_root("narrow")
+        try:
+            self._write_agent_team(
+                tmp,
+                "specialists:\n"
+                "  build-error-resolver:\n"
+                "    mission: fix builds\n"
+                "    write_policy: manual_work_required\n"
+                "    default_scope: [\"scripts/\", \"tests/\"]\n",
+            )
+            self._write_agent_team_overlay(
+                tmp,
+                "specialists:\n"
+                "  build-error-resolver:\n"
+                "    write_policy: read_only\n"
+                "    default_scope: [\"tests/\"]\n",
+            )
+            (tmp / "scripts").mkdir(exist_ok=True)
+            (tmp / "tests").mkdir()
+            result = _run([
+                str(tmp / "scripts" / "agent-brief.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "build-error-resolver",
+                "--goal",
+                "inspect test failure",
+                "--format",
+                "json",
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["role_source"], "base")
+            self.assertEqual(payload["write_policy"], "read_only")
+            self.assertEqual(payload["read_scope"], ["tests"])
+            self.assertEqual(payload["write_scope"], [])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_brief_rejects_overlay_policy_broadening(self) -> None:
+        tmp = self._agent_brief_overlay_root("policy-broaden")
+        try:
+            self._write_agent_team(
+                tmp,
+                "specialists:\n"
+                "  security-reviewer:\n"
+                "    mission: audit\n"
+                "    write_policy: read_only\n"
+                "    default_scope: [\"config/\"]\n",
+            )
+            self._write_agent_team_overlay(
+                tmp,
+                "specialists:\n"
+                "  security-reviewer:\n"
+                "    write_policy: manual_work_required\n",
+            )
+            result = _run([
+                str(tmp / "scripts" / "agent-brief.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "security-reviewer",
+                "--goal",
+                "audit",
+                "--format",
+                "json",
+            ])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("broadens base specialist write_policy", result.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_brief_rejects_overlay_scope_broadening(self) -> None:
+        tmp = self._agent_brief_overlay_root("scope-broaden")
+        try:
+            self._write_agent_team(
+                tmp,
+                "specialists:\n"
+                "  docs-sync-auditor:\n"
+                "    mission: audit docs\n"
+                "    write_policy: read_only\n"
+                "    default_scope: [\"docs/\"]\n",
+            )
+            self._write_agent_team_overlay(
+                tmp,
+                "specialists:\n"
+                "  docs-sync-auditor:\n"
+                "    default_scope: [\".\"]\n",
+            )
+            result = _run([
+                str(tmp / "scripts" / "agent-brief.py"),
+                "--root",
+                str(tmp),
+                "--role",
+                "docs-sync-auditor",
+                "--goal",
+                "audit docs",
+                "--format",
+                "json",
+            ])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("broadens base specialist default_scope", result.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_agent_brief_rejects_policy_broadening(self) -> None:
         result = _run([
@@ -1269,9 +1424,11 @@ class NewInternalToolTests(unittest.TestCase):
                 "completion_command",
                 "workflow",
                 "tier",
+                "role_source",
             }
             self.assertEqual(set(payload), required)
             self.assertEqual(payload["role"], "docs-sync-auditor")
+            self.assertEqual(payload["role_source"], "base")
             self.assertEqual(payload["objective"], "delegate smoke test")
             self.assertEqual(payload["tier"], "incubating")
             self.assertEqual(payload["workflow"], "manual_smoke")

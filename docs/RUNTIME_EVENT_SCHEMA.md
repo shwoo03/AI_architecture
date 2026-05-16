@@ -158,6 +158,8 @@ The summary command reads only `runtime/agent-runs.jsonl`. It does not read `run
 
 `scripts/incubating/agent-flow-delegate.py` is a preparation-only wrapper around `scripts/agent-brief.py`. It reuses the AgentBrief writer as the schema source of truth, writes a brief artifact under `runtime/agent-briefs/`, and returns a handoff JSON with the brief path plus an example `agent-run.py add` completion command. It does not spawn subagents, create AgentRun skeletons, read or write `runtime/agent-runs.jsonl`, or expose a `delegate` command through the stable `scripts/agent-flow.py` surface.
 
+AgentBrief JSON includes `role_source`, with value `base` for specialists from the skeleton registry and `project` for overlay-only specialists from `config/agent-team-overrides.yaml`. The incubating delegate handoff copies this field from the written brief. Readers should treat `role_source` as provenance, not as a permission grant; effective permissions remain `write_policy`, `read_scope`, `write_scope`, and `policy_inheritance`.
+
 The delegate `completion_command` is workflow-aware. For read-only workflows (`manual_smoke`, `dry_run`), it omits the `--changed-path` placeholder because the AgentRun writer allows empty `changed_paths` for those workflows. For other workflow values, it keeps `--changed-path "<repo-relative-path>"` so write-producing runs explicitly record changed paths. The delegate's read-only workflow set must stay aligned with `scripts/incubating/agent-run.py` `READ_ONLY_WORKFLOWS`.
 
 ## Adapter extension 규칙

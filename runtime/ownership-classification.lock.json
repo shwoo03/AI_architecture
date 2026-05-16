@@ -2506,6 +2506,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "docs/_meta/SPECIALIST_OVERLAY_AUDIT.md": {
+      "action": "manual_merge",
+      "matched_pattern": "docs/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "docs/commands/closeout.md": {
       "action": "manual_merge",
       "matched_pattern": "docs/**",
@@ -2758,6 +2765,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "plans/active/0013-enki-ownership-initialize-dry-run.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "plans/active/_template.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -2843,6 +2857,20 @@
       "system_locked": false
     },
     "plans/done/0012-ownership-initialize-report.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0014-specialist-overlay-audit.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0015-specialist-overlay-loader.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
       "owner": "project_owned",
@@ -2955,6 +2983,13 @@
       "system_locked": false
     },
     "rules/common/code-style.md": {
+      "action": "manual_merge",
+      "matched_pattern": "rules/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "rules/common/communication-style.md": {
       "action": "manual_merge",
       "matched_pattern": "rules/**",
       "owner": "manual_merge",
@@ -3302,6 +3337,20 @@
       "matched_pattern": "runtime/state/session-handoff.md",
       "owner": "protected",
       "reason": "protected",
+      "system_locked": false
+    },
+    "runtime/validation/0013-enki-ownership-initialize-dry-run.md": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "runtime/validation/0015-specialist-overlay-loader-prep.md": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
       "system_locked": false
     },
     "runtime/validation/README.md": {
@@ -4742,5 +4791,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 677
+  "total": 684
 }

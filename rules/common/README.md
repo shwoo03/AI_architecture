@@ -63,3 +63,4 @@
 - 공통 코드 스타일: `rules/common/code-style.md`
 - 권고 디렉터리 레이아웃: `rules/common/directory-layout.md`
 - 임시 파일 규칙: `rules/common/ephemeral-files.md`
+- 보고와 질문 스타일: `rules/common/communication-style.md`

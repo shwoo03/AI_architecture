@@ -40,3 +40,10 @@
 - The previous ENKI_WIKI freeze-exception entry was affected by shell command substitution while writing handoff text and lost the literal target path in one bullet.
 - Correct target path: ~/mydir/ENKI_WIKI.
 - Scope remains unchanged: stable overlay release hardening plus safe-only application; deferred v2 slices remain frozen.
+
+## 2026-05-16 21:05 — Freeze exception: v2 specialist overlay mechanism (0014+0015 only)
+- The 2026-05-15 freeze remains valid: avoid self-improvement loops without external usage signals.
+- The user explicitly requested a project-specific specialist environment that can be added when a project needs it; this is a new requirement and justifies a narrow exception.
+- Exception scope is limited to 0014 specialist-overlay-audit and 0015 specialist-overlay-loader.
+- 0016 specialist proposal/add, 0017 orchestration preview, and 0018 execution loop remain frozen until external usage signals show they are needed.
+- 0015 schema lock: project overlays are additive-first. New project specialists are allowed; base specialist `write_policy` and `default_scope` may only narrow; broadening either is rejected; future briefs must record `role_source`.

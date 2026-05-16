@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 120
-- `line_count`: 15213
+- `files`: 123
+- `line_count`: 15458
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -189,6 +189,7 @@
 - `knowledge/project-registry.md`
 - `plans/INDEX.md`
 - `plans/active/0007-role-registry-audit.md`
+- `plans/active/0013-enki-ownership-initialize-dry-run.md`
 - `plans/active/_template.md`
 - `plans/done/0001-phase-1d-1-changed-paths-validation.md`
 - `plans/done/0002-phase-1d-2-retry-idempotency.md`
@@ -201,6 +202,8 @@
 - `plans/done/0010-ownership-skeleton-self-classification.md`
 - `plans/done/0011-ownership-verify-upgrade-integration.md`
 - `plans/done/0012-ownership-initialize-report.md`
+- `plans/done/0014-specialist-overlay-audit.md`
+- `plans/done/0015-specialist-overlay-loader.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

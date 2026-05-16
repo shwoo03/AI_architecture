@@ -19,3 +19,6 @@
 | 0010 | ownership-skeleton-self-classification | done | 2026-05-15 | 0 | 0009 (classifier library and synthetic tests) |
 | 0011 | ownership-verify-upgrade-integration | done | 2026-05-15 | 0 | 0010 (skeleton self-classification lock) |
 | 0012 | ownership-initialize-report | done | 2026-05-15 | 0 | 0011 (ownership-aware verify/upgrade integration) |
+| 0013 | enki-ownership-initialize-dry-run | active | 2026-05-15 | 0 | 0012 (ownership initialize report tool) |
+| 0014 | specialist-overlay-audit | done | 2026-05-16 | 0 | 0006 delegate abort evidence + 2026-05-16 freeze exception |
+| 0015 | specialist-overlay-loader | done | 2026-05-16 | 0 | 0014 (specialist overlay audit) |

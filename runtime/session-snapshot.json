@@ -1,17 +1,17 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-15T09:27:29Z",
+  "ts": "2026-05-16T12:34:08Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-15T09:27:08Z",
+    "ts": "2026-05-16T12:33:41Z",
     "phase": "session",
     "action": "handoff_saved",
     "project": "common-ai-architecture",
     "goal_lineage": [
-      "Ownership-aware upgrade v1 Slice 3.5",
-      "final lifecycle",
+      "0015 specialist overlay loader",
+      "closeout",
       "common-ai-architecture"
     ],
     "tool_call": {
@@ -21,33 +21,30 @@
       "failure_type": "",
       "empty_output": false,
       "duration_ms": null,
-      "summary": "Handoff refreshed after moving Slice 3.5 plan to done."
+      "summary": "Handoff refreshed after implementing and closing out 0015 specialist overlay loader."
     },
     "data": {}
   },
   "completion_evidence_last": {
-    "ts": "2026-05-15T09:25:37Z",
-    "goal": "Ownership-aware upgrade v1 Slice 3.5 initialize report",
+    "ts": "2026-05-16T12:33:36Z",
+    "goal": "0015 specialist overlay loader",
     "changed_paths": [
-      "plans/done/0008-ownership-aware-upgrade-v1.md",
-      "plans/done/0009-ownership-classifier-synthetic-tests.md",
-      "plans/done/0010-ownership-skeleton-self-classification.md",
-      "plans/done/0011-ownership-verify-upgrade-integration.md",
-      "plans/active/0012-ownership-initialize-report.md",
-      "scripts/ownership-initialize.py",
-      "tests/test_ownership_initialize.py",
-      "docs/OWNERSHIP_MODEL.md",
-      "config/ownership.yaml",
-      "tests/test_skeleton_self_classification.py",
-      "scripts/catalog.yaml",
-      "scripts/verify-skeleton.py",
+      "scripts/agent-brief.py",
+      "scripts/incubating/agent-flow-delegate.py",
       "tests/test_validation.py",
+      "docs/AGENT_REGISTRY.md",
+      "docs/RUNTIME_EVENT_SCHEMA.md",
+      "plans/done/0015-specialist-overlay-loader.md",
       "plans/INDEX.md",
-      "runtime/ownership-classification.lock.json",
-      "docs/CODEMAPS",
       "state/progress.md",
-      "runtime/state/session-handoff.md",
-      "runtime/session-snapshot.json"
+      "runtime/validation/0015-specialist-overlay-loader-prep.md",
+      "runtime/ownership-classification.lock.json",
+      "docs/CODEMAPS/INDEX.md",
+      "docs/CODEMAPS/docs.md",
+      "docs/CODEMAPS/other.md",
+      "docs/CODEMAPS/runtime.md",
+      "docs/CODEMAPS/scripts.md",
+      "docs/CODEMAPS/tests.md"
     ],
     "validations": [
       {
