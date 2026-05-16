@@ -1819,6 +1819,123 @@ def cmd_recall(root: Path, args: argparse.Namespace) -> int:
     return result.returncode
 
 
+def parsed_json_stdout(result: CommandResult) -> Any:
+    if not result.stdout.strip():
+        return None
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+def doctor_detail(result: CommandResult) -> str:
+    parsed = parsed_json_stdout(result)
+    if isinstance(parsed, dict):
+        summary = parsed.get("summary")
+        if isinstance(summary, dict):
+            parts = [f"{key}={value}" for key, value in summary.items()]
+            if parts:
+                return ", ".join(parts)
+        if "status" in parsed:
+            return str(parsed.get("status"))
+        if "ok" in parsed:
+            return f"ok={parsed.get('ok')}"
+    text = compact_output(result.stdout or result.stderr, max_chars=200)
+    return text or f"exit {result.exit_code}"
+
+
+def doctor_result_payload(result: CommandResult) -> dict[str, Any]:
+    payload = result_payload(result)
+    parsed = parsed_json_stdout(result)
+    if parsed is not None:
+        payload["json"] = parsed
+    payload["detail"] = doctor_detail(result)
+    return payload
+
+
+def doctor_warning_count(result: CommandResult) -> int:
+    parsed = parsed_json_stdout(result)
+    if isinstance(parsed, dict):
+        summary = parsed.get("summary")
+        if isinstance(summary, dict):
+            value = summary.get("WARN", summary.get("warn", 0))
+            if isinstance(value, int):
+                return value
+    text = f"{result.stdout}\n{result.stderr}"
+    return 1 if re.search(r"\bWARN\b", text) else 0
+
+
+def cmd_doctor(root: Path, args: argparse.Namespace) -> int:
+    quality_command = [
+        sys.executable,
+        str(root / "scripts" / "quality-gate.py"),
+        "--root",
+        str(root),
+        "--tier",
+        args.tier,
+        "--format",
+        "json",
+    ]
+    if not args.with_tests:
+        quality_command.append("--skip-tests")
+    commands = [
+        run_command(
+            root,
+            "skeleton-doctor",
+            [sys.executable, str(root / "scripts" / "skeleton-doctor.py"), "--root", str(root), "--format", "json"],
+            args.timeout,
+        ),
+        run_command(
+            root,
+            "verify-skeleton",
+            [sys.executable, str(root / "scripts" / "verify-skeleton.py"), "--root", str(root)],
+            args.timeout,
+        ),
+        run_command(
+            root,
+            "ownership-lock",
+            [sys.executable, str(root / "scripts" / "ownership-lock.py"), "--root", str(root), "check"],
+            args.timeout,
+        ),
+        run_command(
+            root,
+            "resume-readiness",
+            [sys.executable, str(root / "scripts" / "resume-readiness.py"), "--root", str(root), "--strict", "--format", "json"],
+            args.timeout,
+        ),
+        run_command(root, "quality-gate", quality_command, args.timeout),
+    ]
+    failed = [result for result in commands if not result.ok]
+    warn_count = sum(doctor_warning_count(result) for result in commands if result.ok)
+    status = "FAIL" if failed else ("WARN" if warn_count else "OK")
+    payload = {
+        "root": str(root),
+        "status": status,
+        "tier": args.tier,
+        "with_tests": bool(args.with_tests),
+        "summary": {
+            "OK": sum(1 for result in commands if result.ok),
+            "WARN": warn_count,
+            "FAIL": len(failed),
+            "total": len(commands),
+        },
+        "commands": [doctor_result_payload(result) for result in commands],
+        "next_action": "" if not failed else f"inspect {failed[0].name} output and rerun the component command",
+    }
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"doctor: {payload['status']}")
+        print(f"tier: {args.tier}")
+        print(f"with_tests: {str(bool(args.with_tests)).lower()}")
+        for result in commands:
+            label = "OK" if result.ok else "FAIL"
+            print(f"{label} {result.name}: {doctor_detail(result)}")
+        if failed:
+            print(f"next_action: {payload['next_action']}")
+    return 0 if not failed else 1
+
+
 def specialist_proposal_payload(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     reason = args.reason.strip()
     trigger_matches = match_terms(reason, ON_DEMAND_TRIGGERS)
@@ -2417,6 +2534,13 @@ def build_parser() -> argparse.ArgumentParser:
     recall.add_argument("--format", choices=("text", "json"), default="text")
     recall.add_argument("--timeout", type=int, default=60)
     recall.set_defaults(func=cmd_recall)
+
+    doctor = sub.add_parser("doctor", help="Run the common read-only operational diagnostics in one report.")
+    doctor.add_argument("--tier", choices=("stable", "all"), default="stable")
+    doctor.add_argument("--with-tests", action="store_true", help="Allow quality-gate to run tests instead of the default fast --skip-tests mode.")
+    doctor.add_argument("--format", choices=("text", "json"), default="text")
+    doctor.add_argument("--timeout", type=int, default=180)
+    doctor.set_defaults(func=cmd_doctor)
 
     specialist = sub.add_parser("specialist", help="On-demand specialist proposal, preview, and approved delegation prep.")
     specialist_sub = specialist.add_subparsers(dest="specialist_command", required=True)

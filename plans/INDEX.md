@@ -19,7 +19,7 @@
 | 0010 | ownership-skeleton-self-classification | done | 2026-05-15 | 0 | 0009 (classifier library and synthetic tests) |
 | 0011 | ownership-verify-upgrade-integration | done | 2026-05-15 | 0 | 0010 (skeleton self-classification lock) |
 | 0012 | ownership-initialize-report | done | 2026-05-15 | 0 | 0011 (ownership-aware verify/upgrade integration) |
-| 0013 | enki-ownership-initialize-dry-run | active | 2026-05-15 | 0 | 0012 (ownership initialize report tool) |
+| 0013 | enki-ownership-initialize-dry-run | done | 2026-05-15 | 0 | 0012 (ownership initialize report tool) |
 | 0014 | specialist-overlay-audit | done | 2026-05-16 | 0 | 0006 delegate abort evidence + 2026-05-16 freeze exception |
 | 0015 | specialist-overlay-loader | done | 2026-05-16 | 0 | 0014 (specialist overlay audit) |
 | 0016 | specialist-proposal-add | done | 2026-05-16 | 0 | 0015 + implementation exception |
@@ -29,3 +29,4 @@
 | 0020 | specialist-usage-evidence-ledger | done | 2026-05-16 | 0 | 0017 DelegationPlan + 0018 execute boundary |
 | 0021 | closeout-validator-loop-extension | done | 2026-05-16 | 0 | 0020 usage evidence + explicit user implementation exception |
 | 0022 | spawn-ready-packet | done | 2026-05-16 | 0 | 0021 validator loop + approved DelegationPlan |
+| 0023 | agent-flow-doctor | done | 2026-05-17 | 0 | operational diagnostics UX improvement |

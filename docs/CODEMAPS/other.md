@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 130
-- `line_count`: 15945
+- `files`: 131
+- `line_count`: 15990
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -211,6 +211,7 @@
 - `plans/done/0020-specialist-usage-evidence-ledger.md`
 - `plans/done/0021-closeout-validator-loop-extension.md`
 - `plans/done/0022-spawn-ready-packet.md`
+- `plans/done/0023-agent-flow-doctor.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

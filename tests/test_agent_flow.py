@@ -1300,6 +1300,98 @@ class AgentFlowTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_doctor_runs_common_diagnostics_without_tests_by_default(self) -> None:
+        tmp = self._tmp_root("doctor")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "skeleton-doctor.py").write_text(
+                "import json\nprint(json.dumps({'summary': {'OK': 2, 'WARN': 0, 'FAIL': 0}}))\n",
+                encoding="utf-8",
+            )
+            (scripts / "verify-skeleton.py").write_text("print('skeleton OK: all checks passed')\n", encoding="utf-8")
+            (scripts / "ownership-lock.py").write_text(
+                "import json, sys\n"
+                "print(json.dumps({'ok': True, 'argv': sys.argv}))\n",
+                encoding="utf-8",
+            )
+            (scripts / "resume-readiness.py").write_text(
+                "import json\nprint(json.dumps({'summary': {'ERROR': 0, 'WARN': 0, 'INFO': 0}}))\n",
+                encoding="utf-8",
+            )
+            (scripts / "quality-gate.py").write_text(
+                "import json, sys\nprint(json.dumps({'summary': {'OK': 5, 'SKIP': 1}, 'argv': sys.argv}))\n",
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "doctor", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "OK")
+            self.assertEqual(payload["summary"]["OK"], 5)
+            self.assertEqual(payload["summary"]["FAIL"], 0)
+            names = [item["name"] for item in payload["commands"]]
+            self.assertEqual(
+                names,
+                ["skeleton-doctor", "verify-skeleton", "ownership-lock", "resume-readiness", "quality-gate"],
+            )
+            quality = next(item for item in payload["commands"] if item["name"] == "quality-gate")
+            self.assertIn("--skip-tests", quality["json"]["argv"])
+            self.assertIn("--tier", quality["json"]["argv"])
+            self.assertIn("stable", quality["json"]["argv"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_doctor_reports_failure_but_keeps_full_report(self) -> None:
+        tmp = self._tmp_root("doctor-failure")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "skeleton-doctor.py").write_text("print('{\"summary\": {\"OK\": 1}}')\n", encoding="utf-8")
+            (scripts / "verify-skeleton.py").write_text("print('ok')\n", encoding="utf-8")
+            (scripts / "ownership-lock.py").write_text(
+                "import sys\nprint('classification drift')\nsys.exit(1)\n",
+                encoding="utf-8",
+            )
+            (scripts / "resume-readiness.py").write_text("print('{\"summary\": {\"ERROR\": 0}}')\n", encoding="utf-8")
+            (scripts / "quality-gate.py").write_text("print('{\"summary\": {\"OK\": 1}}')\n", encoding="utf-8")
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "doctor", "--format", "json"])
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "FAIL")
+            self.assertEqual(payload["summary"]["FAIL"], 1)
+            names = [item["name"] for item in payload["commands"]]
+            self.assertIn("quality-gate", names)
+            failed = next(item for item in payload["commands"] if item["name"] == "ownership-lock")
+            self.assertFalse(failed["ok"])
+            self.assertIn("inspect ownership-lock", payload["next_action"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_doctor_with_tests_omits_quality_gate_skip_tests(self) -> None:
+        tmp = self._tmp_root("doctor-with-tests")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            for name in ("skeleton-doctor.py", "resume-readiness.py"):
+                (scripts / name).write_text("print('{\"summary\": {}}')\n", encoding="utf-8")
+            (scripts / "verify-skeleton.py").write_text("print('ok')\n", encoding="utf-8")
+            (scripts / "ownership-lock.py").write_text("print('{\"ok\": true}')\n", encoding="utf-8")
+            (scripts / "quality-gate.py").write_text(
+                "import json, sys\nprint(json.dumps({'summary': {}, 'argv': sys.argv}))\n",
+                encoding="utf-8",
+            )
+            result = _run(
+                [str(self.SCRIPT), "--root", str(tmp), "doctor", "--tier", "all", "--with-tests", "--format", "json"]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            quality = next(item for item in payload["commands"] if item["name"] == "quality-gate")
+            self.assertNotIn("--skip-tests", quality["json"]["argv"])
+            self.assertIn("all", quality["json"]["argv"])
+            self.assertTrue(payload["with_tests"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_closeout_can_compare_quality_gate_baseline(self) -> None:
         tmp = self._tmp_root("closeout-diff")
         try:

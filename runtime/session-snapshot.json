@@ -1,11 +1,11 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-16T15:04:17Z",
+  "ts": "2026-05-16T15:20:52Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-16T15:04:00Z",
+    "ts": "2026-05-16T15:20:32Z",
     "phase": "session",
     "action": "handoff_saved",
     "project": "unknown",
@@ -17,22 +17,30 @@
       "failure_type": "",
       "empty_output": false,
       "duration_ms": null,
-      "summary": "0022 spawn-ready packet complete; handoff updated"
+      "summary": "0023 agent-flow doctor complete; handoff updated"
     },
     "data": {}
   },
   "completion_evidence_last": {
-    "ts": "2026-05-16T15:03:17Z",
-    "goal": "0022 spawn-ready packet",
+    "ts": "2026-05-16T15:19:47Z",
+    "goal": "0023 agent-flow doctor",
     "changed_paths": [
       "scripts/agent-flow.py",
       "tests/test_agent_flow.py",
-      "docs/AGENT_REGISTRY.md",
-      "docs/RUNTIME_EVENT_SCHEMA.md",
       "scripts/README.md",
       "plans/INDEX.md",
-      "plans/done/0022-spawn-ready-packet.md",
-      "state/decisions.md"
+      "plans/done/0023-agent-flow-doctor.md",
+      "runtime/ownership-classification.lock.json",
+      "docs/CODEMAPS/INDEX.md",
+      "docs/CODEMAPS/agents.md",
+      "docs/CODEMAPS/docs.md",
+      "docs/CODEMAPS/other.md",
+      "docs/CODEMAPS/reference.md",
+      "docs/CODEMAPS/rules.md",
+      "docs/CODEMAPS/runtime.md",
+      "docs/CODEMAPS/scripts.md",
+      "docs/CODEMAPS/skills.md",
+      "docs/CODEMAPS/tests.md"
     ],
     "validations": [
       {

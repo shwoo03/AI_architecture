@@ -39,6 +39,7 @@ External trigger active: ENKI_WIKI stable overlay migration (2026-05-15)
 - Slice 4 ENKI_WIKI initialize dry-run started with plan 0013. Read-only `ownership-initialize.py --target ~/mydir/ENKI_WIKI --format json` completed with status=draft, analyzed_paths=957, candidate_paths=261, and stop condition hit because candidates exceed 20. No ENKI target files were written.
 - Slice 4 handoff/activity-log timestamp sync recorded after the initialize stop condition.
 - Slice 4 first-milestone closeout recorded at 2026-05-15T12:36:45Z; next action remains manual review of the 261-path initialize draft before any ENKI target write.
+- 2026-05-17 0013 ENKI ownership initialize dry-run marked done. The milestone completed read-only with normal stop on `candidate_paths=261`; follow-up classification remains a separate human-reviewed slice.
 - 2026-05-16 v2 specialist overlay exception recorded for 0014+0015 only; plan 0014 specialist-overlay-audit is active, while 0016-0018 remain frozen until external usage signals appear.
 - 2026-05-16 handoff/activity-log/session-snapshot refreshed after 0014 setup closeout.
 - 2026-05-16 plan 0014 specialist overlay audit executed. `docs/_meta/SPECIALIST_OVERLAY_AUDIT.md` records current registry, brief, delegate, generated-agent, future 0017/0018 hook, and privilege-safety findings.
@@ -63,8 +64,11 @@ External trigger active: ENKI_WIKI stable overlay migration (2026-05-15)
 - 2026-05-16 0021 moved to done; focused validator tests, `tests.test_validation`, agent-run check, validate-plans, ownership-lock, verify-skeleton, stable/all quality gates, and closeout passed.
 - 2026-05-16 0022 spawn-ready packet implemented by explicit user exception: `agent-flow specialist packet --plan <path> --confirm` writes harness-agnostic `runtime/spawn-packets/*.json` artifacts from approved `DelegationPlan` records and existing delegate handoffs.
 - 2026-05-16 0022 moved to done; packet tests, `tests.test_agent_flow`, validate-plans, ownership-lock, generate-codemaps, verify-skeleton, stable/all quality gates, and closeout passed. Packet generation remains approval-gated and does not spawn agents, auto-chain roles, or allow recursive delegation.
+- 2026-05-17 0023 diagnostic UX implemented: `agent-flow doctor` now aggregates `skeleton-doctor`, `verify-skeleton`, `ownership-lock check`, `resume-readiness --strict`, and tier-aware `quality-gate` into one read-only OK/WARN/FAIL report.
+- 2026-05-17 0023 moved to done; focused doctor tests, `tests.test_agent_flow`, `agent-flow doctor` stable/all real runs, validate-plans, ownership-lock, generate-codemaps, verify-skeleton, all-tier quality gate, and closeout passed.
 
 ## 다음 작업
+- Use `python3 scripts/agent-flow.py doctor --format json` as the first single-command diagnostic before deeper manual checks. Use `--tier all` for incubating coverage and `--with-tests` for slower full validation.
 - Use the new specialist flow only on demand: propose a project specialist when a concrete blocker/trigger exists, approve it before overlay application, preview delegation first, and execute only approved plans with explicit confirmation.
 - Use `python3 scripts/agent-flow.py recall "<query>" --format json` for local session recall; source-of-truth remains Markdown/JSONL, and `runtime/session-recall.sqlite` is rebuildable cache only.
 - Use `python3 scripts/incubating/agent-run.py validate --brief <closeout-validator-brief> --target-run-id <run-id> --verdict pass|warn|fail|needs_human --reason "<reason>" --format json` to append independent validator verdict evidence after specialist work.

@@ -2772,13 +2772,6 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
-    "plans/active/0013-enki-ownership-initialize-dry-run.md": {
-      "action": "preserve_project",
-      "matched_pattern": "plans/**",
-      "owner": "project_owned",
-      "reason": "system_defaults.rules",
-      "system_locked": false
-    },
     "plans/active/_template.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -2870,6 +2863,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "plans/done/0013-enki-ownership-initialize-dry-run.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "plans/done/0014-specialist-overlay-audit.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -2927,6 +2927,13 @@
       "system_locked": false
     },
     "plans/done/0022-spawn-ready-packet.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0023-agent-flow-doctor.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
       "owner": "project_owned",
@@ -4847,5 +4854,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 692
+  "total": 693
 }

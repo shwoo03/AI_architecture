@@ -82,6 +82,7 @@
 - `scripts/reference-task-queue.py`: 긴 reference 분석을 중단/재개할 수 있도록 `runtime/reference-tasks.jsonl`에 append-only 작업 상태를 남깁니다. source hash 기반 unchanged skip과 retry 장부를 포함합니다.
 - `scripts/notion-doc-quality-check.py`: Notion에 올릴 Markdown 초안이 기능 중심 섹션, 입력/출력, 성공/실패 신호, 판단 기준을 갖췄는지 검사합니다. 짧은 changelog나 파일 목록 중심 문서를 완료 문서로 올리지 않기 위한 사전 점검입니다.
 - `scripts/skeleton-doctor.py`: 프로젝트가 바로 문서화, reference review, runtime startup, 로그/인수인계, 구조 검증을 수행할 준비가 되었는지 `OK/WARN/FAIL/INFO`로 진단합니다. 기본은 read-only이며 `--format json`과 선택적 `--projects-root` 전파 상태 점검을 지원합니다.
+- `scripts/agent-flow.py doctor`: 흩어진 운영 진단을 한 번에 보는 public UX wrapper입니다. `skeleton-doctor`, `verify-skeleton`, `ownership-lock check`, `resume-readiness --strict`, `quality-gate`를 read-only로 실행하고 `OK/WARN/FAIL` JSON/text summary를 냅니다. 기본은 빠른 확인을 위해 quality-gate에 `--skip-tests`를 붙이며, `--with-tests`로 풀 테스트를 허용합니다.
 - `scripts/resume-readiness.py`: 다음 에이전트가 handoff, activity log, completion evidence를 보고 추측 없이 이어받을 수 있는지 검사합니다. `--strict`에서는 handoff보다 최신인 runtime 기록도 실패로 올립니다.
 - `scripts/skill-surface-check.py`: `skills/active`를 canonical로 두고 `.codex/skills`, `.claude/skills` 생성물이 동기화됐는지 검사합니다.
 - `scripts/install-state.py`: bootstrap/convert 결과를 `runtime/install-state.jsonl`에 append-only로 기록하고 검증합니다.
@@ -142,6 +143,8 @@ python3 scripts/search-activity-log.py --contains "rotation lock" --last 5
 - `scripts/skeleton-doctor.py` is the next diagnostic layer above `verify-skeleton.py`.
 - `verify-skeleton.py` answers whether required structure is internally consistent.
 - `skeleton-doctor.py` answers whether an agent can start or resume real work safely: profile fields, reference review surface, runtime startup surface, JSONL logs, handoff state, open questions, and structural validation.
+- `python3 scripts/agent-flow.py doctor --format json` is the operator-facing one-shot diagnostic. It aggregates `skeleton-doctor`, `verify-skeleton`, `ownership-lock check`, `resume-readiness --strict`, and tier-aware `quality-gate` without mutating files.
+- Use `--tier all` to include incubating checks and `--with-tests` when a slower full quality-gate run is desired.
 - Use `--projects-root C:\Users\dntmd\Desktop\Projects` to summarize whether existing projects still have safe missing skeleton updates or risky review-only changes.
 
 ## 2026-04-29 review queue
