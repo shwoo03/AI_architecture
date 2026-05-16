@@ -653,6 +653,209 @@ class AgentFlowTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def _prepare_specialist_root(self) -> Path:
+        tmp = self._tmp_root("specialist")
+        self._copy_scripts(tmp, ["agent-brief.py"])
+        (tmp / "scripts" / "incubating").mkdir(parents=True)
+        shutil.copyfile(SCRIPTS / "incubating" / "agent-flow-delegate.py", tmp / "scripts" / "incubating" / "agent-flow-delegate.py")
+        (tmp / "config").mkdir(parents=True)
+        (tmp / "runtime").mkdir(parents=True)
+        (tmp / "docs").mkdir()
+        (tmp / "config" / "agent-team.yaml").write_text(
+            "specialists:\n"
+            "  docs-sync-auditor:\n"
+            "    mission: \"Check docs drift.\"\n"
+            "    write_policy: read_only\n"
+            "    default_scope: [\"docs\"]\n"
+            "    recommended_checks: [\"python3 scripts/verify-skeleton.py\"]\n",
+            encoding="utf-8",
+        )
+        (tmp / "docs" / "README.md").write_text("# Docs\n", encoding="utf-8")
+        return tmp
+
+    def test_specialist_propose_requires_on_demand_trigger(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "propose",
+                    "--role",
+                    "tiny-helper",
+                    "--mission",
+                    "Help with tiny things.",
+                    "--write-policy",
+                    "read_only",
+                    "--scope",
+                    "docs",
+                    "--reason",
+                    "quick targeted fix",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("at least one on-demand trigger", result.stderr)
+            self.assertFalse((tmp / "runtime" / "proposals" / "specialists").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_specialist_propose_and_approve_apply_overlay(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            propose = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "propose",
+                    "--role",
+                    "docs-migration-specialist",
+                    "--mission",
+                    "Review docs migration edge cases.",
+                    "--write-policy",
+                    "read_only",
+                    "--scope",
+                    "docs",
+                    "--recommended-check",
+                    "python3 scripts/verify-skeleton.py",
+                    "--reason",
+                    "context isolation for repeated docs migration review",
+                    "--created-by",
+                    "test",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(propose.returncode, 0, propose.stdout + propose.stderr)
+            proposal_path = json.loads(propose.stdout)["proposal_path"]
+            approve = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "approve",
+                    "--proposal",
+                    proposal_path,
+                    "--by",
+                    "test",
+                    "--apply-overlay",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(approve.returncode, 0, approve.stdout + approve.stderr)
+            payload = json.loads(approve.stdout)
+            self.assertTrue(payload["overlay_applied"])
+            overlay = (tmp / "config" / "agent-team-overrides.yaml").read_text(encoding="utf-8")
+            self.assertIn("docs-migration-specialist:", overlay)
+            brief = _run(
+                [
+                    str(tmp / "scripts" / "agent-brief.py"),
+                    "--root",
+                    str(tmp),
+                    "--role",
+                    "docs-migration-specialist",
+                    "--goal",
+                    "review docs",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(brief.returncode, 0, brief.stdout + brief.stderr)
+            self.assertEqual(json.loads(brief.stdout)["role_source"], "project")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_specialist_preview_can_select_zero_specialists(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "preview",
+                    "--goal",
+                    "quick typo fix",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["delegation_plan"]["selected_roles"], [])
+            self.assertFalse(payload["delegation_plan"]["requires_confirmation"])
+            self.assertTrue((tmp / payload["plan_path"]).is_file())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_specialist_preview_and_execute_approved_plan_uses_existing_delegate(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            preview = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "preview",
+                    "--goal",
+                    "context isolation docs migration review",
+                    "--approve",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+            preview_payload = json.loads(preview.stdout)
+            self.assertEqual(preview_payload["delegation_plan"]["status"], "approved")
+            self.assertIn("docs-sync-auditor", preview_payload["delegation_plan"]["selected_roles"])
+
+            blocked = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "execute",
+                    "--plan",
+                    preview_payload["plan_path"],
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertNotEqual(blocked.returncode, 0)
+            self.assertIn("--confirm", blocked.stderr)
+
+            executed = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "execute",
+                    "--plan",
+                    preview_payload["plan_path"],
+                    "--confirm",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            payload = json.loads(executed.stdout)
+            self.assertEqual(payload["status"], "prepared")
+            self.assertEqual(payload["handoffs"][0]["role"], "docs-sync-auditor")
+            self.assertTrue((tmp / payload["handoffs"][0]["brief_path"]).is_file())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_closeout_failure_does_not_record_completion_evidence(self) -> None:
         tmp = self._tmp_root("closeout")
         try:
@@ -819,6 +1022,33 @@ class AgentFlowTests(unittest.TestCase):
             text = plan.read_text(encoding="utf-8")
             self.assertIn("## Definition of Done", text)
             self.assertIn("python3 scripts/agent-flow.py closeout", text)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_recall_wrapper_passes_through_session_recall_json(self) -> None:
+        tmp = self._tmp_root("recall")
+        try:
+            self._copy_scripts(tmp, ["session-recall.py", "redact.py"])
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "state").mkdir()
+            (tmp / "runtime" / "activity-log.jsonl").write_text('{"action":"recallneedle"}\n', encoding="utf-8")
+            (tmp / "runtime" / "completion-evidence.jsonl").write_text("", encoding="utf-8")
+            (tmp / "runtime" / "skill-usage.jsonl").write_text("", encoding="utf-8")
+            (tmp / "state" / "decisions.md").write_text("## first\n", encoding="utf-8")
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "recall", "recallneedle", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload)
+            self.assertEqual(payload[0]["source_type"], "activity")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_recall_wrapper_rejects_empty_query(self) -> None:
+        tmp = self._tmp_root("recall-empty")
+        try:
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "recall", "   ", "--format", "json"])
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("query is required", result.stderr)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

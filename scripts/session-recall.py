@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from redact import redact_text
+
 try:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
@@ -21,8 +23,10 @@ SOURCES = (
     ("runtime/activity-log.jsonl", "activity"),
     ("runtime/completion-evidence.jsonl", "completion"),
     ("runtime/skill-usage.jsonl", "skill_usage"),
+    ("runtime/state/session-handoff.md", "handoff"),
     ("state/decisions.md", "decision"),
 )
+INDEX_VERSION = "session-recall.v2.redacted-handoff"
 
 
 def repo_root() -> Path:
@@ -45,6 +49,7 @@ def iter_jsonl(path: Path, source_type: str) -> list[dict[str, str]]:
         except json.JSONDecodeError:
             payload = {"raw": line}
         text = json.dumps(payload, ensure_ascii=False, sort_keys=True) if isinstance(payload, (dict, list)) else str(payload)
+        text = redact_text(text)
         records.append({"source": path.as_posix(), "source_type": source_type, "ref": str(line_no), "text": text})
     return records
 
@@ -59,13 +64,13 @@ def iter_markdown_decisions(path: Path, source_type: str) -> list[dict[str, str]
     for line_no, line in enumerate(text.splitlines(), start=1):
         if line.startswith("## "):
             if current:
-                chunks.append({"source": path.as_posix(), "source_type": source_type, "ref": current_ref, "text": "\n".join(current)})
+                chunks.append({"source": path.as_posix(), "source_type": source_type, "ref": current_ref, "text": redact_text("\n".join(current))})
             current_ref = str(line_no)
             current = [line]
         else:
             current.append(line)
     if current:
-        chunks.append({"source": path.as_posix(), "source_type": source_type, "ref": current_ref, "text": "\n".join(current)})
+        chunks.append({"source": path.as_posix(), "source_type": source_type, "ref": current_ref, "text": redact_text("\n".join(current))})
     return chunks
 
 
@@ -127,7 +132,25 @@ def rebuild_index(root: Path) -> int:
             "INSERT OR REPLACE INTO recall_meta(key, value) VALUES(?, ?)",
             ("source_state", json.dumps(source_state(root), ensure_ascii=False, sort_keys=True)),
         )
+        conn.execute(
+            "INSERT OR REPLACE INTO recall_meta(key, value) VALUES(?, ?)",
+            ("index_version", INDEX_VERSION),
+        )
     return len(records)
+
+
+def indexed_meta_value(conn: sqlite3.Connection, key: str) -> str | None:
+    try:
+        row = conn.execute("SELECT value FROM recall_meta WHERE key = ?", (key,)).fetchone()
+    except sqlite3.DatabaseError:
+        return None
+    if not row:
+        return None
+    return str(row[0])
+
+
+def indexed_index_version(conn: sqlite3.Connection) -> str | None:
+    return indexed_meta_value(conn, "index_version")
 
 
 def indexed_source_state(conn: sqlite3.Connection) -> list[dict[str, Any]] | None:
@@ -145,14 +168,16 @@ def indexed_source_state(conn: sqlite3.Connection) -> list[dict[str, Any]] | Non
 
 
 def stale_sources(root: Path, conn: sqlite3.Connection) -> list[str]:
+    stale: list[str] = []
+    if indexed_index_version(conn) != INDEX_VERSION:
+        stale.append("index_version")
     indexed = indexed_source_state(conn)
     if indexed is None:
-        return [rel for rel, _ in SOURCES]
+        return sorted(set(stale + [rel for rel, _ in SOURCES]))
     current_by_source = {item["source"]: item for item in source_state(root)}
-    stale: list[str] = []
     for item in indexed:
         if not isinstance(item, dict):
-            return [rel for rel, _ in SOURCES]
+            return sorted(set(stale + [rel for rel, _ in SOURCES]))
         source = str(item.get("source", ""))
         current = current_by_source.get(source)
         if current is None or current != item:
@@ -165,7 +190,7 @@ def stale_sources(root: Path, conn: sqlite3.Connection) -> list[str]:
 
 def cmd_index(root: Path, args: argparse.Namespace) -> int:
     count = rebuild_index(root)
-    payload = {"indexed": count, "database": db_path(root).relative_to(root).as_posix()}
+    payload = {"indexed": count, "database": db_path(root).relative_to(root).as_posix(), "index_version": INDEX_VERSION}
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -206,8 +231,11 @@ def cmd_summary(root: Path, args: argparse.Namespace) -> int:
     if not db_path(root).exists():
         rebuild_index(root)
     conn = connect(root)
+    if stale_sources(root, conn):
+        rebuild_index(root)
+        conn = connect(root)
     rows = conn.execute("SELECT source_type, count(*) FROM recall GROUP BY source_type ORDER BY source_type").fetchall()
-    payload = {"database": db_path(root).relative_to(root).as_posix(), "counts": {row[0]: row[1] for row in rows}}
+    payload = {"database": db_path(root).relative_to(root).as_posix(), "index_version": INDEX_VERSION, "counts": {row[0]: row[1] for row in rows}}
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -235,7 +263,7 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
             print(f"session recall invalid: {exc}")
         return 1
     if stale:
-        payload = {"ok": False, "count": count, "database": db_path(root).relative_to(root).as_posix(), "status": "stale", "stale_sources": stale}
+        payload = {"ok": False, "count": count, "database": db_path(root).relative_to(root).as_posix(), "index_version": indexed_index_version(conn) or "", "expected_index_version": INDEX_VERSION, "status": "stale", "stale_sources": stale}
         if args.format == "json":
             print(json.dumps(payload, ensure_ascii=False, indent=2))
         else:
@@ -243,7 +271,7 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
             print("run `python scripts/session-recall.py index` to refresh")
         return 1
     if args.format == "json":
-        print(json.dumps({"ok": True, "count": count, "database": db_path(root).relative_to(root).as_posix(), "status": "current"}, ensure_ascii=False, indent=2))
+        print(json.dumps({"ok": True, "count": count, "database": db_path(root).relative_to(root).as_posix(), "index_version": INDEX_VERSION, "status": "current"}, ensure_ascii=False, indent=2))
     else:
         print(f"session recall OK: {count} indexed record(s)")
     return 0

@@ -1,4 +1,5 @@
 from tests.test_support import *
+import sqlite3
 
 
 class RotateActivityLogDryRunTests(unittest.TestCase):
@@ -1101,6 +1102,76 @@ class SessionRecallTests(unittest.TestCase):
             self.assertIn("runtime/activity-log.jsonl", payload["stale_sources"])
             refreshed = _run([str(self.SCRIPT), "--root", str(tmp), "index"])
             self.assertEqual(refreshed.returncode, 0, refreshed.stdout + refreshed.stderr)
+            current = _run([str(self.SCRIPT), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(current.returncode, 0, current.stdout + current.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_handoff_source_is_indexed_and_secrets_are_redacted(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"session-recall-handoff-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime" / "state").mkdir(parents=True)
+            (tmp / "state").mkdir()
+            (tmp / "runtime" / "activity-log.jsonl").write_text("", encoding="utf-8")
+            (tmp / "runtime" / "completion-evidence.jsonl").write_text("", encoding="utf-8")
+            (tmp / "runtime" / "skill-usage.jsonl").write_text("", encoding="utf-8")
+            (tmp / "runtime" / "state" / "session-handoff.md").write_text(
+                "# Session Handoff\n\n## Current Task\nFind handoffneedle with token=supersecretvalue1234567890\n",
+                encoding="utf-8",
+            )
+            (tmp / "state" / "decisions.md").write_text("## first\n", encoding="utf-8")
+            index = _run([str(self.SCRIPT), "--root", str(tmp), "index", "--format", "json"])
+            self.assertEqual(index.returncode, 0, index.stdout + index.stderr)
+            found = _run([str(self.SCRIPT), "--root", str(tmp), "search", "handoffneedle", "--format", "json"])
+            self.assertEqual(found.returncode, 0, found.stdout + found.stderr)
+            payload = json.loads(found.stdout)
+            self.assertTrue(any(item["source_type"] == "handoff" for item in payload), payload)
+            self.assertIn("[REDACTED:generic_secret]", json.dumps(payload, ensure_ascii=False))
+            leaked = _run([str(self.SCRIPT), "--root", str(tmp), "search", "supersecretvalue1234567890", "--format", "json"])
+            self.assertEqual(leaked.returncode, 0, leaked.stdout + leaked.stderr)
+            self.assertEqual(json.loads(leaked.stdout), [])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_check_reports_stale_for_unversioned_index(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"session-recall-version-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "state").mkdir()
+            (tmp / "runtime" / "activity-log.jsonl").write_text('{"action":"first"}\n', encoding="utf-8")
+            (tmp / "runtime" / "completion-evidence.jsonl").write_text("", encoding="utf-8")
+            (tmp / "runtime" / "skill-usage.jsonl").write_text("", encoding="utf-8")
+            (tmp / "state" / "decisions.md").write_text("## first\n", encoding="utf-8")
+            index = _run([str(self.SCRIPT), "--root", str(tmp), "index"])
+            self.assertEqual(index.returncode, 0, index.stdout + index.stderr)
+            conn = sqlite3.connect(tmp / "runtime" / "session-recall.sqlite")
+            with conn:
+                conn.execute("DELETE FROM recall_meta WHERE key = ?", ("index_version",))
+            stale = _run([str(self.SCRIPT), "--root", str(tmp), "check", "--format", "json"])
+            self.assertEqual(stale.returncode, 1)
+            payload = json.loads(stale.stdout)
+            self.assertEqual(payload["status"], "stale")
+            self.assertIn("index_version", payload["stale_sources"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_summary_rebuilds_stale_index(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"session-recall-summary-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            (tmp / "state").mkdir()
+            activity = tmp / "runtime" / "activity-log.jsonl"
+            activity.write_text('{"action":"first"}\n', encoding="utf-8")
+            (tmp / "runtime" / "completion-evidence.jsonl").write_text("", encoding="utf-8")
+            (tmp / "runtime" / "skill-usage.jsonl").write_text("", encoding="utf-8")
+            (tmp / "state" / "decisions.md").write_text("## first\n", encoding="utf-8")
+            index = _run([str(self.SCRIPT), "--root", str(tmp), "index"])
+            self.assertEqual(index.returncode, 0, index.stdout + index.stderr)
+            activity.write_text('{"action":"first"}\n{"action":"second"}\n', encoding="utf-8")
+            summary = _run([str(self.SCRIPT), "--root", str(tmp), "summary", "--format", "json"])
+            self.assertEqual(summary.returncode, 0, summary.stdout + summary.stderr)
+            payload = json.loads(summary.stdout)
+            self.assertEqual(payload["counts"]["activity"], 2)
             current = _run([str(self.SCRIPT), "--root", str(tmp), "check", "--format", "json"])
             self.assertEqual(current.returncode, 0, current.stdout + current.stderr)
         finally:

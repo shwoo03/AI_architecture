@@ -48,7 +48,17 @@ External trigger active: ENKI_WIKI stable overlay migration (2026-05-15)
 - 2026-05-16 0015 implementation prep closeout recorded and handoff/session snapshot refreshed.
 - 2026-05-16 0015 specialist overlay loader implemented: `agent-brief.py` reads optional `config/agent-team-overrides.yaml`, supports overlay-only project specialists, emits `role_source`, allows base narrowing, rejects base broadening, and delegate handoff carries role provenance.
 - 2026-05-16 0015 specialist overlay loader closeout recorded successfully and plan moved to done.
+- 2026-05-16 0016-0018 planning-only exception recorded. Active plan bodies now define the specialist proposal schema, orchestration preview `DelegationPlan` interface, and execution-loop boundary without changing scripts, schemas, CLI behavior, routing behavior, delegate behavior, or generated agent surfaces.
+- 2026-05-16 0016-0018 planning-only handoff and session snapshot refreshed after closeout.
+- 2026-05-16 specialist-agent usage best-practices prep completed. `docs/_meta/SPECIALIST_AGENT_USAGE_BEST_PRACTICES.md` now records source-grounded on-demand trigger/anti-trigger, orchestration, contract, safety, and implementation-readiness rules; 0016-0018 plans reference those rules.
+- 2026-05-16 0016-0018 specialist flow implemented end to end: `agent-flow specialist propose/review/approve/reject`, preview `DelegationPlan`, and approval-gated execute now work through the existing delegate path without auto-spawning agents.
+- 2026-05-16 0016-0018 moved to done; focused specialist tests, `tests.test_agent_flow`, combined operational tests, validate-plans, ownership-lock, verify-skeleton, stable/all quality gates, and closeout passed.
+- 2026-05-16 0016-0018 implementation handoff/readiness timestamp sync refreshed after closeout and final strict-readiness pass.
+- 2026-05-16 0019 session recall hardening implemented: session handoff is indexed, FTS cache text is redacted at insert time, cache index_version invalidates stale unredacted DBs, `agent-flow recall` wraps session recall search, and the SQLite cache is ignored as derived runtime data.
+- 2026-05-16 0019 moved to done; focused recall tests, `tests.test_runtime`, `tests.test_agent_flow`, validate-plans, ownership-lock, verify-skeleton, stable/all quality gates, and closeout passed.
+- 2026-05-16 0019 handoff/session snapshot refreshed after closeout.
 
 ## 다음 작업
-- Keep 0016 specialist proposal/add, 0017 orchestration preview, and 0018 execution loop frozen until external usage evidence appears.
+- Use the new specialist flow only on demand: propose a project specialist when a concrete blocker/trigger exists, approve it before overlay application, preview delegation first, and execute only approved plans with explicit confirmation.
+- Use `python3 scripts/agent-flow.py recall "<query>" --format json` for local session recall; source-of-truth remains Markdown/JSONL, and `runtime/session-recall.sqlite` is rebuildable cache only.
 - Slice 4 ENKI remains blocked on manual review of the 261-path initialize draft before any target write.

@@ -12,6 +12,7 @@ CLAUDE.md
 
 # State (선택 — 팀 공유면 commit, 개인이면 ignore)
 # state/cost-log.jsonl
+runtime/session-recall.sqlite
 
 # OS
 .DS_Store

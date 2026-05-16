@@ -25,6 +25,8 @@
 - `python3 scripts/agent-flow.py start --goal "<goal>"`: 현재 상태, 열린 review queue, handoff, 자연어 목표를 합쳐 다음 실행 흐름을 고릅니다.
 - `python3 scripts/agent-flow.py research --auto --goal "<goal>"`: 로컬/클론된 reference를 목표 문장 기준으로 자동 선택해 먼저 분석하고 필요하면 후보 카드와 proposal을 만듭니다.
 - `python3 scripts/agent-flow.py decide --proposal <path> --decision accepted|rejected|deferred --by <name>`: proposal 결정과 review queue 상태를 같이 맞춥니다.
+- `python3 scripts/agent-flow.py recall "<query>"`: 로컬 session recall 캐시를 검색합니다. 원본은 Markdown/JSONL이고 SQLite 파일은 삭제 후 재생성 가능한 캐시입니다.
+- `python3 scripts/agent-flow.py specialist propose|review|approve|preview|execute ...`: 필요할 때만 specialist proposal, overlay 반영, delegation preview, approved handoff preparation을 수행합니다.
 - `python3 scripts/agent-flow.py closeout --goal "<goal>" --changed-path <path>`: verify, quality gate, closeout evidence 기록을 한 번에 묶습니다.
 
 `start`가 반환하는 `suggested_questions`와 `build_intake`는 사용자가 명령어를 치게 하려는 안내가 아닙니다. 에이전트가 자연어 대화에서 무엇을 물어볼지 참고하는 질문 후보입니다. `write_policy`는 해당 흐름이 read-only인지, 수동 구현 범위 확정과 plan 작성이 필요한지, confirmation 뒤 쓰기 가능한지 알려줍니다. `research --auto --goal`이 반환하는 `reference_candidates`는 자동 선택을 설명하기 위한 top 후보 목록이며, 기본 모드에서는 후보 카드나 proposal을 쓰지 않습니다. `next_action_type: manual_work_required`는 에이전트가 먼저 범위와 수용 기준을 정리하고 구현한 뒤 closeout으로 가야 한다는 뜻입니다. `requires_confirmation: true`는 쓰기/승인/적용 플래그가 포함된 흐름이라 사용자 확인 없이는 진행하지 않는다는 뜻입니다.
@@ -43,6 +45,8 @@
 | Internal | `agent-flow`나 validator가 요구하거나 테스트가 특정 단계를 겨냥할 때 | `python3 scripts/reference-task-queue.py check` |
 
 - `scripts/agent-flow.py`: `start/research/decide/closeout` 네 흐름으로 주요 운영 스크립트를 감싸는 단일 진입점입니다. 기본은 read-only 또는 dry-run이며, reference 후보/제안 생성과 closeout 기록은 명시 플래그가 있을 때만 씁니다.
+- `scripts/agent-flow.py recall ...`: `scripts/session-recall.py search`를 감싸는 public wrapper입니다. 검색 결과는 과거 세션 회상 보조 정보이며 자동 의사결정 입력이 아닙니다.
+- `scripts/agent-flow.py specialist ...`: 0016-0018 on-demand specialist 흐름입니다. `propose`는 concrete trigger가 있어야 proposal을 쓰고, `preview`는 specialist 0명을 선택할 수 있으며, `execute`는 approved `DelegationPlan`과 `--confirm`이 있어야 기존 incubating delegate handoff만 준비합니다.
 - `scripts/catalog.yaml`: public/internal script 경계를 기록합니다. public은 `agent-flow.py` 하나이고, 나머지는 agent-flow나 디버깅 흐름에서 쓰는 internal tool입니다.
 - `scripts/generate-codemaps.py`: `scripts`, `skills`, `agents`, `runtime`, `reference`, `docs`, `tests` 영역을 스캔해 `docs/CODEMAPS/`를 생성합니다. 기본은 preview이며 `--write`로 파일을 씁니다.
 - `scripts/hooks/post-tool-use-log.py`: 도구 사용이나 주요 행동 결과를 활동 로그에 추가합니다.
@@ -65,7 +69,7 @@
 - `scripts/verify-skeleton.py`: 스켈레톤 또는 부트스트랩된 프로젝트의 구조, 필수 경로, 에이전트 메타데이터, JSONL 파싱, 후보 카드, 위키 린트를 확인합니다.
 - `scripts/rotate-activity-log.py`: `runtime/activity-log.jsonl`과 `runtime/agent-runs.jsonl`이 10,000줄을 넘으면 `runtime/archive/<base>-YYYY-MM.jsonl`로 월 단위 아카이브합니다. 기본값은 dry-run이며 `--apply`로 실행합니다.
 - `scripts/search-activity-log.py`: 활동 로그를 읽어 `--since/--until/--phase/--action/--project/--tool/--contains/--sidecar-contains` 필터로 검색합니다. 긴 tool output은 sidecar 파일에 보존될 수 있으며, 기본 출력은 표, `--jsonl`로 원본 JSONL 스트림.
-- `scripts/session-recall.py`: activity log, completion evidence, decisions, skill usage를 SQLite FTS 캐시로 인덱싱하고 검색합니다. 원본 로그를 대체하지 않으며 삭제 후 `index`로 재생성할 수 있습니다.
+- `scripts/session-recall.py`: activity log, completion evidence, decisions, skill usage, session handoff를 SQLite FTS 캐시로 인덱싱하고 검색합니다. 원본 로그를 대체하지 않으며 삭제 후 `index`로 재생성할 수 있습니다. 캐시에는 secret-like 값이 마스킹되어 들어갑니다.
 - `scripts/list-open-questions.py`: 프로젝트 전체 `**/*.md`를 스캔해 `[NEEDS CLARIFICATION: ...]` 마커를 집계합니다. `--count/--by-file/--json`, CI 게이트용 `--strict` 지원.
 - `scripts/quality-gate.py`: 현재 프로젝트에서 사용 가능한 검증 표면을 감지해 한 번에 실행합니다. Skeleton 검증, ledger 검사, eval-all, Python 문법 검사, unittest, `package.json`의 `npm run test/build`를 지원하며 `--tier stable|all`로 stable closeout과 incubating 검증을 분리합니다.
 - `scripts/review-queue.py`: 에이전트가 혼자 결정하면 안 되는 항목을 `runtime/review-queue.jsonl`에 append-only 이벤트로 남깁니다. Notion 중복, risky upgrade, reference adoption, skill lifecycle 승인 대기 같은 항목을 `add/list/resolve/dismiss/count/sweep`으로 관리합니다. `sweep`은 기본 dry-run이며 `--apply`일 때만 정리 이벤트를 append합니다.

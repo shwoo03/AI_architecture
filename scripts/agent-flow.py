@@ -17,6 +17,7 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from importlib import util
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,25 @@ except (AttributeError, OSError):
 DECISION_ALIASES = {"accept": "accepted", "reject": "rejected", "defer": "deferred"}
 DECISIONS = {"accepted", "rejected", "deferred", *DECISION_ALIASES}
 MODES = {"decide", "research", "build", "maintain", "closeout"}
+SPECIALIST_SCHEMA = "ai-architecture.specialist-proposal.v1"
+DELEGATION_PLAN_SCHEMA = "ai-architecture.delegation-plan.v1"
+SPECIALIST_STATUSES = {"draft", "approved", "rejected"}
+WRITE_POLICIES = {"read_only", "manual_work_required", "write_with_confirmation"}
+ON_DEMAND_TRIGGERS: dict[str, tuple[str, ...]] = {
+    "context_isolation": ("context isolation", "context bloat", "many files", "logs", "research", "조사", "분석", "컨텍스트", "로그"),
+    "parallel_work": ("parallel", "independent", "fan out", "병렬", "독립"),
+    "second_opinion": ("review", "validation", "verify", "security", "compliance", "fresh perspective", "검토", "검증", "보안"),
+    "permission_boundary": ("permission", "read-only", "least privilege", "scope", "권한", "범위"),
+    "repeated_pattern": ("repeated", "recurring", "again", "반복", "자주"),
+    "sequential_precondition": ("precondition", "approval", "sequence", "단계", "승인"),
+    "long_running": ("long-running", "high-volume", "test suite", "대량", "장시간"),
+}
+ANTI_TRIGGERS: dict[str, tuple[str, ...]] = {
+    "quick_targeted": ("quick", "tiny", "simple", "typo", "focused", "빠른", "간단", "오타"),
+    "tight_back_and_forth": ("back-and-forth", "interactive", "iterate with user", "대화", "반복 대화"),
+    "duplicate_base_role": ("duplicate", "already covered", "base role", "중복"),
+    "specialist_sprawl": ("many specialists", "everything", "sprawl", "전부", "무조건"),
+}
 REPO_MARKERS = {
     "README",
     "README.md",
@@ -252,6 +272,173 @@ def read_json_stdout(result: CommandResult, fallback: Any) -> Any:
         return json.loads(result.stdout)
     except json.JSONDecodeError:
         return fallback
+
+
+def specialist_proposal_dir(root: Path) -> Path:
+    return root / "runtime" / "proposals" / "specialists"
+
+
+def delegation_plan_dir(root: Path) -> Path:
+    return root / "runtime" / "delegation-plans"
+
+
+def slugify_ascii(value: str, fallback: str = "item") -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or fallback
+
+
+def next_json_sequence(directory: Path, prefix: str) -> int:
+    highest = 0
+    if directory.exists():
+        for path in directory.glob(f"{prefix}-*.json"):
+            suffix = path.stem.removeprefix(prefix + "-")
+            if suffix.isdigit():
+                highest = max(highest, int(suffix))
+    return highest + 1
+
+
+def specialist_proposal_id(root: Path, role: str) -> str:
+    directory = specialist_proposal_dir(root)
+    date_part = utc_now()[:10]
+    prefix = f"sp-{date_part}-{slugify_ascii(role, 'specialist')}"
+    return f"{prefix}-{next_json_sequence(directory, prefix):02d}"
+
+
+def delegation_plan_id(root: Path) -> str:
+    directory = delegation_plan_dir(root)
+    date_part = utc_now()[:10]
+    prefix = f"dp-{date_part}"
+    return f"{prefix}-{next_json_sequence(directory, prefix):02d}"
+
+
+def match_terms(text: str, patterns: dict[str, tuple[str, ...]]) -> list[str]:
+    lowered = text.lower()
+    matches: list[str] = []
+    for name, terms in patterns.items():
+        if any(term.lower() in lowered for term in terms):
+            matches.append(name)
+    return matches
+
+
+def load_json_file(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path.as_posix()} invalid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"{path.as_posix()} must contain a JSON object")
+    return data
+
+
+def write_json_file(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def proposal_path_from_arg(root: Path, value: str) -> Path:
+    path = Path(value)
+    if not path.suffix and not path.is_absolute() and "/" not in value:
+        path = specialist_proposal_dir(root) / f"{value}.json"
+    resolved = path.resolve(strict=False) if path.is_absolute() else (root / path).resolve(strict=False)
+    resolved.relative_to(root.resolve(strict=False))
+    if not resolved.is_file():
+        raise ValueError(f"specialist proposal not found: {value}")
+    return resolved
+
+
+def plan_path_from_arg(root: Path, value: str) -> Path:
+    path = Path(value)
+    if not path.suffix and not path.is_absolute() and "/" not in value:
+        path = delegation_plan_dir(root) / f"{value}.json"
+    resolved = path.resolve(strict=False) if path.is_absolute() else (root / path).resolve(strict=False)
+    resolved.relative_to(root.resolve(strict=False))
+    if not resolved.is_file():
+        raise ValueError(f"delegation plan not found: {value}")
+    return resolved
+
+
+def load_agent_brief_module(root: Path) -> Any:
+    path = root / "scripts" / "agent-brief.py"
+    if not path.is_file():
+        path = repo_root() / "scripts" / "agent-brief.py"
+    spec = util.spec_from_file_location("agent_brief_module", path)
+    if spec is None or spec.loader is None:
+        raise ValueError("cannot load agent-brief.py")
+    module = util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_specialist_registry(root: Path) -> dict[str, dict[str, object]]:
+    module = load_agent_brief_module(root)
+    return module.load_team_registry(root)
+
+
+def yaml_scalar(value: str) -> str:
+    if re.match(r"^[A-Za-z0-9_.\-/]+$", value):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def yaml_inline_list(values: list[str]) -> str:
+    return "[" + ", ".join(json.dumps(value, ensure_ascii=False) for value in values) + "]"
+
+
+def write_overlay_from_registry(root: Path, registry: dict[str, dict[str, object]]) -> str:
+    path = root / "config" / "agent-team-overrides.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["specialists:"]
+    for role in sorted(registry):
+        entry = registry[role]
+        lines.append(f"  {role}:")
+        if entry.get("mission"):
+            lines.append(f"    mission: {yaml_scalar(str(entry['mission']))}")
+        if entry.get("write_policy"):
+            lines.append(f"    write_policy: {yaml_scalar(str(entry['write_policy']))}")
+        scope = entry.get("default_scope")
+        if isinstance(scope, list):
+            lines.append(f"    default_scope: {yaml_inline_list([str(item) for item in scope])}")
+        checks = entry.get("recommended_checks")
+        if isinstance(checks, list):
+            lines.append(f"    recommended_checks: {yaml_inline_list([str(item) for item in checks])}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return rel_to_root(root, path)
+
+
+def read_overlay_registry(root: Path) -> dict[str, dict[str, object]]:
+    module = load_agent_brief_module(root)
+    return module.load_specialist_registry_file(root / "config" / "agent-team-overrides.yaml", strict_top_level=True)
+
+
+def apply_proposal_to_overlay(root: Path, proposal: dict[str, Any]) -> str:
+    overlay = read_overlay_registry(root)
+    role = str(proposal["role"])
+    overlay[role] = {
+        "mission": str(proposal["mission"]),
+        "write_policy": str(proposal["write_policy"]),
+        "default_scope": list(proposal["default_scope"]),
+        "recommended_checks": list(proposal["recommended_checks"]),
+    }
+    overlay_path = write_overlay_from_registry(root, overlay)
+    load_specialist_registry(root)
+    return overlay_path
+
+
+def load_specialist_proposals(root: Path) -> list[dict[str, Any]]:
+    directory = specialist_proposal_dir(root)
+    if not directory.is_dir():
+        return []
+    proposals: list[dict[str, Any]] = []
+    for path in sorted(directory.glob("*.json")):
+        proposal = load_json_file(path)
+        proposal["_path"] = rel_to_root(root, path)
+        proposals.append(proposal)
+    return proposals
+
+
+def specialist_from_registry(root: Path) -> dict[str, dict[str, object]]:
+    return load_specialist_registry(root)
 
 
 def count_markdown_files(path: Path) -> int:
@@ -1494,6 +1681,340 @@ def cmd_plan(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_recall(root: Path, args: argparse.Namespace) -> int:
+    query = str(args.query or "").strip()
+    if not query:
+        print("query is required", file=sys.stderr)
+        return 2
+    command = [
+        sys.executable,
+        str(root / "scripts" / "session-recall.py"),
+        "--root",
+        str(root),
+        "search",
+        query,
+        "--limit",
+        str(args.limit),
+        "--format",
+        args.format,
+    ]
+    result = subprocess.run(
+        command,
+        cwd=str(root),
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        env=command_env(),
+        timeout=args.timeout,
+    )
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    if result.stderr:
+        print(result.stderr, file=sys.stderr, end="" if result.stderr.endswith("\n") else "\n")
+    return result.returncode
+
+
+def specialist_proposal_payload(root: Path, args: argparse.Namespace) -> dict[str, Any]:
+    reason = args.reason.strip()
+    trigger_matches = match_terms(reason, ON_DEMAND_TRIGGERS)
+    anti_trigger_matches = match_terms(reason, ANTI_TRIGGERS)
+    if not trigger_matches:
+        raise ValueError("specialist proposal requires at least one on-demand trigger in --reason")
+    if anti_trigger_matches and not args.allow_anti_trigger:
+        raise ValueError("specialist proposal reason matches anti-trigger(s): " + ", ".join(anti_trigger_matches))
+    role = slugify_ascii(args.role, "specialist")
+    if role != args.role:
+        raise ValueError(f"specialist role must already be a lowercase slug: {role}")
+    if args.write_policy not in WRITE_POLICIES:
+        raise ValueError(f"invalid write_policy: {args.write_policy}")
+    scope = normalize_scope_values(root, args.scope or ["."])
+    checks = list(args.recommended_check)
+    return {
+        "schema_version": SPECIALIST_SCHEMA,
+        "proposal_id": specialist_proposal_id(root, role),
+        "role": role,
+        "mission": args.mission.strip(),
+        "write_policy": args.write_policy,
+        "default_scope": scope,
+        "recommended_checks": checks,
+        "status": "draft",
+        "source_registry": args.source_registry,
+        "created_by": args.created_by,
+        "created_at": utc_now(),
+        "reason": reason,
+        "review_notes": [],
+        "trigger_matches": trigger_matches,
+        "anti_trigger_matches": anti_trigger_matches,
+    }
+
+
+def normalize_scope_values(root: Path, values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        resolved = resolve_under_root(root, value)
+        rel = rel_to_root(root, resolved)
+        if rel not in result:
+            result.append(rel)
+    return result
+
+
+def cmd_specialist_propose(root: Path, args: argparse.Namespace) -> int:
+    proposal = specialist_proposal_payload(root, args)
+    path = specialist_proposal_dir(root) / f"{proposal['proposal_id']}.json"
+    write_json_file(path, proposal)
+    payload = {
+        "root": str(root),
+        "proposal_path": rel_to_root(root, path),
+        "proposal": proposal,
+        "next_actions": [
+            f"python3 scripts/agent-flow.py specialist review --proposal {rel_to_root(root, path)} --format json",
+            f"python3 scripts/agent-flow.py specialist approve --proposal {rel_to_root(root, path)} --by <reviewer> --apply-overlay --format json",
+        ],
+    }
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"proposal_path: {payload['proposal_path']}")
+        print(f"proposal_id: {proposal['proposal_id']}")
+        print("status: draft")
+    return 0
+
+
+def update_proposal_status(root: Path, args: argparse.Namespace, status: str) -> dict[str, Any]:
+    path = proposal_path_from_arg(root, args.proposal)
+    proposal = load_json_file(path)
+    if proposal.get("schema_version") != SPECIALIST_SCHEMA:
+        raise ValueError("unsupported specialist proposal schema")
+    if proposal.get("status") not in SPECIALIST_STATUSES:
+        raise ValueError(f"invalid specialist proposal status: {proposal.get('status')}")
+    proposal["status"] = status
+    note = {
+        "ts": utc_now(),
+        "by": args.by,
+        "decision": status,
+        "note": args.note,
+    }
+    notes = proposal.get("review_notes")
+    proposal["review_notes"] = [*(notes if isinstance(notes, list) else []), note]
+    write_json_file(path, proposal)
+    return {"path": path, "proposal": proposal}
+
+
+def cmd_specialist_review(root: Path, args: argparse.Namespace) -> int:
+    path = proposal_path_from_arg(root, args.proposal)
+    proposal = load_json_file(path)
+    payload = {"root": str(root), "proposal_path": rel_to_root(root, path), "proposal": proposal}
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"proposal_id: {proposal.get('proposal_id')}")
+        print(f"role: {proposal.get('role')}")
+        print(f"status: {proposal.get('status')}")
+        print(f"reason: {proposal.get('reason')}")
+    return 0
+
+
+def cmd_specialist_approve(root: Path, args: argparse.Namespace) -> int:
+    updated = update_proposal_status(root, args, "approved")
+    proposal = updated["proposal"]
+    overlay_path = ""
+    if args.apply_overlay:
+        overlay_path = apply_proposal_to_overlay(root, proposal)
+    payload = {
+        "root": str(root),
+        "proposal_path": rel_to_root(root, updated["path"]),
+        "proposal": proposal,
+        "overlay_applied": bool(args.apply_overlay),
+        "overlay_path": overlay_path,
+    }
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"proposal_path: {payload['proposal_path']}")
+        print("status: approved")
+        print(f"overlay_applied: {payload['overlay_applied']}")
+    return 0
+
+
+def cmd_specialist_reject(root: Path, args: argparse.Namespace) -> int:
+    updated = update_proposal_status(root, args, "rejected")
+    payload = {"root": str(root), "proposal_path": rel_to_root(root, updated["path"]), "proposal": updated["proposal"]}
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"proposal_path: {payload['proposal_path']}")
+        print("status: rejected")
+    return 0
+
+
+def role_source(entry: dict[str, object]) -> str:
+    value = str(entry.get("role_source") or "base")
+    return value if value in {"base", "project"} else "base"
+
+
+def role_score(goal: str, role: str, entry: dict[str, object], proposals: list[dict[str, Any]]) -> tuple[int, list[str]]:
+    goal_text = goal.lower()
+    reasons: list[str] = []
+    score = 0
+    triggers = match_terms(goal, ON_DEMAND_TRIGGERS)
+    anti = match_terms(goal, ANTI_TRIGGERS)
+    if triggers:
+        score += 10 * len(triggers)
+        reasons.append("trigger:" + ",".join(triggers))
+    if anti:
+        score -= 20 * len(anti)
+        reasons.append("anti_trigger:" + ",".join(anti))
+    mission = str(entry.get("mission") or "")
+    haystack = f"{role} {mission}".lower()
+    for token in re.findall(r"[a-z0-9가-힣]{4,}", goal_text):
+        if token in haystack:
+            score += 3
+    if role in goal_text:
+        score += 8
+        reasons.append("role_name_match")
+    for proposal in proposals:
+        if proposal.get("role") != role or proposal.get("status") != "approved":
+            continue
+        score += 5
+        if str(proposal.get("reason") or "").lower() in goal_text:
+            score += 3
+        reasons.append(f"approved_proposal:{proposal.get('proposal_id')}")
+    return score, reasons
+
+
+def build_delegation_plan(root: Path, args: argparse.Namespace) -> dict[str, Any]:
+    registry = specialist_from_registry(root)
+    proposals = load_specialist_proposals(root)
+    candidate_roles: list[str] = []
+    selected_roles: list[str] = []
+    role_sources: dict[str, str] = {}
+    read_scope: dict[str, list[str]] = {}
+    write_policy: dict[str, str] = {}
+    score_reasons: dict[str, list[str]] = {}
+    scored: list[tuple[int, str]] = []
+    for role, entry in sorted(registry.items()):
+        candidate_roles.append(role)
+        role_sources[role] = role_source(entry)
+        scope = entry.get("default_scope")
+        read_scope[role] = [str(item) for item in scope] if isinstance(scope, list) else ["."]
+        write_policy[role] = str(entry.get("write_policy") or "read_only")
+        score, reasons = role_score(args.goal, role, entry, proposals)
+        score_reasons[role] = reasons or ["no_specialist_trigger"]
+        if score > 0:
+            scored.append((score, role))
+    anti_only = bool(match_terms(args.goal, ANTI_TRIGGERS)) and not match_terms(args.goal, ON_DEMAND_TRIGGERS)
+    if not anti_only:
+        selected_roles = [role for _score, role in sorted(scored, key=lambda item: (-item[0], item[1]))[: args.max_roles]]
+    status = "approved" if args.approve and selected_roles else "draft"
+    return {
+        "schema_version": DELEGATION_PLAN_SCHEMA,
+        "plan_id": delegation_plan_id(root),
+        "created_at": utc_now(),
+        "goal": args.goal,
+        "candidate_roles": candidate_roles,
+        "selected_roles": selected_roles,
+        "role_source": {role: role_sources[role] for role in selected_roles},
+        "score_reasons": score_reasons,
+        "read_scope": {role: read_scope[role] for role in selected_roles},
+        "write_policy": {role: write_policy[role] for role in selected_roles},
+        "requires_confirmation": bool(selected_roles),
+        "status": status,
+    }
+
+
+def cmd_specialist_preview(root: Path, args: argparse.Namespace) -> int:
+    plan = build_delegation_plan(root, args)
+    path = delegation_plan_dir(root) / f"{plan['plan_id']}.json"
+    write_json_file(path, plan)
+    payload = {"root": str(root), "plan_path": rel_to_root(root, path), "delegation_plan": plan}
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"plan_path: {payload['plan_path']}")
+        print(f"selected_roles: {', '.join(plan['selected_roles']) or '(none)'}")
+        print(f"status: {plan['status']}")
+    return 0
+
+
+def cmd_specialist_plan_approve(root: Path, args: argparse.Namespace) -> int:
+    path = plan_path_from_arg(root, args.plan)
+    plan = load_json_file(path)
+    if plan.get("schema_version") != DELEGATION_PLAN_SCHEMA:
+        raise ValueError("unsupported delegation plan schema")
+    if not plan.get("selected_roles"):
+        raise ValueError("cannot approve a delegation plan with no selected roles")
+    plan["status"] = "approved"
+    plan["approved_by"] = args.by
+    plan["approved_at"] = utc_now()
+    write_json_file(path, plan)
+    payload = {"root": str(root), "plan_path": rel_to_root(root, path), "delegation_plan": plan}
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"plan_path: {payload['plan_path']}")
+        print("status: approved")
+    return 0
+
+
+def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
+    path = plan_path_from_arg(root, args.plan)
+    plan = load_json_file(path)
+    if plan.get("schema_version") != DELEGATION_PLAN_SCHEMA:
+        raise ValueError("unsupported delegation plan schema")
+    if plan.get("status") != "approved":
+        raise ValueError("delegation plan must be approved before execution")
+    if plan.get("requires_confirmation") and not args.confirm:
+        raise ValueError("delegation plan execution requires --confirm")
+    selected_roles = plan.get("selected_roles")
+    if not isinstance(selected_roles, list) or not selected_roles:
+        raise ValueError("delegation plan has no selected roles")
+    handoffs: list[dict[str, Any]] = []
+    commands: list[CommandResult] = []
+    read_scope = plan.get("read_scope") if isinstance(plan.get("read_scope"), dict) else {}
+    write_policy = plan.get("write_policy") if isinstance(plan.get("write_policy"), dict) else {}
+    for role_value in selected_roles:
+        role = str(role_value)
+        command = [
+            sys.executable,
+            str(root / "scripts" / "incubating" / "agent-flow-delegate.py"),
+            "--root",
+            str(root),
+            "--role",
+            role,
+            "--goal",
+            str(plan["goal"]),
+            "--workflow",
+            args.workflow,
+            "--format",
+            "json",
+        ]
+        for scope in read_scope.get(role, []) if isinstance(read_scope.get(role), list) else []:
+            command.extend(["--scope", str(scope)])
+        policy = str(write_policy.get(role) or "")
+        if policy:
+            command.extend(["--write-policy", policy])
+        result = run_command(root, f"delegate-{role}", command, args.timeout)
+        commands.append(result)
+        if result.ok:
+            handoffs.append(read_json_stdout(result, {}))
+    ok = all(result.ok for result in commands)
+    payload = {
+        "root": str(root),
+        "plan_path": rel_to_root(root, path),
+        "status": "prepared" if ok else "failed",
+        "handoffs": handoffs,
+        "commands": [result_payload(result) for result in commands],
+    }
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"plan_path: {payload['plan_path']}")
+        print(f"status: {payload['status']}")
+        for handoff in handoffs:
+            print(f"handoff: {handoff.get('brief_path')}")
+    return 0 if ok else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=None, help="Project root (default: this skeleton root).")
@@ -1545,6 +2066,70 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--format", choices=("text", "json"), default="text")
     plan.add_argument("--force", action="store_true")
     plan.set_defaults(func=cmd_plan)
+
+    recall = sub.add_parser("recall", help="Search the local session recall index.")
+    recall.add_argument("query")
+    recall.add_argument("--limit", type=int, default=10)
+    recall.add_argument("--format", choices=("text", "json"), default="text")
+    recall.add_argument("--timeout", type=int, default=60)
+    recall.set_defaults(func=cmd_recall)
+
+    specialist = sub.add_parser("specialist", help="On-demand specialist proposal, preview, and approved delegation prep.")
+    specialist_sub = specialist.add_subparsers(dest="specialist_command", required=True)
+
+    propose = specialist_sub.add_parser("propose", help="Create an on-demand specialist proposal.")
+    propose.add_argument("--role", required=True)
+    propose.add_argument("--mission", required=True)
+    propose.add_argument("--write-policy", choices=sorted(WRITE_POLICIES), required=True)
+    propose.add_argument("--scope", action="append", default=[])
+    propose.add_argument("--recommended-check", action="append", default=[])
+    propose.add_argument("--reason", required=True)
+    propose.add_argument("--source-registry", choices=("project", "base"), default="project")
+    propose.add_argument("--created-by", default="codex")
+    propose.add_argument("--allow-anti-trigger", action="store_true")
+    propose.add_argument("--format", choices=("text", "json"), default="text")
+    propose.set_defaults(func=cmd_specialist_propose)
+
+    review = specialist_sub.add_parser("review", help="Inspect a specialist proposal.")
+    review.add_argument("--proposal", required=True)
+    review.add_argument("--format", choices=("text", "json"), default="text")
+    review.set_defaults(func=cmd_specialist_review)
+
+    approve = specialist_sub.add_parser("approve", help="Approve a specialist proposal and optionally apply it to the project overlay.")
+    approve.add_argument("--proposal", required=True)
+    approve.add_argument("--by", required=True)
+    approve.add_argument("--note", default="")
+    approve.add_argument("--apply-overlay", action="store_true")
+    approve.add_argument("--format", choices=("text", "json"), default="text")
+    approve.set_defaults(func=cmd_specialist_approve)
+
+    reject = specialist_sub.add_parser("reject", help="Reject a specialist proposal.")
+    reject.add_argument("--proposal", required=True)
+    reject.add_argument("--by", required=True)
+    reject.add_argument("--note", default="")
+    reject.add_argument("--format", choices=("text", "json"), default="text")
+    reject.set_defaults(func=cmd_specialist_reject)
+
+    preview = specialist_sub.add_parser("preview", help="Create a delegation preview from current goal and specialist registry.")
+    preview.add_argument("--goal", required=True)
+    preview.add_argument("--max-roles", type=int, default=3)
+    preview.add_argument("--approve", action="store_true")
+    preview.add_argument("--format", choices=("text", "json"), default="text")
+    preview.set_defaults(func=cmd_specialist_preview)
+
+    plan_approve = specialist_sub.add_parser("plan-approve", help="Approve a delegation plan draft.")
+    plan_approve.add_argument("--plan", required=True)
+    plan_approve.add_argument("--by", required=True)
+    plan_approve.add_argument("--format", choices=("text", "json"), default="text")
+    plan_approve.set_defaults(func=cmd_specialist_plan_approve)
+
+    execute = specialist_sub.add_parser("execute", help="Prepare approved specialist delegation via the existing incubating delegate path.")
+    execute.add_argument("--plan", required=True)
+    execute.add_argument("--confirm", action="store_true")
+    execute.add_argument("--workflow", default="dry_run")
+    execute.add_argument("--format", choices=("text", "json"), default="text")
+    execute.add_argument("--timeout", type=int, default=60)
+    execute.set_defaults(func=cmd_specialist_execute)
     return parser
 
 

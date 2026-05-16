@@ -22,3 +22,7 @@
 | 0013 | enki-ownership-initialize-dry-run | active | 2026-05-15 | 0 | 0012 (ownership initialize report tool) |
 | 0014 | specialist-overlay-audit | done | 2026-05-16 | 0 | 0006 delegate abort evidence + 2026-05-16 freeze exception |
 | 0015 | specialist-overlay-loader | done | 2026-05-16 | 0 | 0014 (specialist overlay audit) |
+| 0016 | specialist-proposal-add | done | 2026-05-16 | 0 | 0015 + implementation exception |
+| 0017 | orchestration-preview | done | 2026-05-16 | 0 | 0016 proposal schema |
+| 0018 | execution-loop | done | 2026-05-16 | 0 | 0017 DelegationPlan interface |
+| 0019 | session-recall-hardening | done | 2026-05-16 | 0 | existing session-recall operational tool |

@@ -2506,6 +2506,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "docs/_meta/SPECIALIST_AGENT_USAGE_BEST_PRACTICES.md": {
+      "action": "manual_merge",
+      "matched_pattern": "docs/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "docs/_meta/SPECIALIST_OVERLAY_AUDIT.md": {
       "action": "manual_merge",
       "matched_pattern": "docs/**",
@@ -2871,6 +2878,34 @@
       "system_locked": false
     },
     "plans/done/0015-specialist-overlay-loader.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0016-specialist-proposal-add.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0017-orchestration-preview.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0018-execution-loop.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0019-session-recall-hardening.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
       "owner": "project_owned",
@@ -4791,5 +4826,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 684
+  "total": 689
 }

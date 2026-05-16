@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 123
-- `line_count`: 15458
+- `files`: 127
+- `line_count`: 15767
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -204,6 +204,10 @@
 - `plans/done/0012-ownership-initialize-report.md`
 - `plans/done/0014-specialist-overlay-audit.md`
 - `plans/done/0015-specialist-overlay-loader.md`
+- `plans/done/0016-specialist-proposal-add.md`
+- `plans/done/0017-orchestration-preview.md`
+- `plans/done/0018-execution-loop.md`
+- `plans/done/0019-session-recall-hardening.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

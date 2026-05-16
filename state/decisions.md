@@ -47,3 +47,19 @@
 - Exception scope is limited to 0014 specialist-overlay-audit and 0015 specialist-overlay-loader.
 - 0016 specialist proposal/add, 0017 orchestration preview, and 0018 execution loop remain frozen until external usage signals show they are needed.
 - 0015 schema lock: project overlays are additive-first. New project specialists are allowed; base specialist `write_policy` and `default_scope` may only narrow; broadening either is rejected; future briefs must record `role_source`.
+
+## 2026-05-16 21:52 — Planning-only freeze exception: v2 specialist orchestration interfaces (0016-0018)
+- The 2026-05-15 freeze remains valid. This exception does not reopen implementation work.
+- Exception scope is limited to writing plan bodies for 0016 specialist-proposal-add, 0017 orchestration-preview, and 0018 execution-loop.
+- Authoring order is fixed: 0016 defines the specialist proposal schema, 0017 references that schema as input and defines a `DelegationPlan` draft, and 0018 references the `DelegationPlan` as its execution-boundary input.
+- Implementation remains out of scope: no changes to scripts, schemas, CLI behavior, routing behavior, delegate behavior, or generated agent behavior.
+- Stop conditions: no new router, no new execution loop, no overlay permission broadening, no auto-spawn, and no plan body may prescribe concrete code-edit steps or mutate scripts/schemas/CLI behavior.
+- 0017 and 0018 plan bodies must include an explicit `Interface Contract` section so future implementation cannot invent incompatible inputs or outputs.
+- Resume conditions for implementation: an external project must record concrete specialist proposal/routing/execution blocker evidence in activity log or handoff, or the user must explicitly open a new implementation exception.
+
+## 2026-05-16 22:17 — Implementation exception: on-demand specialist flow (0016-0018)
+- The user explicitly opened `/goal 18` and requested implementation through 0018.
+- Exception scope is limited to on-demand specialist proposal/add, orchestration preview, and approval-gated execution preparation through the existing `scripts/agent-flow.py` public entrypoint.
+- The implementation must preserve 0015 additive-only overlay safety: project specialists may be added, base specialists may be narrowed, and permission broadening remains rejected by `agent-brief.py`.
+- Execution remains approval-gated. `agent-flow specialist execute` may prepare existing incubating delegate handoffs only for an approved `DelegationPlan` with explicit `--confirm`; it must not auto-spawn agents or create a second execution loop.
+- Generated `.codex/` and `.claude/` agent surfaces remain out of scope.

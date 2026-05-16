@@ -1,50 +1,39 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-16T12:34:08Z",
+  "ts": "2026-05-16T13:43:02Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-16T12:33:41Z",
+    "ts": "2026-05-16T13:42:46Z",
     "phase": "session",
     "action": "handoff_saved",
-    "project": "common-ai-architecture",
-    "goal_lineage": [
-      "0015 specialist overlay loader",
-      "closeout",
-      "common-ai-architecture"
-    ],
+    "project": "unknown",
+    "goal_lineage": [],
     "tool_call": {
       "tool": "codex",
-      "status": "completed",
+      "status": "ok",
       "normalized_status": "success",
       "failure_type": "",
       "empty_output": false,
       "duration_ms": null,
-      "summary": "Handoff refreshed after implementing and closing out 0015 specialist overlay loader."
+      "summary": "0019 session recall hardening complete; handoff updated"
     },
     "data": {}
   },
   "completion_evidence_last": {
-    "ts": "2026-05-16T12:33:36Z",
-    "goal": "0015 specialist overlay loader",
+    "ts": "2026-05-16T13:42:00Z",
+    "goal": "0019 session recall hardening",
     "changed_paths": [
-      "scripts/agent-brief.py",
-      "scripts/incubating/agent-flow-delegate.py",
-      "tests/test_validation.py",
-      "docs/AGENT_REGISTRY.md",
+      ".gitignore",
+      "scripts/session-recall.py",
+      "scripts/agent-flow.py",
+      "tests/test_runtime.py",
+      "tests/test_agent_flow.py",
       "docs/RUNTIME_EVENT_SCHEMA.md",
-      "plans/done/0015-specialist-overlay-loader.md",
+      "scripts/README.md",
       "plans/INDEX.md",
-      "state/progress.md",
-      "runtime/validation/0015-specialist-overlay-loader-prep.md",
-      "runtime/ownership-classification.lock.json",
-      "docs/CODEMAPS/INDEX.md",
-      "docs/CODEMAPS/docs.md",
-      "docs/CODEMAPS/other.md",
-      "docs/CODEMAPS/runtime.md",
-      "docs/CODEMAPS/scripts.md",
-      "docs/CODEMAPS/tests.md"
+      "plans/done/0019-session-recall-hardening.md"
     ],
     "validations": [
       {
@@ -56,7 +45,7 @@
       },
       {
         "name": "quality-gate",
-        "command": "python3 scripts/quality-gate.py --root . --format json --strict --explain --test-timeout 300",
+        "command": "python3 scripts/quality-gate.py --root . --format json --strict --explain --test-timeout 360",
         "status": "OK",
         "exit_code": 0,
         "detail": "{\n  \"root\": \"/Users/shwoo/mydir/AI/AI_architecture\",\n  \"tier\": \"stable\",\n  \"feature_manifest\": {\n    \"path\": \"/Users/shwoo/mydir/AI/AI_architecture/docs/feature-status.yaml\",\n    \"ok\": true,\n    \"feature_count\": 20,\n    \"features_by_tier\": {\n      \"deprecated\": 0,\n      \"experimental\": 2,\n      \"incubating\": 6,\n      \"stable\": 12\n    },\n    \"included_count\": 12,\n    \"skipped_count\": 8\n  },\n  \"skipped_by_tier\": [\n    \"agent-brief\",\n    \"specialist-routing\",\n    \"delegation-plan\",\n    \"agent-run-ledger\",\n    \"agent-result-aggregation\",\n    \"validator-loop\",\n    \"openai-agents-sdk-adapter\",\n    \"langgraph-adapter\"\n  ],\n  \"summary\": {\n    \"OK\": 37,\n    \"SKIP\": 2\n  },\n  \"checks\": [\n    {\n      \"name\": \"feature-status\",\n      \"status\": \"OK\",\n      \"detail\": \"feature manifest stable: 12 includ..."

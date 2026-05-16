@@ -1,7 +1,7 @@
 # Codemap: docs
 
-- `files`: 55
-- `line_count`: 4565
+- `files`: 56
+- `line_count`: 4701
 - `directories`: 8
 
 ## Navigation Entry Points
@@ -57,6 +57,7 @@
 - `docs/_meta/BEST_PRACTICE_GAP_IMPLEMENTATION_PLAN.md`
 - `docs/_meta/ECC_PAPERCLIP_PATTERNS.md`
 - `docs/_meta/NOTION_SOURCE_ASSESSMENT.md`
+- `docs/_meta/SPECIALIST_AGENT_USAGE_BEST_PRACTICES.md`
 - `docs/_meta/SPECIALIST_OVERLAY_AUDIT.md`
 - `docs/commands/closeout.md`
 - `docs/commands/decide.md`

@@ -6,7 +6,7 @@ version: 1
 
 public:
   - path: scripts/agent-flow.py
-    purpose: Natural-language routing and standard start/research/decide/closeout entrypoint.
+    purpose: Natural-language routing, reference decisions, closeout, and on-demand specialist proposal/preview/approved delegation preparation.
 
 routing:
   modes:
