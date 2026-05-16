@@ -532,9 +532,1437 @@
       "reason": "system_defaults.rules",
       "system_locked": true
     },
+    ".claude/agents/.GENERATED_DO_NOT_EDIT": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/agents/codebase-explorer.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/agents/implementation-worker.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/agents/independent-validator.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/agents/strategy-planner.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/.GENERATED_DO_NOT_EDIT": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/code-style.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/communication-style.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/confirmation-required.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/directory-layout.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/ephemeral-files.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/git-hygiene.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/mcp-discipline.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/search-first.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/secrets.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/security-review.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/tdd-workflow.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/common/verification-loop.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/languages/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/languages/go/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/languages/python/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/languages/rust/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/languages/typescript/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/languages/web/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/rules/security-scan-allowlist.json": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/.GENERATED_DO_NOT_EDIT": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/scripts/frame-template.html": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/scripts/helper.js": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/scripts/server.cjs": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/scripts/start-server.sh": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/scripts/stop-server.sh": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/spec-document-reviewer-prompt.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/brainstorming/visual-companion.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/code-review-expert/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/code-review-expert/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/code-review-expert/agents/agent.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/code-review-expert/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/code-review-expert/references/code-quality-checklist.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/code-review-expert/references/removal-plan.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/code-review-expert/references/security-checklist.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/code-review-expert/references/solid-checklist.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/LICENSE.txt": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/agents/analyzer.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/agents/comparator.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/agents/grader.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/assets/eval_review.html": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/eval-viewer/generate_review.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/eval-viewer/viewer.html": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/references/schemas.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/__init__.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/aggregate_benchmark.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/generate_report.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/improve_description.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/package_skill.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/quick_validate.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/run_eval.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/run_loop.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/codex-skill-creator/scripts/utils.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/find-skills/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/find-skills/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/frontend-design/LICENSE.txt": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/frontend-design/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/frontend-design/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/LICENSE.txt": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/reference/evaluation.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/reference/mcp_best_practices.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/reference/node_mcp_server.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/reference/python_mcp_server.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/scripts/connections.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/scripts/evaluation.py": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/scripts/example_evaluation.xml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/mcp-builder/scripts/requirements.txt": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/notion-dedup/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/notion-dedup/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/search-first/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/search-first/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/security-review/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/security-review/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/tdd-workflow/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/tdd-workflow/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/verification-loop/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/verification-loop/data/checklist.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/verification-loop/data/examples/verification-report.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/verification-loop/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/web-design-guidelines/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/web-design-guidelines/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/writing-skills/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/writing-skills/anthropic-best-practices.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/writing-skills/examples/CLAUDE_MD_TESTING.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/writing-skills/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/writing-skills/graphviz-conventions.dot": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/writing-skills/persuasion-principles.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/writing-skills/render-graphs.js": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".claude/skills/writing-skills/testing-skills-with-subagents.md": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
     ".codex-plugin/plugin.json": {
       "action": "update_system",
       "matched_pattern": ".codex-plugin/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/agents/.GENERATED_DO_NOT_EDIT": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/agents/codebase-explorer.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/agents/implementation-worker.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/agents/independent-validator.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/agents/strategy-planner.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/config.toml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/mcp.json": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/.GENERATED_DO_NOT_EDIT": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/code-style.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/communication-style.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/confirmation-required.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/directory-layout.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/ephemeral-files.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/git-hygiene.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/mcp-discipline.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/search-first.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/secrets.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/security-review.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/tdd-workflow.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/common/verification-loop.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/languages/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/languages/go/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/languages/python/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/languages/rust/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/languages/typescript/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/languages/web/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/rules/security-scan-allowlist.json": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/.GENERATED_DO_NOT_EDIT": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/scripts/frame-template.html": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/scripts/helper.js": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/scripts/server.cjs": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/scripts/start-server.sh": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/scripts/stop-server.sh": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/spec-document-reviewer-prompt.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/brainstorming/visual-companion.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/code-review-expert/README.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/code-review-expert/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/code-review-expert/agents/agent.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/code-review-expert/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/code-review-expert/references/code-quality-checklist.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/code-review-expert/references/removal-plan.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/code-review-expert/references/security-checklist.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/code-review-expert/references/solid-checklist.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/LICENSE.txt": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/agents/analyzer.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/agents/comparator.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/agents/grader.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/assets/eval_review.html": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/eval-viewer/generate_review.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/eval-viewer/viewer.html": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/references/schemas.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/__init__.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/aggregate_benchmark.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/generate_report.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/improve_description.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/package_skill.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/quick_validate.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/run_eval.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/run_loop.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/codex-skill-creator/scripts/utils.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/find-skills/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/find-skills/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/frontend-design/LICENSE.txt": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/frontend-design/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/frontend-design/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/LICENSE.txt": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/reference/evaluation.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/reference/mcp_best_practices.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/reference/node_mcp_server.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/reference/python_mcp_server.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/scripts/connections.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/scripts/evaluation.py": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/scripts/example_evaluation.xml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/mcp-builder/scripts/requirements.txt": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/notion-dedup/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/notion-dedup/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/search-first/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/search-first/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/security-review/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/security-review/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/tdd-workflow/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/tdd-workflow/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/verification-loop/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/verification-loop/data/checklist.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/verification-loop/data/examples/verification-report.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/verification-loop/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/web-design-guidelines/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/web-design-guidelines/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/writing-skills/SKILL.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/writing-skills/anthropic-best-practices.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/writing-skills/examples/CLAUDE_MD_TESTING.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/writing-skills/goldens/case-001.yaml": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/writing-skills/graphviz-conventions.dot": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/writing-skills/persuasion-principles.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/writing-skills/render-graphs.js": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    ".codex/skills/writing-skills/testing-skills-with-subagents.md": {
+      "action": "update_system",
+      "matched_pattern": ".codex/**",
       "owner": "system_owned",
       "reason": "system_defaults.rules",
       "system_locked": true
@@ -588,6 +2016,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    ".mcp.json": {
+      "action": "update_system",
+      "matched_pattern": ".mcp.json",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
     ".skeleton-version": {
       "action": "update_system",
       "matched_pattern": ".skeleton-version",
@@ -598,6 +2033,13 @@
     "AGENTS.md": {
       "action": "manual_merge",
       "matched_pattern": "AGENTS.md",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
+    "CLAUDE.md": {
+      "action": "manual_merge",
+      "matched_pattern": "CLAUDE.md",
       "owner": "manual_merge",
       "reason": "system_defaults.rules",
       "system_locked": true
@@ -3510,5 +4952,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 501
+  "total": 707
 }

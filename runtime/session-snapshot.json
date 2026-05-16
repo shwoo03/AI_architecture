@@ -1,16 +1,17 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-16T19:03:15Z",
+  "ts": "2026-05-16T19:45:23Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-16T19:02:36Z",
+    "ts": "2026-05-16T19:45:08Z",
     "phase": "session",
     "action": "handoff_saved",
     "project": "AI_architecture",
     "goal_lineage": [
-      "generated/local dirty policy cleanup"
+      "private near-original GitHub mirror policy and push",
+      "AI_architecture operating OS"
     ],
     "tool_call": {
       "tool": "session-handoff",
@@ -19,22 +20,26 @@
       "failure_type": "",
       "empty_output": false,
       "duration_ms": null,
-      "summary": "Generated/local dirty policy cleanup handoff saved; generated .claude/.codex/.mcp.json/CLAUDE.md are now ignored local artifacts and canonical sources remain tracked."
+      "summary": "Updated handoff and progress after private near-original mirror policy validation; ready to commit and push."
     },
     "data": {}
   },
   "completion_evidence_last": {
-    "ts": "2026-05-16T19:01:45Z",
-    "goal": "Generated/local dirty policy cleanup",
+    "ts": "2026-05-16T19:44:07Z",
+    "goal": "Private near-original GitHub mirror policy and push",
     "changed_paths": [
       ".gitignore",
       "README.md",
-      "rules/common/git-hygiene.md",
       "docs/NEW_PROJECT_CHECKLIST.md",
+      "rules/common/git-hygiene.md",
+      "rules/common/secrets.md",
+      "scripts/bootstrap/new-project.py",
+      "scripts/bootstrap/README.md",
       "scripts/README.md",
-      "runtime/ownership-classification.lock.json",
-      "runtime/install-state.jsonl",
-      "docs/CODEMAPS/INDEX.md"
+      ".codex",
+      ".claude",
+      ".mcp.json",
+      "AGENTS.md"
     ],
     "validations": [
       {

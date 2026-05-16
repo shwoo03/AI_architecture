@@ -29,8 +29,6 @@ except (AttributeError, OSError):
 # Directories skipped by name anywhere in the tree.
 SKIP_DIRS = {
     ".git",
-    ".codex",
-    ".claude",
     "__pycache__",
     ".pytest_cache",
     ".mypy_cache",
@@ -39,7 +37,6 @@ SKIP_DIRS = {
     "venv",
     ".venv",
     "env",
-    ".env",
     "dist",
     "build",
 }
@@ -61,7 +58,6 @@ SKIP_FILES = {
     "knowledge/log.md",
     "knowledge/project-registry.md",
     "knowledge/lint-report.md",
-    ".claude/settings.local.json",
 }
 
 # File basenames skipped anywhere in the tree.

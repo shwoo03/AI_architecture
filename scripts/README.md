@@ -200,7 +200,8 @@ python3 scripts/reference-copy-ledger.py check
 
 - `skills/active` is the canonical project skill tree.
 - `.codex/skills` and `.claude/skills` are generated runtime artifacts from `scripts/convert.py`.
-- Do not edit or commit `.codex/skills` or `.claude/skills` directly. Edit `skills/active`, then run `scripts/convert.py` and `scripts/skill-surface-check.py --strict`.
+- Do not edit `.codex/skills` or `.claude/skills` directly. Edit `skills/active`, then run `scripts/convert.py` and `scripts/skill-surface-check.py --strict`.
+- Private near-original mirrors may commit generated surfaces after regeneration. Public or shared repos should re-check this choice before publishing.
 
 ## 2026-05-02 runtime ledgers and eval-all
 

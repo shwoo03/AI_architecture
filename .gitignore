@@ -1,18 +1,29 @@
-# Build artifacts (canonical에서 변환됨)
-.codex/
-.claude/
-.mcp.json
+# Private near-original mirror policy:
+# Generated runtime surfaces (.codex/, .claude/, .mcp.json, CLAUDE.md)
+# and explicitly approved .env files are allowed to be committed in private
+# repositories. Do not print secret values in logs or reviews.
 
-# Symlink (생성됨)
-CLAUDE.md
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Secrets
-.env
-*.key
-*.pem
+# JavaScript/package dependencies and build outputs
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
 
-# State (선택 — 팀 공유면 commit, 개인이면 ignore)
-# state/cost-log.jsonl
+# Virtual environments and local dependency folders
+.venv/
+venv/
+env/
+
+# Rebuildable local caches
 runtime/session-recall.sqlite
 
 # OS

@@ -41,6 +41,7 @@ Safety:
 
 - Refuse to use the skeleton root as the destination.
 - Refuse to merge into a non-empty destination unless `--force` is passed.
-- Avoid copying `.git`, `.codex`, caches, and existing runtime JSONL logs.
+- Avoid copying `.git`, caches, dependency folders, build outputs, and existing runtime JSONL logs.
+- Generated surfaces such as `.codex/` and `.claude/` are allowed in private near-original mirrors, but should be regenerated from canonical source instead of edited directly.
 - Preserve runtime-owned config boundaries.
 - Print a summary of created files.
