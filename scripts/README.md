@@ -46,7 +46,7 @@
 
 - `scripts/agent-flow.py`: `start/research/decide/closeout` 네 흐름으로 주요 운영 스크립트를 감싸는 단일 진입점입니다. 기본은 read-only 또는 dry-run이며, reference 후보/제안 생성과 closeout 기록은 명시 플래그가 있을 때만 씁니다.
 - `scripts/agent-flow.py recall ...`: `scripts/session-recall.py search`를 감싸는 public wrapper입니다. 검색 결과는 과거 세션 회상 보조 정보이며 자동 의사결정 입력이 아닙니다.
-- `scripts/agent-flow.py specialist ...`: 0016-0018 on-demand specialist 흐름입니다. `propose`는 concrete trigger가 있어야 proposal을 쓰고, `preview`는 specialist 0명을 선택할 수 있으며, `execute`는 approved `DelegationPlan`과 `--confirm`이 있어야 기존 incubating delegate handoff만 준비합니다.
+- `scripts/agent-flow.py specialist ...`: 0016-0018 on-demand specialist 흐름입니다. `propose`는 concrete trigger가 있어야 proposal을 쓰고, `preview`는 specialist 0명을 선택할 수 있으며, `execute`는 approved `DelegationPlan`과 `--confirm`이 있어야 기존 incubating delegate handoff만 준비합니다. `packet`은 같은 승인 경계에서 harness-agnostic spawn-ready JSON을 쓰지만 실제 subagent를 spawn하지 않습니다.
 - `scripts/catalog.yaml`: public/internal script 경계를 기록합니다. public은 `agent-flow.py` 하나이고, 나머지는 agent-flow나 디버깅 흐름에서 쓰는 internal tool입니다.
 - `scripts/generate-codemaps.py`: `scripts`, `skills`, `agents`, `runtime`, `reference`, `docs`, `tests` 영역을 스캔해 `docs/CODEMAPS/`를 생성합니다. 기본은 preview이며 `--write`로 파일을 씁니다.
 - `scripts/hooks/post-tool-use-log.py`: 도구 사용이나 주요 행동 결과를 활동 로그에 추가합니다.

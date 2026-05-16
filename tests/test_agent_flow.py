@@ -935,6 +935,134 @@ class AgentFlowTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_specialist_packet_writes_harness_agnostic_spawn_packet(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            preview = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "preview",
+                    "--goal",
+                    "context isolation docs migration review",
+                    "--approve",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+            preview_payload = json.loads(preview.stdout)
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "packet",
+                    "--plan",
+                    preview_payload["plan_path"],
+                    "--confirm",
+                    "--by",
+                    "test",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            packet_path = tmp / payload["packet_path"]
+            self.assertTrue(packet_path.is_file())
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+            self.assertEqual(packet["schema_version"], "ai-architecture.spawn-ready-packet.v1")
+            self.assertEqual(packet["status"], "ready")
+            self.assertFalse(packet["auto_spawn"])
+            self.assertFalse(packet["auto_chain"])
+            self.assertFalse(packet["recursive_delegation_allowed"])
+            self.assertEqual(packet["confirmed_by"], "test")
+            self.assertIn("docs-sync-auditor", packet["selected_roles"])
+            self.assertGreaterEqual(len(packet["units"]), 1)
+            unit = packet["units"][0]
+            self.assertEqual(unit["role"], "docs-sync-auditor")
+            self.assertTrue((tmp / unit["brief_path"]).is_file())
+            self.assertIn("completion_command", unit)
+            self.assertEqual(unit["expected_result_schema"]["ledger"], "runtime/agent-runs.jsonl")
+            self.assertTrue(unit["requires_individual_confirmation"])
+            self.assertFalse(unit["recursive_delegation_allowed"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_specialist_packet_requires_approved_plan_and_confirmation(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            draft = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "preview",
+                    "--goal",
+                    "context isolation docs migration review",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(draft.returncode, 0, draft.stdout + draft.stderr)
+            draft_payload = json.loads(draft.stdout)
+            from_draft = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "packet",
+                    "--plan",
+                    draft_payload["plan_path"],
+                    "--confirm",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertNotEqual(from_draft.returncode, 0)
+            self.assertIn("approved", from_draft.stderr)
+
+            approved = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "plan-approve",
+                    "--plan",
+                    draft_payload["plan_path"],
+                    "--by",
+                    "test",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+            without_confirm = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "packet",
+                    "--plan",
+                    draft_payload["plan_path"],
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertNotEqual(without_confirm.returncode, 0)
+            self.assertIn("--confirm", without_confirm.stderr)
+            self.assertFalse((tmp / "runtime" / "spawn-packets").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_specialist_plan_approve_records_usage_evidence(self) -> None:
         tmp = self._prepare_specialist_root()
         try:

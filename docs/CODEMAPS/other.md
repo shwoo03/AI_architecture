@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 129
-- `line_count`: 15881
+- `files`: 130
+- `line_count`: 15945
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -210,6 +210,7 @@
 - `plans/done/0019-session-recall-hardening.md`
 - `plans/done/0020-specialist-usage-evidence-ledger.md`
 - `plans/done/0021-closeout-validator-loop-extension.md`
+- `plans/done/0022-spawn-ready-packet.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

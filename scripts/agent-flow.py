@@ -38,6 +38,7 @@ MODES = {"decide", "research", "build", "maintain", "closeout"}
 SPECIALIST_SCHEMA = "ai-architecture.specialist-proposal.v1"
 DELEGATION_PLAN_SCHEMA = "ai-architecture.delegation-plan.v1"
 SPECIALIST_USAGE_SCHEMA = "ai-architecture.specialist-usage.v1"
+SPAWN_PACKET_SCHEMA = "ai-architecture.spawn-ready-packet.v1"
 SPECIALIST_STATUSES = {"draft", "approved", "rejected"}
 WRITE_POLICIES = {"read_only", "manual_work_required", "write_with_confirmation"}
 ON_DEMAND_TRIGGERS: dict[str, tuple[str, ...]] = {
@@ -284,6 +285,10 @@ def delegation_plan_dir(root: Path) -> Path:
     return root / "runtime" / "delegation-plans"
 
 
+def spawn_packet_dir(root: Path) -> Path:
+    return root / "runtime" / "spawn-packets"
+
+
 def specialist_usage_path(root: Path) -> Path:
     return root / "runtime" / "specialist-usage.jsonl"
 
@@ -314,6 +319,13 @@ def delegation_plan_id(root: Path) -> str:
     directory = delegation_plan_dir(root)
     date_part = utc_now()[:10]
     prefix = f"dp-{date_part}"
+    return f"{prefix}-{next_json_sequence(directory, prefix):02d}"
+
+
+def spawn_packet_id(root: Path) -> str:
+    directory = spawn_packet_dir(root)
+    date_part = utc_now()[:10]
+    prefix = f"spawn-{date_part}"
     return f"{prefix}-{next_json_sequence(directory, prefix):02d}"
 
 
@@ -2104,64 +2116,72 @@ def cmd_specialist_plan_approve(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
+def load_approved_delegation_plan(root: Path, args: argparse.Namespace, *, confirm: bool, record_blocked: bool = True) -> tuple[Path, dict[str, Any]]:
     path = plan_path_from_arg(root, args.plan)
     plan = load_json_file(path)
     if plan.get("schema_version") != DELEGATION_PLAN_SCHEMA:
         raise ValueError("unsupported delegation plan schema")
     if plan.get("status") != "approved":
-        append_specialist_usage(
-            root,
-            specialist_usage_event(
+        if record_blocked:
+            append_specialist_usage(
                 root,
-                event_type="delegation_execute_blocked",
-                args=args,
-                outcome="blocked",
-                plan=plan,
-                plan_path=path,
-                reason="delegation plan must be approved before execution",
-                user_decision="blocked",
-                confirmed=bool(args.confirm),
-            ),
-        )
+                specialist_usage_event(
+                    root,
+                    event_type="delegation_execute_blocked",
+                    args=args,
+                    outcome="blocked",
+                    plan=plan,
+                    plan_path=path,
+                    reason="delegation plan must be approved before execution",
+                    user_decision="blocked",
+                    confirmed=bool(args.confirm),
+                ),
+            )
         raise ValueError("delegation plan must be approved before execution")
-    if plan.get("requires_confirmation") and not args.confirm:
-        append_specialist_usage(
-            root,
-            specialist_usage_event(
+    if plan.get("requires_confirmation") and not confirm:
+        if record_blocked:
+            append_specialist_usage(
                 root,
-                event_type="delegation_execute_blocked",
-                args=args,
-                outcome="blocked",
-                plan=plan,
-                plan_path=path,
-                reason="delegation plan execution requires --confirm",
-                user_decision="blocked",
-                confirmed=False,
-            ),
-        )
+                specialist_usage_event(
+                    root,
+                    event_type="delegation_execute_blocked",
+                    args=args,
+                    outcome="blocked",
+                    plan=plan,
+                    plan_path=path,
+                    reason="delegation plan execution requires --confirm",
+                    user_decision="blocked",
+                    confirmed=False,
+                ),
+            )
         raise ValueError("delegation plan execution requires --confirm")
     selected_roles = plan.get("selected_roles")
     if not isinstance(selected_roles, list) or not selected_roles:
-        append_specialist_usage(
-            root,
-            specialist_usage_event(
+        if record_blocked:
+            append_specialist_usage(
                 root,
-                event_type="delegation_execute_blocked",
-                args=args,
-                outcome="blocked",
-                plan=plan,
-                plan_path=path,
-                reason="delegation plan has no selected roles",
-                user_decision="blocked",
-                confirmed=bool(args.confirm),
-            ),
-        )
+                specialist_usage_event(
+                    root,
+                    event_type="delegation_execute_blocked",
+                    args=args,
+                    outcome="blocked",
+                    plan=plan,
+                    plan_path=path,
+                    reason="delegation plan has no selected roles",
+                    user_decision="blocked",
+                    confirmed=bool(args.confirm),
+                ),
+            )
         raise ValueError("delegation plan has no selected roles")
+    return path, plan
+
+
+def prepare_delegate_handoffs(root: Path, plan: dict[str, Any], *, workflow: str, timeout: int) -> tuple[list[dict[str, Any]], list[CommandResult]]:
     handoffs: list[dict[str, Any]] = []
     commands: list[CommandResult] = []
     read_scope = plan.get("read_scope") if isinstance(plan.get("read_scope"), dict) else {}
     write_policy = plan.get("write_policy") if isinstance(plan.get("write_policy"), dict) else {}
+    selected_roles = plan.get("selected_roles") if isinstance(plan.get("selected_roles"), list) else []
     for role_value in selected_roles:
         role = str(role_value)
         command = [
@@ -2174,7 +2194,7 @@ def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
             "--goal",
             str(plan["goal"]),
             "--workflow",
-            args.workflow,
+            workflow,
             "--format",
             "json",
         ]
@@ -2183,10 +2203,16 @@ def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
         policy = str(write_policy.get(role) or "")
         if policy:
             command.extend(["--write-policy", policy])
-        result = run_command(root, f"delegate-{role}", command, args.timeout)
+        result = run_command(root, f"delegate-{role}", command, timeout)
         commands.append(result)
         if result.ok:
             handoffs.append(read_json_stdout(result, {}))
+    return handoffs, commands
+
+
+def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
+    path, plan = load_approved_delegation_plan(root, args, confirm=bool(args.confirm), record_blocked=True)
+    handoffs, commands = prepare_delegate_handoffs(root, plan, workflow=args.workflow, timeout=args.timeout)
     ok = all(result.ok for result in commands)
     payload = {
         "root": str(root),
@@ -2218,6 +2244,119 @@ def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
         for handoff in handoffs:
             print(f"handoff: {handoff.get('brief_path')}")
     return 0 if ok else 1
+
+
+def spawn_unit_from_handoff(handoff: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
+    role = str(handoff.get("role") or "")
+    plan_role_source = plan.get("role_source") if isinstance(plan.get("role_source"), dict) else {}
+    resolved_role_source = str(handoff.get("role_source") or plan_role_source.get(role, "base"))
+    return {
+        "role": role,
+        "role_source": resolved_role_source,
+        "brief_id": str(handoff.get("brief_id") or ""),
+        "brief_path": str(handoff.get("brief_path") or ""),
+        "objective": str(handoff.get("objective") or plan.get("goal") or ""),
+        "read_scope": handoff.get("read_scope") if isinstance(handoff.get("read_scope"), list) else [],
+        "write_scope": handoff.get("write_scope") if isinstance(handoff.get("write_scope"), list) else [],
+        "write_policy": str(handoff.get("write_policy") or ""),
+        "validation_commands": handoff.get("validation_hints") if isinstance(handoff.get("validation_hints"), list) else [],
+        "completion_command": str(handoff.get("completion_command") or ""),
+        "handoff_prompt": str(handoff.get("next_prompt") or ""),
+        "expected_result_schema": {
+            "ledger": "runtime/agent-runs.jsonl",
+            "command": "scripts/incubating/agent-run.py add",
+            "required_fields": [
+                "agent_run_id",
+                "brief_id",
+                "status",
+                "goal_lineage",
+                "changed_paths",
+                "validation",
+                "ext",
+            ],
+        },
+        "requires_individual_confirmation": True,
+        "recursive_delegation_allowed": False,
+    }
+
+
+def build_spawn_packet(root: Path, plan_path: Path, plan: dict[str, Any], handoffs: list[dict[str, Any]], args: argparse.Namespace) -> dict[str, Any]:
+    packet_id = spawn_packet_id(root)
+    return {
+        "schema_version": SPAWN_PACKET_SCHEMA,
+        "packet_id": packet_id,
+        "created_at": utc_now(),
+        "plan_id": str(plan.get("plan_id") or ""),
+        "plan_path": rel_to_root(root, plan_path),
+        "goal": str(plan.get("goal") or ""),
+        "status": "ready",
+        "selected_roles": [str(role) for role in plan.get("selected_roles", [])] if isinstance(plan.get("selected_roles"), list) else [],
+        "auto_spawn": False,
+        "auto_chain": False,
+        "recursive_delegation_allowed": False,
+        "requires_confirmation": True,
+        "confirmed_by": str(getattr(args, "by", "") or "codex"),
+        "workflow": str(args.workflow),
+        "execution_boundary": "external_harness",
+        "harness": {
+            "format": "harness-agnostic-json",
+            "supported_by": ["codex", "claude", "opencode", "manual"],
+            "adapter_required": True,
+            "adapter_may_spawn": False,
+        },
+        "units": [spawn_unit_from_handoff(handoff, plan) for handoff in handoffs],
+        "operator_instructions": [
+            "Do not spawn automatically from this packet.",
+            "Confirm each unit individually before handing it to a runtime harness.",
+            "Do not allow recursive specialist delegation.",
+            "After work completes, append the AgentRun evidence with the unit completion_command.",
+            "Use closeout-validator verdicts after AgentRun evidence exists.",
+        ],
+        "forbidden_actions": [
+            "auto_spawn",
+            "auto_chain_execution",
+            "recursive_delegation",
+            "permission_broadening",
+            "target_agent_run_mutation",
+        ],
+    }
+
+
+def cmd_specialist_packet(root: Path, args: argparse.Namespace) -> int:
+    path, plan = load_approved_delegation_plan(root, args, confirm=bool(args.confirm), record_blocked=False)
+    handoffs, commands = prepare_delegate_handoffs(root, plan, workflow=args.workflow, timeout=args.timeout)
+    ok = all(result.ok for result in commands)
+    if not ok:
+        payload = {
+            "root": str(root),
+            "plan_path": rel_to_root(root, path),
+            "status": "failed",
+            "packet_path": "",
+            "commands": [result_payload(result) for result in commands],
+        }
+        if args.format == "json":
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print("status: failed")
+        return 1
+    packet = build_spawn_packet(root, path, plan, handoffs, args)
+    packet_path = spawn_packet_dir(root) / f"{packet['packet_id']}.json"
+    write_json_file(packet_path, packet)
+    payload = {
+        "root": str(root),
+        "plan_path": rel_to_root(root, path),
+        "packet_path": rel_to_root(root, packet_path),
+        "status": "ready",
+        "spawn_packet": packet,
+        "commands": [result_payload(result) for result in commands],
+    }
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"packet_path: {payload['packet_path']}")
+        print("status: ready")
+        print("auto_spawn: false")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2335,6 +2474,15 @@ def build_parser() -> argparse.ArgumentParser:
     execute.add_argument("--format", choices=("text", "json"), default="text")
     execute.add_argument("--timeout", type=int, default=60)
     execute.set_defaults(func=cmd_specialist_execute)
+
+    packet = specialist_sub.add_parser("packet", help="Create a harness-agnostic spawn-ready packet from an approved delegation plan.")
+    packet.add_argument("--plan", required=True)
+    packet.add_argument("--confirm", action="store_true")
+    packet.add_argument("--workflow", default="dry_run")
+    packet.add_argument("--by", default="codex")
+    packet.add_argument("--format", choices=("text", "json"), default="text")
+    packet.add_argument("--timeout", type=int, default=60)
+    packet.set_defaults(func=cmd_specialist_packet)
     return parser
 
 

@@ -69,3 +69,9 @@
 - Exception scope is limited to extending the existing `closeout-validator` and `runtime/agent-runs.jsonl` append-only ledger with validator verdict records.
 - The implementation must not create a new validator agent, new execution loop, automatic specialist spawn, automatic specialist selection, or stable promotion.
 - Existing AgentRun records remain immutable. New status values and validator metadata are additive-only and apply only to newly appended records.
+
+## 2026-05-16 23:55 — Implementation exception: spawn-ready packet (0022)
+- The user explicitly requested implementing 0022 after 0021.
+- Exception scope is limited to creating harness-agnostic spawn-ready packet artifacts from approved and confirmed `DelegationPlan` records.
+- The implementation may reuse existing delegate handoff generation to populate packet units, but must not spawn agents or create a second execution loop.
+- Packets must remain adapter-neutral and must mark auto-spawn, auto-chain, and recursive delegation as disallowed.
