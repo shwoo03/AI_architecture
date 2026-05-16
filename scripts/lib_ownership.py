@@ -249,7 +249,7 @@ def collect_repo_paths(root: str | Path) -> list[str]:
     base = Path(root)
     try:
         result = subprocess.run(
-            ["git", "-C", str(base), "ls-files", "--cached", "--others", "--exclude-standard"],
+            ["git", "-C", str(base), "-c", "core.quotePath=false", "ls-files", "--cached", "--others", "--exclude-standard"],
             capture_output=True,
             text=True,
             encoding="utf-8",

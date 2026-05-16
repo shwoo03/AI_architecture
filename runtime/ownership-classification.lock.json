@@ -2311,11 +2311,11 @@
       "system_locked": false
     },
     "docs/DOCUMENTATION_STYLE_GUIDE.md": {
-      "action": "manual_merge",
-      "matched_pattern": "docs/**",
-      "owner": "manual_merge",
+      "action": "update_system",
+      "matched_pattern": "docs/DOCUMENTATION_STYLE_GUIDE.md",
+      "owner": "system_owned",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "docs/FEATURE_DECISION_GUIDE.md": {
       "action": "update_system",
@@ -2346,11 +2346,11 @@
       "system_locked": false
     },
     "docs/NOTION_DOCUMENTATION_RULES.md": {
-      "action": "manual_merge",
-      "matched_pattern": "docs/**",
-      "owner": "manual_merge",
+      "action": "update_system",
+      "matched_pattern": "docs/NOTION_DOCUMENTATION_RULES.md",
+      "owner": "system_owned",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "docs/OPERATING_LOOP.md": {
       "action": "update_system",
@@ -2472,11 +2472,11 @@
       "system_locked": false
     },
     "docs/VERSION_ROADMAP.md": {
-      "action": "manual_merge",
-      "matched_pattern": "docs/**",
-      "owner": "manual_merge",
+      "action": "update_system",
+      "matched_pattern": "docs/VERSION_ROADMAP.md",
+      "owner": "system_owned",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "docs/WORKFLOW_CATALOG.md": {
       "action": "update_system",
@@ -2570,11 +2570,11 @@
       "system_locked": false
     },
     "docs/decisions/ADR-0002-sdk-adapter-not-core.md": {
-      "action": "manual_merge",
-      "matched_pattern": "docs/**",
-      "owner": "manual_merge",
+      "action": "update_system",
+      "matched_pattern": "docs/decisions/ADR-0002-sdk-adapter-not-core.md",
+      "owner": "system_owned",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "docs/decisions/ADR-0003-jsonl-ledger-source-of-truth.md": {
       "action": "manual_merge",
@@ -2591,11 +2591,11 @@
       "system_locked": false
     },
     "docs/design/V2_SPECIALIST_TEAM_OS.md": {
-      "action": "manual_merge",
-      "matched_pattern": "docs/**",
-      "owner": "manual_merge",
+      "action": "update_system",
+      "matched_pattern": "docs/design/V2_SPECIALIST_TEAM_OS.md",
+      "owner": "system_owned",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "docs/feature-status.yaml": {
       "action": "update_system",
@@ -2626,18 +2626,18 @@
       "system_locked": false
     },
     "docs/reference-wiki/wiki/index.md": {
-      "action": "manual_merge",
-      "matched_pattern": "docs/**",
-      "owner": "manual_merge",
+      "action": "update_system",
+      "matched_pattern": "docs/reference-wiki/wiki/**",
+      "owner": "system_owned",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "docs/reference-wiki/wiki/log.md": {
-      "action": "manual_merge",
-      "matched_pattern": "docs/**",
-      "owner": "manual_merge",
+      "action": "update_system",
+      "matched_pattern": "docs/reference-wiki/wiki/**",
+      "owner": "system_owned",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "docs/tooling-requirements.md": {
       "action": "manual_merge",
@@ -2947,6 +2947,27 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "plans/done/0025-enki-ownership-classification.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0026-enki-ownership-baseline-and-safe-apply.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0027-enki-manual-risky-system-review.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "plans/failed/.gitkeep": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -3025,6 +3046,13 @@
       "system_locked": false
     },
     "research/reference-candidates/2026-05-13-paperclip.md": {
+      "action": "preserve_project",
+      "matched_pattern": "research/reference-candidates/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "research/reference-candidates/2026-05-17-andrej-karpathy-skills.md": {
       "action": "preserve_project",
       "matched_pattern": "research/reference-candidates/**",
       "owner": "project_owned",
@@ -3417,6 +3445,27 @@
       "system_locked": false
     },
     "runtime/validation/0015-specialist-overlay-loader-prep.md": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "runtime/validation/0025-enki-ownership-classification.md": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "runtime/validation/0026-enki-ownership-baseline-and-safe-apply.md": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "runtime/validation/0027-enki-manual-risky-system-review.md": {
       "action": "preserve_project",
       "matched_pattern": "runtime/**",
       "owner": "project_owned",
@@ -4023,7 +4072,7 @@
       "matched_pattern": "scripts/**",
       "owner": "manual_merge",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "scripts/validate-reference-candidates.py": {
       "action": "manual_merge",
@@ -4037,7 +4086,7 @@
       "matched_pattern": "scripts/**",
       "owner": "manual_merge",
       "reason": "system_defaults.rules",
-      "system_locked": false
+      "system_locked": true
     },
     "scripts/verify-parity.py": {
       "action": "manual_merge",
@@ -4861,5 +4910,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 694
+  "total": 701
 }

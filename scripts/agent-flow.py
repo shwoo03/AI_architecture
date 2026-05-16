@@ -2037,8 +2037,12 @@ def project_profile_state(target: Path) -> str:
     if not text.strip():
         return "partial"
     lowered = text.lower()
-    placeholders = ("needs clarification", "todo", "tbd", "<", "primary_goal: \"\"", "success_criteria: []", "failure_definition: \"\"")
-    if any(marker in lowered for marker in placeholders):
+    placeholder_patterns = (
+        r"(?m)^\s*[-*]?\s*`?primary_goal`?\s*:\s*(?:\"\"|''|\[\]|todo\b|tbd\b|\[needs clarification:)",
+        r"(?m)^\s*[-*]?\s*`?success_criteria`?\s*:\s*(?:\"\"|''|\[\]|todo\b|tbd\b|\[needs clarification:)",
+        r"(?m)^\s*[-*]?\s*`?failure_definition`?\s*:\s*(?:\"\"|''|\[\]|todo\b|tbd\b|\[needs clarification:)",
+    )
+    if any(re.search(pattern, lowered) for pattern in placeholder_patterns):
         return "partial"
     required_terms = ("primary_goal", "success_criteria", "failure_definition")
     if not all(term in lowered for term in required_terms):

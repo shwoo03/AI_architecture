@@ -1,7 +1,7 @@
 # Codemap: runtime
 
-- `files`: 23
-- `line_count`: 6497
+- `files`: 26
+- `line_count`: 6915
 - `directories`: 9
 
 ## Navigation Entry Points
@@ -41,6 +41,9 @@
 - `runtime/state/session-handoff.md`
 - `runtime/validation/0013-enki-ownership-initialize-dry-run.md`
 - `runtime/validation/0015-specialist-overlay-loader-prep.md`
+- `runtime/validation/0025-enki-ownership-classification.md`
+- `runtime/validation/0026-enki-ownership-baseline-and-safe-apply.md`
+- `runtime/validation/0027-enki-manual-risky-system-review.md`
 - `runtime/validation/README.md`
 - `state/blockers.md`
 - `state/decisions.md`

@@ -694,7 +694,7 @@ def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     checks.append(check_json_findings_tool(root, "markdown-sanitize.py", ["--check"], args.timeout, strict=args.strict, name="markdown-sanitize"))
     checks.append(run_command(root, [sys.executable, str(root / "scripts" / "failure-classify.py"), "--text", "timeout while running validation", "--format", "json"], args.timeout))
     checks.append(check_json_findings_tool(root, "change-drift-check.py", [], args.timeout, strict=args.strict, name="change-drift-check"))
-    checks.append(check_script_command(root, "validate-plans.py", [], args.timeout))
+    checks.append(check_script_command(root, "validate-plans.py", ["--allow-legacy-done"], args.timeout))
     checks.append(check_script_command(root, "reference-wiki.py", [], args.timeout))
     checks.append(check_portability(root, args.timeout))
     checks.append(check_codemap_freshness(root))

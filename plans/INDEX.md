@@ -31,3 +31,6 @@
 | 0022 | spawn-ready-packet | done | 2026-05-16 | 0 | 0021 validator loop + approved DelegationPlan |
 | 0023 | agent-flow-doctor | done | 2026-05-17 | 0 | operational diagnostics UX improvement |
 | 0024 | project-adoption-intake | done | 2026-05-17 | 0 | 0023 diagnostics + existing skeleton upgrade tooling |
+| 0025 | enki-ownership-classification | done | 2026-05-17 | 0 | 0024 adoption intake stop condition |
+| 0026 | enki-ownership-baseline-and-safe-apply | done | 2026-05-17 | 0 | 0025 ownership classification proposal |
+| 0027 | enki-manual-risky-system-review | done | 2026-05-17 | 0 | 0026 baseline and safe apply |

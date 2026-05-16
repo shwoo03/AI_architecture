@@ -41,36 +41,59 @@ def plan_files(root: Path) -> list[Path]:
     return sorted(files)
 
 
-def validate_file(root: Path, path: Path) -> list[str]:
+def is_legacy_done_plan(root: Path, path: Path, text: str) -> bool:
+    try:
+        rel = path.relative_to(root).as_posix()
+    except ValueError:
+        return False
+    if not rel.startswith("plans/done/"):
+        return False
+    if all(heading in text for heading in REQUIRED_HEADINGS):
+        return False
+    return text.lstrip().startswith("# Plan ") or "| seq |" in text
+
+
+def validate_file(root: Path, path: Path, *, allow_legacy_done: bool = False) -> tuple[list[str], bool]:
     text = path.read_text(encoding="utf-8", errors="replace")
     rel = path.relative_to(root).as_posix()
+    if allow_legacy_done and is_legacy_done_plan(root, path, text):
+        return [], True
     findings: list[str] = []
     for heading in REQUIRED_HEADINGS:
         if heading not in text:
             findings.append(f"{rel} missing heading `{heading}`")
     if "python3 scripts/agent-flow.py closeout" not in text and "python scripts/agent-flow.py closeout" not in text:
         findings.append(f"{rel} missing closeout validation command")
-    return findings
+    return findings, False
 
 
-def run_check(root: Path) -> dict[str, object]:
+def run_check(root: Path, *, allow_legacy_done: bool = False) -> dict[str, object]:
     findings: list[str] = []
+    legacy_done_skipped = 0
     files = plan_files(root)
     for path in files:
-        findings.extend(validate_file(root, path))
-    return {"ok": not findings, "plans": len(files), "findings": findings}
+        file_findings, skipped = validate_file(root, path, allow_legacy_done=allow_legacy_done)
+        findings.extend(file_findings)
+        if skipped:
+            legacy_done_skipped += 1
+    return {"ok": not findings, "plans": len(files), "legacy_done_skipped": legacy_done_skipped, "findings": findings}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=None)
     parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument(
+        "--allow-legacy-done",
+        action="store_true",
+        help="Do not fail historical plans/done records that predate the structured plan contract.",
+    )
     args = parser.parse_args()
     root = Path(args.root).resolve() if args.root else repo_root().resolve()
     if not root.is_dir():
         print(f"root not a directory: {root}", file=sys.stderr)
         return 2
-    payload = run_check(root)
+    payload = run_check(root, allow_legacy_done=args.allow_legacy_done)
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     elif payload["findings"]:
@@ -78,7 +101,8 @@ def main() -> int:
         for finding in payload["findings"]:
             print(f"  ERROR {finding}")
     else:
-        print(f"plans OK: {payload['plans']} plan(s) checked")
+        suffix = f", {payload['legacy_done_skipped']} legacy done plan(s) skipped" if payload.get("legacy_done_skipped") else ""
+        print(f"plans OK: {payload['plans']} plan(s) checked{suffix}")
     return 0 if payload["ok"] else 1
 
 

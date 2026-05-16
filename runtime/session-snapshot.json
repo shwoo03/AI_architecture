@@ -1,37 +1,40 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-16T16:28:42Z",
+  "ts": "2026-05-16T17:27:24Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-16T16:28:29Z",
+    "ts": "2026-05-16T17:22:12Z",
     "phase": "session",
     "action": "handoff_saved",
-    "project": "unknown",
-    "goal_lineage": [],
+    "project": "AI_architecture",
+    "goal_lineage": [
+      "ENKI_WIKI operating OS migration final evidence"
+    ],
     "tool_call": {
       "tool": "codex",
-      "status": "ok",
+      "status": "success",
       "normalized_status": "success",
       "failure_type": "",
       "empty_output": false,
       "duration_ms": null,
-      "summary": "0024 project adoption intake complete; handoff/progress updated"
+      "summary": "Handoff refreshed after final ENKI adoption-intake profile fix and validation; ENKI is clean with five local migration commits and only intentional preserve/licensing review signals remain."
     },
     "data": {}
   },
   "completion_evidence_last": {
-    "ts": "2026-05-16T16:26:39Z",
-    "goal": "0024 project adoption intake",
+    "ts": "2026-05-16T17:13:24Z",
+    "goal": "0027 ENKI manual risky system review",
     "changed_paths": [
-      "scripts/agent-flow.py",
-      "tests/test_agent_flow.py",
-      "scripts/README.md",
-      "scripts/catalog.yaml",
-      "docs/SKELETON_UPGRADE.md",
-      "plans/done/0024-project-adoption-intake.md",
-      "plans/INDEX.md"
+      "config/ownership.yaml",
+      "scripts/validate-plans.py",
+      "scripts/quality-gate.py",
+      "tests/test_skeleton_self_classification.py",
+      "tests/test_validation.py",
+      "plans/done/0027-enki-manual-risky-system-review.md",
+      "plans/INDEX.md",
+      "runtime/validation/0027-enki-manual-risky-system-review.md"
     ],
     "validations": [
       {

@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 132
-- `line_count`: 16107
+- `files`: 135
+- `line_count`: 16306
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -213,6 +213,9 @@
 - `plans/done/0022-spawn-ready-packet.md`
 - `plans/done/0023-agent-flow-doctor.md`
 - `plans/done/0024-project-adoption-intake.md`
+- `plans/done/0025-enki-ownership-classification.md`
+- `plans/done/0026-enki-ownership-baseline-and-safe-apply.md`
+- `plans/done/0027-enki-manual-risky-system-review.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

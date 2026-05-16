@@ -51,6 +51,8 @@ system_defaults:
     - scripts/source-recovery.py
     - scripts/upgrade-from-skeleton.py
     - scripts/task-closeout.py
+    - scripts/validate-plans.py
+    - scripts/validate-reference-proposals.py
     - scripts/feature-status.py
     - scripts/lib_feature_status.py
     - scripts/lib_ownership.py
@@ -67,6 +69,12 @@ system_defaults:
     - docs/FEATURE_DECISION_GUIDE.md
     - docs/AGENT_REGISTRY.md
     - docs/OWNERSHIP_MODEL.md
+    - docs/VERSION_ROADMAP.md
+    - docs/DOCUMENTATION_STYLE_GUIDE.md
+    - docs/NOTION_DOCUMENTATION_RULES.md
+    - docs/design/V2_SPECIALIST_TEAM_OS.md
+    - docs/decisions/ADR-0002-sdk-adapter-not-core.md
+    - docs/reference-wiki/wiki/**
     - docs/PROJECT_PROFILE.template.md
     - docs/PROJECT_SPEC.template.md
     - docs/PROJECT_OPERATING_PLAN.template.md
@@ -117,6 +125,18 @@ system_defaults:
     - pattern: docs/AGENT_REGISTRY.md
       owner: system_owned
     - pattern: docs/OWNERSHIP_MODEL.md
+      owner: system_owned
+    - pattern: docs/VERSION_ROADMAP.md
+      owner: system_owned
+    - pattern: docs/DOCUMENTATION_STYLE_GUIDE.md
+      owner: system_owned
+    - pattern: docs/NOTION_DOCUMENTATION_RULES.md
+      owner: system_owned
+    - pattern: docs/design/V2_SPECIALIST_TEAM_OS.md
+      owner: system_owned
+    - pattern: docs/decisions/ADR-0002-sdk-adapter-not-core.md
+      owner: system_owned
+    - pattern: docs/reference-wiki/wiki/**
       owner: system_owned
     - pattern: docs/PROJECT_PROFILE.template.md
       owner: system_owned

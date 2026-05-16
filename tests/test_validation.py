@@ -2661,6 +2661,30 @@ class NewInternalToolTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_validate_plans_can_skip_legacy_done_archive(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"plan-legacy-{uuid.uuid4().hex}"
+        try:
+            (tmp / "plans" / "done").mkdir(parents=True)
+            (tmp / "plans" / "done" / "001-old.md").write_text(
+                "# Plan 001 — old archive\n\n| seq | 001 |\n",
+                encoding="utf-8",
+            )
+            result = _run(
+                [
+                    str(SCRIPTS / "validate-plans.py"),
+                    "--root",
+                    str(tmp),
+                    "--allow-legacy-done",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["legacy_done_skipped"], 1)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_reference_wiki_current_contract_passes(self) -> None:
         result = _run([str(SCRIPTS / "reference-wiki.py"), "--root", str(REPO_ROOT), "--format", "json"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

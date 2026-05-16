@@ -32,6 +32,7 @@ class SkeletonSelfClassificationTests(unittest.TestCase):
                 "scripts/ownership-lock.py",
                 "runtime/activity-log.jsonl",
                 "docs/OWNERSHIP_MODEL.md",
+                "docs/VERSION_ROADMAP.md",
                 "docs/PROJECT_PROFILE.template.md",
                 "CLAUDE.md",
                 "runtime/ownership-classification.lock.json",
@@ -44,6 +45,8 @@ class SkeletonSelfClassificationTests(unittest.TestCase):
         self.assertEqual(report.classifications["runtime/activity-log.jsonl"].action, "protected_preserve")
         self.assertEqual(report.classifications["docs/OWNERSHIP_MODEL.md"].owner, "system_owned")
         self.assertTrue(report.classifications["docs/OWNERSHIP_MODEL.md"].system_locked)
+        self.assertEqual(report.classifications["docs/VERSION_ROADMAP.md"].owner, "system_owned")
+        self.assertTrue(report.classifications["docs/VERSION_ROADMAP.md"].system_locked)
         self.assertEqual(report.classifications["docs/PROJECT_PROFILE.template.md"].owner, "system_owned")
         self.assertEqual(report.classifications["CLAUDE.md"].owner, "manual_merge")
         self.assertTrue(report.classifications["CLAUDE.md"].system_locked)

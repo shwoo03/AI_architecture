@@ -178,3 +178,24 @@ class OwnershipClassifierTests(unittest.TestCase):
         self.assertEqual(result.owner, "system_owned")
         self.assertEqual(result.action, "add_system")
         self.assertTrue(result.system_locked)
+
+    def test_collect_repo_paths_preserves_non_ascii_git_paths(self) -> None:
+        ownership = self._module()
+        tmp = Path(tempfile.mkdtemp(prefix="ownership-nonascii-"))
+        try:
+            (tmp / "주제").write_text("topic\n", encoding="utf-8")
+            for command in (
+                ["git", "init"],
+                ["git", "config", "user.email", "test@example.invalid"],
+                ["git", "config", "user.name", "Test User"],
+                ["git", "add", "."],
+                ["git", "commit", "-m", "initial"],
+            ):
+                result = subprocess.run(command, cwd=str(tmp), capture_output=True, text=True, encoding="utf-8", timeout=30)
+                if result.returncode != 0:
+                    self.skipTest(f"git unavailable for non-ascii ownership test: {result.stderr or result.stdout}")
+            paths = ownership.collect_repo_paths(tmp)
+            self.assertIn("주제", paths)
+            self.assertNotIn('"\\354\\243\\274\\354\\240\\234"', paths)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)

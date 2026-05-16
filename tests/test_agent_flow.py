@@ -1364,6 +1364,27 @@ class AgentFlowTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_adopt_profile_ready_allows_wiki_links_and_tbd_guidance(self) -> None:
+        tmp = self._tmp_root("adopt-profile-ready")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            (target / "docs" / "PROJECT_PROFILE.md").write_text(
+                "primary_goal: preserve [[wiki/link]] content\n"
+                "success_criteria: tests pass and data remains intact\n"
+                "failure_definition: operational data loss\n"
+                "notes: unknown fields may be marked as TBD in future edits\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "docs/PROJECT_PROFILE.md"], cwd=str(target), check=True, capture_output=True, text=True)
+            subprocess.run(["git", "commit", "-m", "profile"], cwd=str(target), check=True, capture_output=True, text=True)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--status", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["project_profile_state"], "ready")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_adopt_dry_run_synthesizes_upgrade_and_ownership(self) -> None:
         tmp = self._tmp_root("adopt-dry-run")
         try:
