@@ -170,6 +170,8 @@ The delegate `completion_command` is workflow-aware. For read-only workflows (`m
 
 `scripts/agent-flow.py specialist execute` does not spawn agents. It validates an approved `DelegationPlan`, requires `--confirm` when confirmation is marked, and reuses `scripts/incubating/agent-flow-delegate.py` to create AgentBrief handoffs.
 
+`runtime/specialist-usage.jsonl` stores append-only evidence for specialist recommendation, selection, rejection, approval, and execution-preparation decisions. It is not an execution ledger; `runtime/agent-runs.jsonl` remains the AgentRun execution record. Required fields are `event_id`, `ts`, `schema_version`, `event_type`, `goal`, `actor`, `command`, `outcome`, `proposal_id`, `plan_id`, `candidate_roles`, `selected_roles`, `rejected_roles`, `role_source`, `score_reasons`, `user_decision`, `reason`, `requires_confirmation`, `confirmed`, `artifact_paths`, `handoff_paths`, and `validation_refs`. `schema_version` is `ai-architecture.specialist-usage.v1`. Records are advisory evidence only: they do not change specialist scoring, do not auto-select specialists, do not produce validator verdicts, and do not create spawn packets.
+
 ## Adapter extension 규칙
 
 외부 SDK나 graph runtime의 provider-specific 필드는 core schema에 직접 추가하지 않습니다. 필요한 경우 `ext.<adapter_name>.*` namespace 아래에 격리합니다.

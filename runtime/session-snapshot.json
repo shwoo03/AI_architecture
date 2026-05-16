@@ -1,11 +1,11 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-16T13:43:02Z",
+  "ts": "2026-05-16T14:16:25Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-16T13:42:46Z",
+    "ts": "2026-05-16T14:15:52Z",
     "phase": "session",
     "action": "handoff_saved",
     "project": "unknown",
@@ -17,23 +17,19 @@
       "failure_type": "",
       "empty_output": false,
       "duration_ms": null,
-      "summary": "0019 session recall hardening complete; handoff updated"
+      "summary": "0020 specialist usage evidence ledger complete; handoff updated"
     },
     "data": {}
   },
   "completion_evidence_last": {
-    "ts": "2026-05-16T13:42:00Z",
-    "goal": "0019 session recall hardening",
+    "ts": "2026-05-16T14:15:14Z",
+    "goal": "0020 specialist usage evidence ledger",
     "changed_paths": [
-      ".gitignore",
-      "scripts/session-recall.py",
       "scripts/agent-flow.py",
-      "tests/test_runtime.py",
       "tests/test_agent_flow.py",
       "docs/RUNTIME_EVENT_SCHEMA.md",
-      "scripts/README.md",
       "plans/INDEX.md",
-      "plans/done/0019-session-recall-hardening.md"
+      "plans/done/0020-specialist-usage-evidence-ledger.md"
     ],
     "validations": [
       {

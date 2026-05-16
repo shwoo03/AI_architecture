@@ -2912,6 +2912,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "plans/done/0020-specialist-usage-evidence-ledger.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "plans/failed/.gitkeep": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -4826,5 +4833,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 689
+  "total": 690
 }

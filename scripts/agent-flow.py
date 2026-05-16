@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from lib_catalog import load_catalog_modes_with_status as load_shared_catalog_modes_with_status
+from redact import redact_json
 
 
 try:
@@ -36,6 +37,7 @@ DECISIONS = {"accepted", "rejected", "deferred", *DECISION_ALIASES}
 MODES = {"decide", "research", "build", "maintain", "closeout"}
 SPECIALIST_SCHEMA = "ai-architecture.specialist-proposal.v1"
 DELEGATION_PLAN_SCHEMA = "ai-architecture.delegation-plan.v1"
+SPECIALIST_USAGE_SCHEMA = "ai-architecture.specialist-usage.v1"
 SPECIALIST_STATUSES = {"draft", "approved", "rejected"}
 WRITE_POLICIES = {"read_only", "manual_work_required", "write_with_confirmation"}
 ON_DEMAND_TRIGGERS: dict[str, tuple[str, ...]] = {
@@ -282,6 +284,10 @@ def delegation_plan_dir(root: Path) -> Path:
     return root / "runtime" / "delegation-plans"
 
 
+def specialist_usage_path(root: Path) -> Path:
+    return root / "runtime" / "specialist-usage.jsonl"
+
+
 def slugify_ascii(value: str, fallback: str = "item") -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or fallback
@@ -311,6 +317,17 @@ def delegation_plan_id(root: Path) -> str:
     return f"{prefix}-{next_json_sequence(directory, prefix):02d}"
 
 
+def next_specialist_usage_sequence(root: Path) -> int:
+    path = specialist_usage_path(root)
+    if not path.exists():
+        return 1
+    count = 0
+    for line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+        if line.strip():
+            count += 1
+    return count + 1
+
+
 def match_terms(text: str, patterns: dict[str, tuple[str, ...]]) -> list[str]:
     lowered = text.lower()
     matches: list[str] = []
@@ -333,6 +350,82 @@ def load_json_file(path: Path) -> dict[str, Any]:
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def append_jsonl_file(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def command_name(args: argparse.Namespace) -> str:
+    if getattr(args, "specialist_command", ""):
+        return f"specialist.{args.specialist_command}"
+    return str(getattr(args, "command", "") or "")
+
+
+def specialist_usage_event(
+    root: Path,
+    *,
+    event_type: str,
+    args: argparse.Namespace,
+    outcome: str,
+    goal: str = "",
+    proposal: dict[str, Any] | None = None,
+    proposal_path: Path | None = None,
+    plan: dict[str, Any] | None = None,
+    plan_path: Path | None = None,
+    handoffs: list[dict[str, Any]] | None = None,
+    validation_refs: list[str] | None = None,
+    reason: str = "",
+    user_decision: str = "",
+    confirmed: bool = False,
+) -> dict[str, Any]:
+    handoffs = handoffs or []
+    proposal = proposal or {}
+    plan = plan or {}
+    candidate_roles = [str(role) for role in plan.get("candidate_roles", [])] if isinstance(plan.get("candidate_roles"), list) else []
+    selected_roles = [str(role) for role in plan.get("selected_roles", [])] if isinstance(plan.get("selected_roles"), list) else []
+    rejected_roles = [role for role in candidate_roles if role not in set(selected_roles)]
+    artifact_paths: list[str] = []
+    if proposal_path is not None:
+        artifact_paths.append(rel_to_root(root, proposal_path))
+    if plan_path is not None:
+        artifact_paths.append(rel_to_root(root, plan_path))
+    handoff_paths = [str(item.get("handoff_path") or item.get("brief_path") or "") for item in handoffs]
+    handoff_paths = [path for path in handoff_paths if path]
+    sequence = next_specialist_usage_sequence(root)
+    event = {
+        "event_id": f"su-{utc_now().replace(':', '').replace('-', '')}-{sequence:04d}",
+        "ts": utc_now(),
+        "schema_version": SPECIALIST_USAGE_SCHEMA,
+        "event_type": event_type,
+        "goal": goal or str(plan.get("goal") or ""),
+        "actor": str(getattr(args, "by", "") or getattr(args, "created_by", "") or "codex"),
+        "command": command_name(args),
+        "outcome": outcome,
+        "proposal_id": str(proposal.get("proposal_id") or ""),
+        "plan_id": str(plan.get("plan_id") or ""),
+        "candidate_roles": candidate_roles,
+        "selected_roles": selected_roles,
+        "rejected_roles": rejected_roles,
+        "role_source": plan.get("role_source") if isinstance(plan.get("role_source"), dict) else {},
+        "score_reasons": plan.get("score_reasons") if isinstance(plan.get("score_reasons"), dict) else {},
+        "user_decision": user_decision,
+        "reason": reason or str(proposal.get("reason") or ""),
+        "requires_confirmation": bool(plan.get("requires_confirmation", False)),
+        "confirmed": confirmed,
+        "artifact_paths": artifact_paths,
+        "handoff_paths": handoff_paths,
+        "validation_refs": validation_refs or [],
+    }
+    return redact_json(event)
+
+
+def append_specialist_usage(root: Path, event: dict[str, Any]) -> str:
+    path = specialist_usage_path(root)
+    append_jsonl_file(path, event)
+    return rel_to_root(root, path)
 
 
 def proposal_path_from_arg(root: Path, value: str) -> Path:
@@ -1820,6 +1913,20 @@ def cmd_specialist_approve(root: Path, args: argparse.Namespace) -> int:
     overlay_path = ""
     if args.apply_overlay:
         overlay_path = apply_proposal_to_overlay(root, proposal)
+    append_specialist_usage(
+        root,
+        specialist_usage_event(
+            root,
+            event_type="proposal_approved",
+            args=args,
+            outcome="approved",
+            proposal=proposal,
+            proposal_path=updated["path"],
+            reason=args.note,
+            user_decision="approved",
+            confirmed=True,
+        ),
+    )
     payload = {
         "root": str(root),
         "proposal_path": rel_to_root(root, updated["path"]),
@@ -1838,6 +1945,20 @@ def cmd_specialist_approve(root: Path, args: argparse.Namespace) -> int:
 
 def cmd_specialist_reject(root: Path, args: argparse.Namespace) -> int:
     updated = update_proposal_status(root, args, "rejected")
+    append_specialist_usage(
+        root,
+        specialist_usage_event(
+            root,
+            event_type="proposal_rejected",
+            args=args,
+            outcome="rejected",
+            proposal=updated["proposal"],
+            proposal_path=updated["path"],
+            reason=args.note,
+            user_decision="rejected",
+            confirmed=True,
+        ),
+    )
     payload = {"root": str(root), "proposal_path": rel_to_root(root, updated["path"]), "proposal": updated["proposal"]}
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -1926,6 +2047,20 @@ def cmd_specialist_preview(root: Path, args: argparse.Namespace) -> int:
     plan = build_delegation_plan(root, args)
     path = delegation_plan_dir(root) / f"{plan['plan_id']}.json"
     write_json_file(path, plan)
+    append_specialist_usage(
+        root,
+        specialist_usage_event(
+            root,
+            event_type="preview_created",
+            args=args,
+            outcome="created",
+            goal=args.goal,
+            plan=plan,
+            plan_path=path,
+            user_decision="preview",
+            confirmed=bool(args.approve and plan.get("status") == "approved"),
+        ),
+    )
     payload = {"root": str(root), "plan_path": rel_to_root(root, path), "delegation_plan": plan}
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -1947,6 +2082,19 @@ def cmd_specialist_plan_approve(root: Path, args: argparse.Namespace) -> int:
     plan["approved_by"] = args.by
     plan["approved_at"] = utc_now()
     write_json_file(path, plan)
+    append_specialist_usage(
+        root,
+        specialist_usage_event(
+            root,
+            event_type="delegation_plan_approved",
+            args=args,
+            outcome="approved",
+            plan=plan,
+            plan_path=path,
+            user_decision="approved",
+            confirmed=True,
+        ),
+    )
     payload = {"root": str(root), "plan_path": rel_to_root(root, path), "delegation_plan": plan}
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -1962,11 +2110,53 @@ def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
     if plan.get("schema_version") != DELEGATION_PLAN_SCHEMA:
         raise ValueError("unsupported delegation plan schema")
     if plan.get("status") != "approved":
+        append_specialist_usage(
+            root,
+            specialist_usage_event(
+                root,
+                event_type="delegation_execute_blocked",
+                args=args,
+                outcome="blocked",
+                plan=plan,
+                plan_path=path,
+                reason="delegation plan must be approved before execution",
+                user_decision="blocked",
+                confirmed=bool(args.confirm),
+            ),
+        )
         raise ValueError("delegation plan must be approved before execution")
     if plan.get("requires_confirmation") and not args.confirm:
+        append_specialist_usage(
+            root,
+            specialist_usage_event(
+                root,
+                event_type="delegation_execute_blocked",
+                args=args,
+                outcome="blocked",
+                plan=plan,
+                plan_path=path,
+                reason="delegation plan execution requires --confirm",
+                user_decision="blocked",
+                confirmed=False,
+            ),
+        )
         raise ValueError("delegation plan execution requires --confirm")
     selected_roles = plan.get("selected_roles")
     if not isinstance(selected_roles, list) or not selected_roles:
+        append_specialist_usage(
+            root,
+            specialist_usage_event(
+                root,
+                event_type="delegation_execute_blocked",
+                args=args,
+                outcome="blocked",
+                plan=plan,
+                plan_path=path,
+                reason="delegation plan has no selected roles",
+                user_decision="blocked",
+                confirmed=bool(args.confirm),
+            ),
+        )
         raise ValueError("delegation plan has no selected roles")
     handoffs: list[dict[str, Any]] = []
     commands: list[CommandResult] = []
@@ -2005,6 +2195,21 @@ def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
         "handoffs": handoffs,
         "commands": [result_payload(result) for result in commands],
     }
+    append_specialist_usage(
+        root,
+        specialist_usage_event(
+            root,
+            event_type="delegation_execute_prepared",
+            args=args,
+            outcome="prepared" if ok else "failed",
+            plan=plan,
+            plan_path=path,
+            handoffs=handoffs,
+            validation_refs=[result.name for result in commands],
+            user_decision="confirmed" if args.confirm else "",
+            confirmed=bool(args.confirm),
+        ),
+    )
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:

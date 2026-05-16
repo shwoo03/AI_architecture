@@ -57,8 +57,11 @@ External trigger active: ENKI_WIKI stable overlay migration (2026-05-15)
 - 2026-05-16 0019 session recall hardening implemented: session handoff is indexed, FTS cache text is redacted at insert time, cache index_version invalidates stale unredacted DBs, `agent-flow recall` wraps session recall search, and the SQLite cache is ignored as derived runtime data.
 - 2026-05-16 0019 moved to done; focused recall tests, `tests.test_runtime`, `tests.test_agent_flow`, validate-plans, ownership-lock, verify-skeleton, stable/all quality gates, and closeout passed.
 - 2026-05-16 0019 handoff/session snapshot refreshed after closeout.
+- 2026-05-16 0020 specialist usage evidence ledger implemented: specialist preview/approve/reject/plan-approve/execute now append redacted advisory-only evidence records to `runtime/specialist-usage.jsonl` without changing scoring, auto-selection, validator verdicts, or spawn packet behavior.
+- 2026-05-16 0020 moved to done; `tests.test_agent_flow`, validate-plans, ownership-lock, verify-skeleton, stable/all quality gates, and closeout passed.
 
 ## 다음 작업
 - Use the new specialist flow only on demand: propose a project specialist when a concrete blocker/trigger exists, approve it before overlay application, preview delegation first, and execute only approved plans with explicit confirmation.
 - Use `python3 scripts/agent-flow.py recall "<query>" --format json` for local session recall; source-of-truth remains Markdown/JSONL, and `runtime/session-recall.sqlite` is rebuildable cache only.
+- Let `runtime/specialist-usage.jsonl` accumulate at least 20 external/real-use evidence records, 30+ preferred, before opening 0021 closeout-validator loop work.
 - Slice 4 ENKI remains blocked on manual review of the 261-path initialize draft before any target write.

@@ -673,6 +673,12 @@ class AgentFlowTests(unittest.TestCase):
         (tmp / "docs" / "README.md").write_text("# Docs\n", encoding="utf-8")
         return tmp
 
+    def _specialist_usage_records(self, root: Path) -> list[dict]:
+        path = root / "runtime" / "specialist-usage.jsonl"
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
     def test_specialist_propose_requires_on_demand_trigger(self) -> None:
         tmp = self._prepare_specialist_root()
         try:
@@ -769,6 +775,63 @@ class AgentFlowTests(unittest.TestCase):
             )
             self.assertEqual(brief.returncode, 0, brief.stdout + brief.stderr)
             self.assertEqual(json.loads(brief.stdout)["role_source"], "project")
+            records = self._specialist_usage_records(tmp)
+            self.assertEqual(records[-1]["schema_version"], "ai-architecture.specialist-usage.v1")
+            self.assertEqual(records[-1]["event_type"], "proposal_approved")
+            self.assertEqual(records[-1]["proposal_id"], payload["proposal"]["proposal_id"])
+            self.assertEqual(records[-1]["user_decision"], "approved")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_specialist_reject_records_usage_evidence(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            propose = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "propose",
+                    "--role",
+                    "docs-review-specialist",
+                    "--mission",
+                    "Review docs edge cases.",
+                    "--write-policy",
+                    "read_only",
+                    "--scope",
+                    "docs",
+                    "--reason",
+                    "context isolation for repeated docs review",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(propose.returncode, 0, propose.stdout + propose.stderr)
+            proposal_path = json.loads(propose.stdout)["proposal_path"]
+            reject = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "reject",
+                    "--proposal",
+                    proposal_path,
+                    "--by",
+                    "test",
+                    "--note",
+                    "token=supersecretvalue1234567890",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(reject.returncode, 0, reject.stdout + reject.stderr)
+            records = self._specialist_usage_records(tmp)
+            self.assertEqual(records[-1]["event_type"], "proposal_rejected")
+            self.assertEqual(records[-1]["user_decision"], "rejected")
+            self.assertIn("[REDACTED:generic_secret]", json.dumps(records[-1], ensure_ascii=False))
+            self.assertNotIn("supersecretvalue1234567890", json.dumps(records[-1], ensure_ascii=False))
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -793,6 +856,12 @@ class AgentFlowTests(unittest.TestCase):
             self.assertEqual(payload["delegation_plan"]["selected_roles"], [])
             self.assertFalse(payload["delegation_plan"]["requires_confirmation"])
             self.assertTrue((tmp / payload["plan_path"]).is_file())
+            records = self._specialist_usage_records(tmp)
+            self.assertEqual(records[-1]["event_type"], "preview_created")
+            self.assertIn("docs-sync-auditor", records[-1]["candidate_roles"])
+            self.assertEqual(records[-1]["selected_roles"], [])
+            self.assertIn("docs-sync-auditor", records[-1]["rejected_roles"])
+            self.assertIn("docs-sync-auditor", records[-1]["score_reasons"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -833,6 +902,10 @@ class AgentFlowTests(unittest.TestCase):
             )
             self.assertNotEqual(blocked.returncode, 0)
             self.assertIn("--confirm", blocked.stderr)
+            blocked_records = self._specialist_usage_records(tmp)
+            self.assertEqual(blocked_records[-1]["event_type"], "delegation_execute_blocked")
+            self.assertEqual(blocked_records[-1]["outcome"], "blocked")
+            self.assertFalse(blocked_records[-1]["confirmed"])
 
             executed = _run(
                 [
@@ -853,6 +926,53 @@ class AgentFlowTests(unittest.TestCase):
             self.assertEqual(payload["status"], "prepared")
             self.assertEqual(payload["handoffs"][0]["role"], "docs-sync-auditor")
             self.assertTrue((tmp / payload["handoffs"][0]["brief_path"]).is_file())
+            records = self._specialist_usage_records(tmp)
+            self.assertEqual(records[0]["event_type"], "preview_created")
+            self.assertEqual(records[-1]["event_type"], "delegation_execute_prepared")
+            self.assertEqual(records[-1]["outcome"], "prepared")
+            self.assertTrue(records[-1]["confirmed"])
+            self.assertEqual(records[-1]["handoff_paths"], [item["brief_path"] for item in payload["handoffs"]])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_specialist_plan_approve_records_usage_evidence(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            preview = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "preview",
+                    "--goal",
+                    "context isolation docs migration review",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+            preview_payload = json.loads(preview.stdout)
+            approve = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "plan-approve",
+                    "--plan",
+                    preview_payload["plan_path"],
+                    "--by",
+                    "test",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(approve.returncode, 0, approve.stdout + approve.stderr)
+            records = self._specialist_usage_records(tmp)
+            self.assertEqual(records[-1]["event_type"], "delegation_plan_approved")
+            self.assertEqual(records[-1]["plan_id"], preview_payload["delegation_plan"]["plan_id"])
+            self.assertEqual(records[-1]["user_decision"], "approved")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

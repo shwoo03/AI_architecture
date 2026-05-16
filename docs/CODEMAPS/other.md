@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 127
-- `line_count`: 15767
+- `files`: 128
+- `line_count`: 15817
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -208,6 +208,7 @@
 - `plans/done/0017-orchestration-preview.md`
 - `plans/done/0018-execution-loop.md`
 - `plans/done/0019-session-recall-hardening.md`
+- `plans/done/0020-specialist-usage-evidence-ledger.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`
