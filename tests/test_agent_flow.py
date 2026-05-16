@@ -37,13 +37,25 @@ class AgentFlowTests(unittest.TestCase):
             if result.returncode != 0:
                 self.skipTest(f"git unavailable for adopt tests: {result.stderr or result.stdout}")
 
-    def _fake_adopt_tools(self, root: Path, *, candidate_paths: int = 0, safe_additions: int = 1) -> None:
+    def _fake_adopt_tools(
+        self,
+        root: Path,
+        *,
+        candidate_paths: int = 0,
+        safe_additions: int = 1,
+        manual_paths: list[str] | None = None,
+        risky_paths: list[str] | None = None,
+    ) -> None:
         scripts = root / "scripts"
         scripts.mkdir(parents=True, exist_ok=True)
+        manual = [{"path": path, "reason": "manual_merge", "owner": "manual_merge", "action": "review"} for path in (manual_paths or [])]
+        risky = [{"path": path, "reason": "target has different system-owned content", "owner": "system_owned", "action": "update_available"} for path in (risky_paths or [])]
         (scripts / "upgrade-from-skeleton.py").write_text(
             "import json\n"
             f"safe = [{{'path': f'file-{{i}}.md'}} for i in range({safe_additions})]\n"
-            "print(json.dumps({'dry_run': True, 'summary': {'add:safe': len(safe)}, 'brief': {'safe_additions': safe, 'manual_reviews': [], 'risky_reviews': []}}))\n",
+            f"manual = {manual!r}\n"
+            f"risky = {risky!r}\n"
+            "print(json.dumps({'dry_run': True, 'summary': {'add:safe': len(safe), 'review:manual': len(manual), 'update_available:risky': len(risky)}, 'brief': {'safe_additions': safe, 'manual_reviews': manual, 'risky_reviews': risky}}))\n",
             encoding="utf-8",
         )
         (scripts / "ownership-initialize.py").write_text(
@@ -1546,6 +1558,72 @@ class AgentFlowTests(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["license_signal"], "warning")
             self.assertEqual(payload["recommendation"], "stop")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_unknown_license_is_non_blocking_metadata_review(self) -> None:
+        tmp = self._tmp_root("adopt-license-unknown")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            subprocess.run(["git", "rm", "LICENSE"], cwd=str(target), check=True, capture_output=True, text=True)
+            subprocess.run(["git", "commit", "-m", "remove license"], cwd=str(target), check=True, capture_output=True, text=True)
+            self._fake_adopt_tools(tmp, candidate_paths=0, safe_additions=2)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["license_signal"], "unknown")
+            self.assertNotIn("target license is unknown", "\n".join(payload["stop_reasons"]))
+            self.assertTrue(any("non-blocking metadata review" in reason for reason in payload["review_classification"]["non_blocking_review"]))
+            self.assertEqual(payload["review_classification"]["blocking"], [])
+            self.assertEqual(payload["recommendation"], "needs_review")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_reads_old_install_state_with_fallback(self) -> None:
+        tmp = self._tmp_root("adopt-install-state")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            (target / "runtime").mkdir()
+            (target / "runtime" / "install-state.jsonl").write_text(
+                '{"event":"convert_completed","source_commit":"abcdef1234567890","validation_status":"verified"}\n'
+                '{"event":"old_entry_without_new_keys"}\n',
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "runtime/install-state.jsonl"], cwd=str(target), check=True, capture_output=True, text=True)
+            subprocess.run(["git", "commit", "-m", "install state"], cwd=str(target), check=True, capture_output=True, text=True)
+            self._fake_adopt_tools(tmp, candidate_paths=0, safe_additions=2)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["install_state"]["records"], 2)
+            self.assertEqual(payload["install_state"]["latest_event"], "old_entry_without_new_keys")
+            self.assertEqual(payload["skeleton_source_commit_previous"], "abcdef123456")
+            self.assertEqual(payload["skeleton_source_commit_current"], payload["skeleton_revision_current"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_reports_intentional_preserve_candidates(self) -> None:
+        tmp = self._tmp_root("adopt-preserve-candidates")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            self._fake_adopt_tools(
+                tmp,
+                candidate_paths=0,
+                safe_additions=0,
+                manual_paths=["config/ownership.yaml"],
+                risky_paths=[".github/workflows/ci.yml"],
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            candidates = payload["intentional_preserve_candidates"]
+            self.assertEqual({item["path"] for item in candidates}, {"config/ownership.yaml", ".github/workflows/ci.yml"})
+            self.assertTrue(any("manual or risky" in reason for reason in payload["review_classification"]["non_blocking_review"]))
+            self.assertEqual(payload["review_classification"]["blocking"], [])
+            self.assertEqual(payload["recommendation"], "needs_review")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

@@ -35,3 +35,4 @@
 | 0026 | enki-ownership-baseline-and-safe-apply | done | 2026-05-17 | 0 | 0025 ownership classification proposal |
 | 0027 | enki-manual-risky-system-review | done | 2026-05-17 | 0 | 0026 baseline and safe apply |
 | 0028 | closeout-wrapper-timing | done | 2026-05-17 | 0 | ENKI migration follow-up performance evidence |
+| 0029 | adoption-semantics-install-state | done | 2026-05-17 | 0 | 0024 adoption intake + ENKI migration follow-up semantics |

@@ -2084,6 +2084,32 @@ def target_skeleton_revision(target: Path) -> str | None:
     return None
 
 
+def target_install_state(target: Path) -> dict[str, Any]:
+    records = jsonl_records(target / "runtime" / "install-state.jsonl")
+    latest = records[-1] if records else {}
+    source_commit = ""
+    for record in reversed(records):
+        if not isinstance(record, dict):
+            continue
+        source_commit = str(record.get("source_commit") or record.get("skeleton_commit") or record.get("skeleton_revision") or "")
+        if source_commit:
+            source_commit = source_commit[:12]
+            break
+    if not source_commit:
+        source_commit = target_skeleton_revision(target) or ""
+    preserved = []
+    if isinstance(latest, dict) and isinstance(latest.get("preserved_paths"), list):
+        preserved = [str(item) for item in latest["preserved_paths"]]
+    return {
+        "path": "runtime/install-state.jsonl",
+        "records": len(records),
+        "latest_event": str(latest.get("event") or "") if isinstance(latest, dict) else "",
+        "latest_source_commit": source_commit,
+        "validation_status": str(latest.get("validation_status") or "") if isinstance(latest, dict) else "",
+        "preserved_paths": preserved,
+    }
+
+
 def project_profile_state(target: Path) -> str:
     path = target / "docs" / "PROJECT_PROFILE.md"
     if not path.exists():
@@ -2151,6 +2177,41 @@ def upgrade_brief_from_payload(payload: Any) -> dict[str, int]:
         "manual_merge": manual_merge,
         "risky_changed": risky_changed,
     }
+
+
+def upgrade_review_items(payload: Any) -> list[dict[str, str]]:
+    if not isinstance(payload, dict):
+        return []
+    brief = payload.get("brief")
+    if not isinstance(brief, dict):
+        return []
+    items: list[dict[str, str]] = []
+    for key, classification in (("manual_reviews", "manual_merge"), ("risky_reviews", "risky_changed")):
+        value = brief.get(key)
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if isinstance(item, dict):
+                path = str(item.get("path") or item.get("target_path") or item.get("local_path") or "")
+                reason = str(item.get("reason") or item.get("ownership_action") or classification)
+                owner = str(item.get("owner") or "")
+                action = str(item.get("action") or "")
+            else:
+                path = str(item)
+                reason = classification
+                owner = ""
+                action = ""
+            if path:
+                items.append(
+                    {
+                        "path": path,
+                        "classification": classification,
+                        "reason": reason,
+                        "owner": owner,
+                        "action": action,
+                    }
+                )
+    return items
 
 
 def run_adopt_json_tool(root: Path, command: list[str], name: str, timeout: int) -> tuple[CommandResult, Any]:
@@ -2228,9 +2289,20 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
         "target_git_clean": False,
         "skeleton_revision_in_target": None,
         "skeleton_revision_current": current_revision,
+        "skeleton_source_commit_previous": "",
+        "skeleton_source_commit_current": current_revision or "",
+        "install_state": {
+            "path": "runtime/install-state.jsonl",
+            "records": 0,
+            "latest_event": "",
+            "latest_source_commit": "",
+            "validation_status": "",
+            "preserved_paths": [],
+        },
         "project_profile_state": "missing",
         "license_signal": "unknown",
         "upgrade_brief": {"safe_missing": 0, "manual_merge": 0, "risky_changed": 0},
+        "intentional_preserve_candidates": [],
         "ownership": {
             "status": "unavailable",
             "analyzed_paths": 0,
@@ -2240,6 +2312,7 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
         },
         "recommendation": "stop",
         "stop_reasons": [],
+        "review_classification": {"blocking": [], "non_blocking_review": []},
         "next_action": "",
         "diagnostics": [],
     }
@@ -2262,14 +2335,17 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
     elif not clean:
         stop_reasons.append("target git working tree is dirty")
 
-    payload["skeleton_revision_in_target"] = target_skeleton_revision(target)
+    install_state = target_install_state(target)
+    payload["install_state"] = install_state
+    payload["skeleton_revision_in_target"] = install_state["latest_source_commit"] or target_skeleton_revision(target)
+    payload["skeleton_source_commit_previous"] = payload["skeleton_revision_in_target"] or ""
     payload["project_profile_state"] = project_profile_state(target)
     payload["license_signal"] = license_signal(target)
     payload["ownership"] = ownership_status_for_existing_target(target, stop_threshold)
     if payload["license_signal"] == "warning":
-        stop_reasons.append("target license requires human review before copying skeleton assets")
+        stop_reasons.append("target license warning requires human review before copying skeleton assets")
     elif payload["license_signal"] == "unknown":
-        review_reasons.append("target license is unknown")
+        review_reasons.append("target license is unknown; treat as non-blocking metadata review, not legal clearance")
     if payload["project_profile_state"] != "ready":
         review_reasons.append(f"PROJECT_PROFILE is {payload['project_profile_state']}")
 
@@ -2293,6 +2369,7 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
         payload["diagnostics"].append(adopt_result_payload(upgrade_result))
         if upgrade_result.ok and isinstance(upgrade_payload, dict):
             payload["upgrade_brief"] = upgrade_brief_from_payload(upgrade_payload)
+            payload["intentional_preserve_candidates"] = upgrade_review_items(upgrade_payload)
         else:
             review_reasons.append("upgrade brief unavailable or unparsable")
 
@@ -2325,6 +2402,10 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
     payload["recommendation"] = recommendation
     payload["stop_reasons"] = stop_reasons
     payload["review_reasons"] = review_reasons
+    payload["review_classification"] = {
+        "blocking": stop_reasons,
+        "non_blocking_review": review_reasons,
+    }
     payload["next_action"] = adopt_next_action(recommendation, stop_reasons, review_reasons)
     return payload, 0
 
@@ -2339,6 +2420,8 @@ def cmd_adopt(root: Path, args: argparse.Namespace) -> int:
         print(f"target: {payload['target']}")
         print(f"target_exists: {str(payload['target_exists']).lower()}")
         print(f"target_git_clean: {str(payload['target_git_clean']).lower()}")
+        print(f"skeleton_source_commit_previous: {payload['skeleton_source_commit_previous'] or '(none)'}")
+        print(f"skeleton_source_commit_current: {payload['skeleton_source_commit_current'] or '(unknown)'}")
         print(f"project_profile_state: {payload['project_profile_state']}")
         print(f"license_signal: {payload['license_signal']}")
         ownership = payload["ownership"]
@@ -2349,6 +2432,8 @@ def cmd_adopt(root: Path, args: argparse.Namespace) -> int:
             print(f"stop: {reason}")
         for reason in payload.get("review_reasons", []):
             print(f"review: {reason}")
+        if payload.get("intentional_preserve_candidates"):
+            print(f"intentional_preserve_candidates: {len(payload['intentional_preserve_candidates'])}")
         print(f"next_action: {payload['next_action']}")
     return exit_code
 

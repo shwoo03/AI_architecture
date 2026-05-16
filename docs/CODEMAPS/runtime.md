@@ -1,7 +1,7 @@
 # Codemap: runtime
 
-- `files`: 27
-- `line_count`: 6966
+- `files`: 28
+- `line_count`: 7033
 - `directories`: 9
 
 ## Navigation Entry Points
@@ -45,6 +45,7 @@
 - `runtime/validation/0026-enki-ownership-baseline-and-safe-apply.md`
 - `runtime/validation/0027-enki-manual-risky-system-review.md`
 - `runtime/validation/0028-closeout-timing-measurement.md`
+- `runtime/validation/0029-adoption-semantics-install-state.md`
 - `runtime/validation/README.md`
 - `state/blockers.md`
 - `state/decisions.md`

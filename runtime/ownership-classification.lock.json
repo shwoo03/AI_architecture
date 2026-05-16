@@ -2765,13 +2765,6 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
-    "plans/active/0028-closeout-wrapper-timing.md": {
-      "action": "preserve_project",
-      "matched_pattern": "plans/**",
-      "owner": "project_owned",
-      "reason": "system_defaults.rules",
-      "system_locked": false
-    },
     "plans/active/_template.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -2976,6 +2969,13 @@
       "system_locked": false
     },
     "plans/done/0028-closeout-wrapper-timing.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0029-adoption-semantics-install-state.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
       "owner": "project_owned",
@@ -3494,6 +3494,13 @@
       "system_locked": false
     },
     "runtime/validation/0028-closeout-timing-measurement.md": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "runtime/validation/0029-adoption-semantics-install-state.md": {
       "action": "preserve_project",
       "matched_pattern": "runtime/**",
       "owner": "project_owned",
@@ -4938,5 +4945,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 705
+  "total": 706
 }

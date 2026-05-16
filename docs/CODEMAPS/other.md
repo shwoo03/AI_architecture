@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 136
-- `line_count`: 16402
+- `files`: 137
+- `line_count`: 16485
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -217,6 +217,7 @@
 - `plans/done/0026-enki-ownership-baseline-and-safe-apply.md`
 - `plans/done/0027-enki-manual-risky-system-review.md`
 - `plans/done/0028-closeout-wrapper-timing.md`
+- `plans/done/0029-adoption-semantics-install-state.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`
