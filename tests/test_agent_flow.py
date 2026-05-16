@@ -15,6 +15,43 @@ class AgentFlowTests(unittest.TestCase):
         for name in names:
             shutil.copyfile(SCRIPTS / name, root / "scripts" / name)
 
+    def _init_clean_git_target(self, target: Path) -> None:
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "README.md").write_text("# Legacy Target\n", encoding="utf-8")
+        (target / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+        (target / "docs").mkdir()
+        (target / "docs" / "PROJECT_PROFILE.md").write_text(
+            "primary_goal: keep legacy project running\n"
+            "success_criteria: tests pass\n"
+            "failure_definition: data loss\n",
+            encoding="utf-8",
+        )
+        for command in (
+            ["git", "init"],
+            ["git", "config", "user.email", "test@example.invalid"],
+            ["git", "config", "user.name", "Test User"],
+            ["git", "add", "."],
+            ["git", "commit", "-m", "initial"],
+        ):
+            result = subprocess.run(command, cwd=str(target), capture_output=True, text=True, encoding="utf-8", timeout=30)
+            if result.returncode != 0:
+                self.skipTest(f"git unavailable for adopt tests: {result.stderr or result.stdout}")
+
+    def _fake_adopt_tools(self, root: Path, *, candidate_paths: int = 0, safe_additions: int = 1) -> None:
+        scripts = root / "scripts"
+        scripts.mkdir(parents=True, exist_ok=True)
+        (scripts / "upgrade-from-skeleton.py").write_text(
+            "import json\n"
+            f"safe = [{{'path': f'file-{{i}}.md'}} for i in range({safe_additions})]\n"
+            "print(json.dumps({'dry_run': True, 'summary': {'add:safe': len(safe)}, 'brief': {'safe_additions': safe, 'manual_reviews': [], 'risky_reviews': []}}))\n",
+            encoding="utf-8",
+        )
+        (scripts / "ownership-initialize.py").write_text(
+            "import json\n"
+            f"print(json.dumps({{'ok': True, 'status': 'draft', 'analyzed_paths': 3, 'candidate_paths': {candidate_paths}}}))\n",
+            encoding="utf-8",
+        )
+
     def _fake_reference_root(self, root: Path) -> Path:
         repo = root / "runtime" / "external-repos" / "local" / "fake"
         (repo / "scripts").mkdir(parents=True)
@@ -1297,6 +1334,108 @@ class AgentFlowTests(unittest.TestCase):
             result = _run([str(self.SCRIPT), "--root", str(tmp), "recall", "   ", "--format", "json"])
             self.assertEqual(result.returncode, 2)
             self.assertIn("query is required", result.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_status_reports_target_without_running_full_tools(self) -> None:
+        tmp = self._tmp_root("adopt-status")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            marker = tmp / "runtime" / "adopt-full-tool-ran"
+            (scripts / "upgrade-from-skeleton.py").write_text(
+                f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            (scripts / "ownership-initialize.py").write_text(
+                f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--status", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["mode"], "status")
+            self.assertTrue(payload["target_exists"])
+            self.assertTrue(payload["target_git_clean"])
+            self.assertFalse(marker.exists())
+            self.assertEqual(payload["upgrade_brief"], {"safe_missing": 0, "manual_merge": 0, "risky_changed": 0})
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_dry_run_synthesizes_upgrade_and_ownership(self) -> None:
+        tmp = self._tmp_root("adopt-dry-run")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            self._fake_adopt_tools(tmp, candidate_paths=0, safe_additions=2)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["mode"], "dry_run")
+            self.assertEqual(payload["upgrade_brief"]["safe_missing"], 2)
+            self.assertEqual(payload["ownership"]["candidate_paths"], 0)
+            self.assertEqual(payload["recommendation"], "apply_safe_ready")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_stops_when_candidate_threshold_exceeded(self) -> None:
+        tmp = self._tmp_root("adopt-candidates")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            self._fake_adopt_tools(tmp, candidate_paths=21, safe_additions=2)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["recommendation"], "stop")
+            self.assertTrue(payload["ownership"]["exceeds_threshold"])
+            self.assertTrue(any("candidate_paths" in reason for reason in payload["stop_reasons"]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_stops_when_target_git_dirty(self) -> None:
+        tmp = self._tmp_root("adopt-dirty")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            (target / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+            self._fake_adopt_tools(tmp, candidate_paths=0, safe_additions=2)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["target_git_clean"])
+            self.assertEqual(payload["recommendation"], "stop")
+            self.assertTrue(any("dirty" in reason for reason in payload["stop_reasons"]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_warns_on_gpl_license(self) -> None:
+        tmp = self._tmp_root("adopt-license")
+        try:
+            target = tmp / "target"
+            self._init_clean_git_target(target)
+            (target / "LICENSE").write_text("GNU General Public License version 3\n", encoding="utf-8")
+            subprocess.run(["git", "add", "LICENSE"], cwd=str(target), check=True, capture_output=True, text=True)
+            subprocess.run(["git", "commit", "-m", "license"], cwd=str(target), check=True, capture_output=True, text=True)
+            self._fake_adopt_tools(tmp, candidate_paths=0, safe_additions=2)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["license_signal"], "warning")
+            self.assertEqual(payload["recommendation"], "stop")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_adopt_does_not_expose_write_or_risky_modes(self) -> None:
+        tmp = self._tmp_root("adopt-flags")
+        try:
+            target = tmp / "target"
+            target.mkdir()
+            for forbidden in ("--apply-safe", "--verify", "--rollback", "--include-risky"):
+                result = _run([str(self.SCRIPT), "--root", str(tmp), "adopt", "--target", str(target), forbidden, "--format", "json"])
+                self.assertEqual(result.returncode, 2, forbidden)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

@@ -163,6 +163,10 @@
 
 업그레이드 원칙은 변하지 않습니다: 먼저 dry-run diff를 보고, risky 변경은 proposal/review queue로 남기며, 승인 후에만 파일을 반영합니다. 적용 뒤에는 `python3 scripts/verify.py`와 `python3 scripts/quality-gate.py --format json`을 실행합니다.
 
+`python3 scripts/agent-flow.py adopt --target <project> --format json`은 이 절차의 read-only 진입점입니다. 단일 명령으로 adoption을 끝내지 않고, 각 adoption slice 시작 전에 target git 상태, 라이선스 신호, 프로젝트 프로필 상태, safe missing 파일 수, ownership candidate 수, stop reason, next action을 한 번에 보고합니다.
+
+0024의 `adopt` 표면은 `--status`와 기본 dry-run만 제공합니다. `--apply-safe`, `--verify`, `--rollback`, `--include-risky`는 의도적으로 노출하지 않습니다. 쓰기가 필요한 apply-safe 흐름은 별도 승인된 slice에서 dry-run을 다시 실행한 뒤 다룹니다.
+
 ### Overlay profile
 
 기본 overlay profile은 `stable`입니다. 기능별 tier와 overlay 기본값은 `docs/feature-status.yaml`이 단일 진실 소스입니다.

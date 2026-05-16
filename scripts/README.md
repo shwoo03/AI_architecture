@@ -147,6 +147,14 @@ python3 scripts/search-activity-log.py --contains "rotation lock" --last 5
 - Use `--tier all` to include incubating checks and `--with-tests` when a slower full quality-gate run is desired.
 - Use `--projects-root C:\Users\dntmd\Desktop\Projects` to summarize whether existing projects still have safe missing skeleton updates or risky review-only changes.
 
+## 2026-05-17 project adoption intake
+
+- `python3 scripts/agent-flow.py adopt --target <project> --format json` is the read-only intake for bringing an existing project onto this operating OS.
+- It wraps the existing dry-run upgrade and ownership initialize tools, then reports target git cleanliness, project profile state, license signal, safe missing files, ownership candidate count, recommendation, stop reasons, and next action.
+- `--status` runs only lightweight checks and skips the full upgrade/ownership analysis.
+- The command intentionally does not expose apply, verify, rollback, or include-risky modes. Use the raw internal scripts only when a later approved slice requires writes.
+- `adopt` writes no target files and no adoption ledger. Closeout evidence records the skeleton-side implementation work.
+
 ## 2026-04-29 review queue
 
 - `runtime/review-queue.jsonl` is the durable human-decision queue.

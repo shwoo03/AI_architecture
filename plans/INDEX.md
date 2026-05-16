@@ -30,3 +30,4 @@
 | 0021 | closeout-validator-loop-extension | done | 2026-05-16 | 0 | 0020 usage evidence + explicit user implementation exception |
 | 0022 | spawn-ready-packet | done | 2026-05-16 | 0 | 0021 validator loop + approved DelegationPlan |
 | 0023 | agent-flow-doctor | done | 2026-05-17 | 0 | operational diagnostics UX improvement |
+| 0024 | project-adoption-intake | done | 2026-05-17 | 0 | 0023 diagnostics + existing skeleton upgrade tooling |

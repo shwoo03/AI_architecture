@@ -1936,6 +1936,364 @@ def cmd_doctor(root: Path, args: argparse.Namespace) -> int:
     return 0 if not failed else 1
 
 
+def git_status_short(target: Path, timeout: int) -> tuple[bool, str, str]:
+    result = subprocess.run(
+        ["git", "-C", str(target), "status", "--short"],
+        cwd=str(target),
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        env=command_env(),
+        timeout=timeout,
+    )
+    if result.returncode != 0:
+        return False, compact_output(result.stderr or result.stdout), "unavailable"
+    return result.stdout.strip() == "", result.stdout.strip(), "ok"
+
+
+def short_git_revision(path: Path, timeout: int) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
+        cwd=str(path),
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        env=command_env(),
+        timeout=timeout,
+    )
+    if result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    return value or None
+
+
+def jsonl_records(path: Path) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    if not path.exists():
+        return records
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(item, dict):
+            records.append(item)
+    return records
+
+
+def find_revision_in_value(value: Any) -> str | None:
+    if isinstance(value, str):
+        match = re.search(r"\b[0-9a-f]{7,40}\b", value)
+        return match.group(0)[:12] if match else None
+    if isinstance(value, dict):
+        preferred = (
+            "skeleton_revision",
+            "skeleton_commit",
+            "source_revision",
+            "source_commit",
+            "to_commit",
+            "from_commit",
+            "revision",
+            "commit",
+        )
+        for key in preferred:
+            if key in value:
+                found = find_revision_in_value(value[key])
+                if found:
+                    return found
+        for nested in value.values():
+            found = find_revision_in_value(nested)
+            if found:
+                return found
+    if isinstance(value, list):
+        for nested in value:
+            found = find_revision_in_value(nested)
+            if found:
+                return found
+    return None
+
+
+def target_skeleton_revision(target: Path) -> str | None:
+    for rel in ("runtime/install-state.jsonl", "runtime/activity-log.jsonl"):
+        records = jsonl_records(target / rel)
+        for record in reversed(records):
+            haystack = json.dumps(record, ensure_ascii=False).lower()
+            if not any(term in haystack for term in ("skeleton", "bootstrap", "adoption", "upgrade")):
+                continue
+            found = find_revision_in_value(record)
+            if found:
+                return found
+    return None
+
+
+def project_profile_state(target: Path) -> str:
+    path = target / "docs" / "PROJECT_PROFILE.md"
+    if not path.exists():
+        return "missing"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if not text.strip():
+        return "partial"
+    lowered = text.lower()
+    placeholders = ("needs clarification", "todo", "tbd", "<", "primary_goal: \"\"", "success_criteria: []", "failure_definition: \"\"")
+    if any(marker in lowered for marker in placeholders):
+        return "partial"
+    required_terms = ("primary_goal", "success_criteria", "failure_definition")
+    if not all(term in lowered for term in required_terms):
+        return "partial"
+    return "ready"
+
+
+def license_signal(target: Path) -> str:
+    license_paths = sorted(path for path in target.glob("LICENSE*") if path.is_file())
+    if not license_paths:
+        return "unknown"
+    sample = "\n".join(path.read_text(encoding="utf-8", errors="replace")[:4000] for path in license_paths[:3]).lower()
+    if "affero general public license" in sample or "gnu general public license" in sample or "agpl" in sample or "gpl" in sample:
+        return "warning"
+    if any(term in sample for term in ("mit license", "apache license", "bsd license", "isc license")):
+        return "compatible"
+    return "unknown"
+
+
+def count_brief_items(payload: Any, key: str) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    brief = payload.get("brief")
+    if isinstance(brief, dict):
+        value = brief.get(key)
+        if isinstance(value, list):
+            return len(value)
+    return 0
+
+
+def upgrade_brief_from_payload(payload: Any) -> dict[str, int]:
+    if not isinstance(payload, dict):
+        return {"safe_missing": 0, "manual_merge": 0, "risky_changed": 0}
+    summary = payload.get("summary")
+    safe_missing = count_brief_items(payload, "safe_additions")
+    manual_merge = count_brief_items(payload, "manual_reviews")
+    risky_changed = count_brief_items(payload, "risky_reviews")
+    if isinstance(summary, dict):
+        for key, value in summary.items():
+            if not isinstance(value, int):
+                continue
+            lowered = str(key).lower()
+            if "add" in lowered and "safe" in lowered:
+                safe_missing = max(safe_missing, value)
+            elif "review" in lowered or "manual" in lowered:
+                manual_merge = max(manual_merge, value)
+            elif "risky" in lowered or "update_available" in lowered:
+                risky_changed = max(risky_changed, value)
+    return {
+        "safe_missing": safe_missing,
+        "manual_merge": manual_merge,
+        "risky_changed": risky_changed,
+    }
+
+
+def run_adopt_json_tool(root: Path, command: list[str], name: str, timeout: int) -> tuple[CommandResult, Any]:
+    result = run_command(root, name, command, timeout)
+    parsed = parsed_json_stdout(result)
+    return result, parsed
+
+
+def adopt_result_payload(result: CommandResult) -> dict[str, Any]:
+    payload = result_payload(result)
+    payload["detail"] = doctor_detail(result)
+    return payload
+
+
+def ownership_status_for_existing_target(target: Path, stop_threshold: int) -> dict[str, Any]:
+    config = target / "config" / "ownership.yaml"
+    lock = target / "runtime" / "ownership-classification.lock.json"
+    if config.exists() and lock.exists():
+        status = "already_initialized"
+    elif config.exists():
+        status = "missing_lock"
+    else:
+        status = "missing_config"
+    return {
+        "status": status,
+        "analyzed_paths": 0,
+        "candidate_paths": 0,
+        "stop_threshold": stop_threshold,
+        "exceeds_threshold": False,
+    }
+
+
+def ownership_from_initialize_payload(payload: Any, stop_threshold: int) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {
+            "status": "unavailable",
+            "analyzed_paths": 0,
+            "candidate_paths": 0,
+            "stop_threshold": stop_threshold,
+            "exceeds_threshold": False,
+        }
+    candidate_paths = int(payload.get("candidate_paths") or 0)
+    return {
+        "status": str(payload.get("status") or "unavailable"),
+        "analyzed_paths": int(payload.get("analyzed_paths") or 0),
+        "candidate_paths": candidate_paths,
+        "stop_threshold": stop_threshold,
+        "exceeds_threshold": candidate_paths > stop_threshold,
+    }
+
+
+def adopt_next_action(recommendation: str, stop_reasons: list[str], review_reasons: list[str]) -> str:
+    if recommendation == "stop":
+        if stop_reasons:
+            return "Resolve stop reasons before planning apply-safe adoption."
+        return "Stop and inspect the target state before continuing."
+    if recommendation == "apply_safe_ready":
+        return "Open the apply-safe slice only after reviewing this dry-run output; 0025 must rerun dry-run before writing."
+    if review_reasons:
+        return "Review profile, license, ownership, manual merge, or risky signals before continuing."
+    return "Review the intake output and decide the next adoption slice."
+
+
+def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    target = Path(args.target).expanduser().resolve(strict=False)
+    target_exists = target.is_dir()
+    mode = "status" if args.status else "dry_run"
+    stop_threshold = int(args.stop_threshold)
+    current_revision = short_git_revision(root, min(args.timeout, 20))
+    payload: dict[str, Any] = {
+        "ok": target_exists,
+        "target": str(target),
+        "mode": mode,
+        "target_exists": target_exists,
+        "target_git_clean": False,
+        "skeleton_revision_in_target": None,
+        "skeleton_revision_current": current_revision,
+        "project_profile_state": "missing",
+        "license_signal": "unknown",
+        "upgrade_brief": {"safe_missing": 0, "manual_merge": 0, "risky_changed": 0},
+        "ownership": {
+            "status": "unavailable",
+            "analyzed_paths": 0,
+            "candidate_paths": 0,
+            "stop_threshold": stop_threshold,
+            "exceeds_threshold": False,
+        },
+        "recommendation": "stop",
+        "stop_reasons": [],
+        "next_action": "",
+        "diagnostics": [],
+    }
+    stop_reasons: list[str] = []
+    review_reasons: list[str] = []
+    if not target_exists:
+        stop_reasons.append("target does not exist or is not a directory")
+        payload["stop_reasons"] = stop_reasons
+        payload["next_action"] = adopt_next_action("stop", stop_reasons, review_reasons)
+        return payload, 2
+
+    try:
+        clean, git_detail, git_status = git_status_short(target, min(args.timeout, 20))
+    except (OSError, subprocess.SubprocessError) as exc:
+        clean, git_detail, git_status = False, str(exc), "unavailable"
+    payload["target_git_clean"] = clean
+    payload["diagnostics"].append({"name": "target-git-status", "ok": git_status == "ok", "detail": git_detail})
+    if git_status != "ok":
+        stop_reasons.append("target git status unavailable")
+    elif not clean:
+        stop_reasons.append("target git working tree is dirty")
+
+    payload["skeleton_revision_in_target"] = target_skeleton_revision(target)
+    payload["project_profile_state"] = project_profile_state(target)
+    payload["license_signal"] = license_signal(target)
+    payload["ownership"] = ownership_status_for_existing_target(target, stop_threshold)
+    if payload["license_signal"] == "warning":
+        stop_reasons.append("target license requires human review before copying skeleton assets")
+    elif payload["license_signal"] == "unknown":
+        review_reasons.append("target license is unknown")
+    if payload["project_profile_state"] != "ready":
+        review_reasons.append(f"PROJECT_PROFILE is {payload['project_profile_state']}")
+
+    if not args.status:
+        upgrade_result, upgrade_payload = run_adopt_json_tool(
+            root,
+            [
+                sys.executable,
+                str(root / "scripts" / "upgrade-from-skeleton.py"),
+                "--target",
+                str(target),
+                "--brief",
+                "--profile",
+                "stable",
+                "--format",
+                "json",
+            ],
+            "upgrade-from-skeleton-brief",
+            args.timeout,
+        )
+        payload["diagnostics"].append(adopt_result_payload(upgrade_result))
+        if upgrade_result.ok and isinstance(upgrade_payload, dict):
+            payload["upgrade_brief"] = upgrade_brief_from_payload(upgrade_payload)
+        else:
+            review_reasons.append("upgrade brief unavailable or unparsable")
+
+        ownership_result, ownership_payload = run_adopt_json_tool(
+            root,
+            [sys.executable, str(root / "scripts" / "ownership-initialize.py"), "--target", str(target), "--format", "json"],
+            "ownership-initialize",
+            args.timeout,
+        )
+        payload["diagnostics"].append(adopt_result_payload(ownership_result))
+        payload["ownership"] = ownership_from_initialize_payload(ownership_payload, stop_threshold)
+        if payload["ownership"]["exceeds_threshold"]:
+            stop_reasons.append(f"candidate_paths ({payload['ownership']['candidate_paths']}) exceeds stop_threshold ({stop_threshold})")
+        if payload["ownership"]["status"] in {"bad_source", "bad_target", "unavailable"}:
+            stop_reasons.append("ownership initialize unavailable")
+        elif payload["ownership"]["status"] in {"lock_missing", "missing_config", "already_initialized"}:
+            review_reasons.append(f"ownership status is {payload['ownership']['status']}")
+
+        brief = payload["upgrade_brief"]
+        if brief["manual_merge"] or brief["risky_changed"]:
+            review_reasons.append("manual or risky upgrade items require review")
+
+    if stop_reasons:
+        recommendation = "stop"
+    elif not args.status and payload["upgrade_brief"]["safe_missing"] > 0 and not review_reasons:
+        recommendation = "apply_safe_ready"
+    else:
+        recommendation = "needs_review"
+    payload["ok"] = True
+    payload["recommendation"] = recommendation
+    payload["stop_reasons"] = stop_reasons
+    payload["review_reasons"] = review_reasons
+    payload["next_action"] = adopt_next_action(recommendation, stop_reasons, review_reasons)
+    return payload, 0
+
+
+def cmd_adopt(root: Path, args: argparse.Namespace) -> int:
+    payload, exit_code = build_adopt_payload(root, args)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"adopt: {payload['recommendation']}")
+        print(f"mode: {payload['mode']}")
+        print(f"target: {payload['target']}")
+        print(f"target_exists: {str(payload['target_exists']).lower()}")
+        print(f"target_git_clean: {str(payload['target_git_clean']).lower()}")
+        print(f"project_profile_state: {payload['project_profile_state']}")
+        print(f"license_signal: {payload['license_signal']}")
+        ownership = payload["ownership"]
+        print(f"ownership: {ownership['status']} candidate_paths={ownership['candidate_paths']} threshold={ownership['stop_threshold']}")
+        brief = payload["upgrade_brief"]
+        print(f"upgrade_brief: safe_missing={brief['safe_missing']} manual_merge={brief['manual_merge']} risky_changed={brief['risky_changed']}")
+        for reason in payload["stop_reasons"]:
+            print(f"stop: {reason}")
+        for reason in payload.get("review_reasons", []):
+            print(f"review: {reason}")
+        print(f"next_action: {payload['next_action']}")
+    return exit_code
+
+
 def specialist_proposal_payload(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     reason = args.reason.strip()
     trigger_matches = match_terms(reason, ON_DEMAND_TRIGGERS)
@@ -2541,6 +2899,14 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--format", choices=("text", "json"), default="text")
     doctor.add_argument("--timeout", type=int, default=180)
     doctor.set_defaults(func=cmd_doctor)
+
+    adopt = sub.add_parser("adopt", help="Read-only intake for adopting the skeleton into an external project.")
+    adopt.add_argument("--target", required=True, help="Existing project directory to inspect.")
+    adopt.add_argument("--status", action="store_true", help="Run only lightweight status checks.")
+    adopt.add_argument("--stop-threshold", type=int, default=20, help="Ownership candidate count above which dry-run recommends stop.")
+    adopt.add_argument("--format", choices=("text", "json"), default="text")
+    adopt.add_argument("--timeout", type=int, default=120)
+    adopt.set_defaults(func=cmd_adopt)
 
     specialist = sub.add_parser("specialist", help="On-demand specialist proposal, preview, and approved delegation prep.")
     specialist_sub = specialist.add_subparsers(dest="specialist_command", required=True)

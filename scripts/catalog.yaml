@@ -6,7 +6,7 @@ version: 1
 
 public:
   - path: scripts/agent-flow.py
-    purpose: Natural-language routing, reference decisions, closeout, and on-demand specialist proposal/preview/approved delegation preparation.
+    purpose: Natural-language routing, reference decisions, closeout, diagnostics, project adoption intake, and on-demand specialist proposal/preview/approved delegation preparation.
 
 routing:
   modes:
@@ -207,11 +207,11 @@ internal:
     - path: scripts/convert.py
       used_by: canonical artifact generation
     - path: scripts/upgrade-from-skeleton.py
-      used_by: skeleton upgrades
+      used_by: skeleton upgrades and agent-flow adopt dry-run intake
     - path: scripts/ownership-lock.py
       used_by: ownership-aware upgrade self-classification lock generation
     - path: scripts/ownership-initialize.py
-      used_by: ownership-aware upgrade target initialization reports
+      used_by: ownership-aware upgrade target initialization reports and agent-flow adopt dry-run intake
     - path: scripts/skeleton-doctor.py
       used_by: readiness diagnostics
     - path: scripts/agent-autonomy-check.py
