@@ -714,6 +714,13 @@
       "reason": "system_defaults.rules",
       "system_locked": true
     },
+    ".claude/settings.local.json": {
+      "action": "update_system",
+      "matched_pattern": ".claude/**",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
     ".claude/skills/.GENERATED_DO_NOT_EDIT": {
       "action": "update_system",
       "matched_pattern": ".claude/**",
@@ -4952,5 +4959,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 707
+  "total": 708
 }

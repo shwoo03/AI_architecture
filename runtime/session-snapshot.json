@@ -1,37 +1,22 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-16T19:55:35Z",
+  "ts": "2026-05-17T03:25:43Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-16T19:55:05Z",
-    "phase": "session",
-    "action": "handoff_saved",
-    "project": "AI_architecture",
-    "goal_lineage": [],
-    "tool_call": {
-      "tool": "codex",
-      "status": "ok",
-      "normalized_status": "success",
-      "failure_type": "",
-      "empty_output": false,
-      "duration_ms": null,
-      "summary": "Closeout/test validation loop cost reduction handoff refreshed: scripts-fast auto closeout, quality-gate --jobs, timing evidence, validation status."
-    },
-    "data": {}
+    "ts": "2026-05-17T03:25:43Z",
+    "phase": "closeout",
+    "action": "task_closeout",
+    "goal": "Push private near-original mirror including env and generated runtime surfaces, excluding only caches and dependency/build artifacts",
+    "result": "recording"
   },
   "completion_evidence_last": {
-    "ts": "2026-05-16T19:53:02Z",
-    "goal": "Reduce closeout and validation loop cost",
+    "ts": "2026-05-17T03:25:43Z",
+    "goal": "Push private near-original mirror including env and generated runtime surfaces, excluding only caches and dependency/build artifacts",
     "changed_paths": [
-      "scripts/agent-flow.py",
-      "scripts/task-closeout.py",
-      "scripts/quality-gate.py",
-      "tests/test_agent_flow.py",
-      "tests/test_runtime.py",
-      "tests/test_validation.py",
-      "scripts/README.md"
+      ".claude/settings.local.json",
+      "runtime/ownership-classification.lock.json"
     ],
     "validations": [
       {
@@ -42,18 +27,25 @@
         "detail": "skeleton OK: all checks passed"
       },
       {
-        "name": "python-syntax-changed",
-        "command": "python3 -c import ast,pathlib,sys;[ast.parse(pathlib.Path(p).read_text(encoding='utf-8-sig'), filename=p) for p in sys.argv[1:]] scripts/agent-flow.py scripts/task-closeout.py scripts/quality-gate.py tests/test_agent_flow.py tests/test_runtime.py tests/test_validation.py",
+        "name": "completion-evidence",
+        "command": "python3 scripts/completion-evidence.py --root . check",
         "status": "OK",
         "exit_code": 0,
-        "detail": "exit 0"
+        "detail": "completion evidence OK: 55 record(s) checked"
       },
       {
-        "name": "python-unittest-focused",
-        "command": "python3 -m unittest tests.test_agent_flow tests.test_validation tests.test_runtime -v",
+        "name": "resume-readiness",
+        "command": "python3 scripts/resume-readiness.py --root . --strict",
         "status": "OK",
         "exit_code": 0,
-        "detail": "test_adopt_does_not_expose_write_or_risky_modes (tests.test_agent_flow.AgentFlowTests.test_adopt_does_not_expose_write_or_risky_modes) ... ok | test_adopt_dry_run_synthesizes_upgrade_and_ownership (tests.test_agent_flow.AgentFlowTests.test_adopt_dry_run_synthesizes_upgrade_and_ownership) ... ok | test_adopt_profile_ready_allows_wiki_links_and_tbd_guidance (tests.test_agent_flow.AgentFlowTests.test_adopt_profile_ready_allows_wiki_links_and_tbd_guidance) ... ok | test_adopt_reads_old_install_state_with_fallback (tests.test_agent_flow.AgentFlowTests.test_adopt_reads_old_install_state_with_fallback) ... ok"
+        "detail": "Resume Readiness | root: /Users/shwoo/mydir/AI/AI_architecture | summary: error=0, warn=0, info=0 | OK next agent can resume from current handoff and ledgers"
+      },
+      {
+        "name": "skill-surface",
+        "command": "python3 scripts/skill-surface-check.py --root . --strict",
+        "status": "OK",
+        "exit_code": 0,
+        "detail": "Skill Surface Check | root: /Users/shwoo/mydir/AI/AI_architecture | summary: error=0, warn=0, info=0 | active_skills: 13"
       }
     ],
     "outcome": "genuine_success",
