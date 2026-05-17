@@ -27,7 +27,7 @@
 - `python3 scripts/agent-flow.py decide --proposal <path> --decision accepted|rejected|deferred --by <name>`: proposal 결정과 review queue 상태를 같이 맞춥니다.
 - `python3 scripts/agent-flow.py recall "<query>"`: 로컬 session recall 캐시를 검색합니다. 원본은 Markdown/JSONL이고 SQLite 파일은 삭제 후 재생성 가능한 캐시입니다.
 - `python3 scripts/agent-flow.py specialist propose|review|approve|preview|execute ...`: 필요할 때만 specialist proposal, overlay 반영, delegation preview, approved handoff preparation을 수행합니다.
-- `python3 scripts/agent-flow.py closeout --goal "<goal>" --changed-path <path>`: verify, quality gate, closeout evidence 기록을 한 번에 묶습니다.
+- `python3 scripts/agent-flow.py closeout --goal "<goal>" --changed-path <path>`: 변경 경로에 맞는 검증 profile을 고르고 closeout evidence를 기록합니다. 기본 `auto`는 개발 루프 속도를 위해 스크립트 변경을 `scripts-fast`로 라우팅하고, 전체 게이트가 필요하면 `--profile all` 또는 명시 `--profile scripts`를 사용합니다.
 
 `start`가 반환하는 `suggested_questions`와 `build_intake`는 사용자가 명령어를 치게 하려는 안내가 아닙니다. 에이전트가 자연어 대화에서 무엇을 물어볼지 참고하는 질문 후보입니다. `write_policy`는 해당 흐름이 read-only인지, 수동 구현 범위 확정과 plan 작성이 필요한지, confirmation 뒤 쓰기 가능한지 알려줍니다. `research --auto --goal`이 반환하는 `reference_candidates`는 자동 선택을 설명하기 위한 top 후보 목록이며, 기본 모드에서는 후보 카드나 proposal을 쓰지 않습니다. `next_action_type: manual_work_required`는 에이전트가 먼저 범위와 수용 기준을 정리하고 구현한 뒤 closeout으로 가야 한다는 뜻입니다. `requires_confirmation: true`는 쓰기/승인/적용 플래그가 포함된 흐름이라 사용자 확인 없이는 진행하지 않는다는 뜻입니다.
 
@@ -72,7 +72,7 @@
 - `scripts/search-activity-log.py`: 활동 로그를 읽어 `--since/--until/--phase/--action/--project/--tool/--contains/--sidecar-contains` 필터로 검색합니다. 긴 tool output은 sidecar 파일에 보존될 수 있으며, 기본 출력은 표, `--jsonl`로 원본 JSONL 스트림.
 - `scripts/session-recall.py`: activity log, completion evidence, decisions, skill usage, session handoff를 SQLite FTS 캐시로 인덱싱하고 검색합니다. 원본 로그를 대체하지 않으며 삭제 후 `index`로 재생성할 수 있습니다. 캐시에는 secret-like 값이 마스킹되어 들어갑니다.
 - `scripts/list-open-questions.py`: 프로젝트 전체 `**/*.md`를 스캔해 `[NEEDS CLARIFICATION: ...]` 마커를 집계합니다. `--count/--by-file/--json`, CI 게이트용 `--strict` 지원.
-- `scripts/quality-gate.py`: 현재 프로젝트에서 사용 가능한 검증 표면을 감지해 한 번에 실행합니다. Skeleton 검증, ledger 검사, eval-all, Python 문법 검사, unittest, `package.json`의 `npm run test/build`를 지원하며 `--tier stable|all`로 stable closeout과 incubating 검증을 분리합니다.
+- `scripts/quality-gate.py`: 현재 프로젝트에서 사용 가능한 검증 표면을 감지해 한 번에 실행합니다. Skeleton 검증, ledger 검사, eval-all, Python 문법 검사, unittest, `package.json`의 `npm run test/build`를 지원하며 `--tier stable|all`로 stable closeout과 incubating 검증을 분리합니다. 독립 진단은 기본 `--jobs 4`로 bounded parallel 실행되며, 재현 디버깅이 필요하면 `--jobs 1`로 순차 실행합니다.
 - `scripts/review-queue.py`: 에이전트가 혼자 결정하면 안 되는 항목을 `runtime/review-queue.jsonl`에 append-only 이벤트로 남깁니다. Notion 중복, risky upgrade, reference adoption, skill lifecycle 승인 대기 같은 항목을 `add/list/resolve/dismiss/count/sweep`으로 관리합니다. `sweep`은 기본 dry-run이며 `--apply`일 때만 정리 이벤트를 append합니다.
 - `scripts/validate-reference-candidates.py`: `research/reference-candidates/`의 실제 후보 카드가 필수 필드, 허용 값, 점수 합계, 리스트 항목을 갖췄는지 검사합니다.
 - `scripts/validate-reference-proposals.py`: `runtime/proposals/reference-adoption/`의 실제 dry-run 제안서가 필수 필드, 후보 카드 링크, 모듈형 흡수 판단, 검증 계획, 중단 조건을 갖췄는지 검사합니다.
@@ -190,6 +190,7 @@ python3 scripts/reference-copy-ledger.py check
 
 - `scripts/agent-autonomy-check.py --strict` prevents the skeleton from drifting back to "user runs the command" language.
 - `scripts/task-closeout.py` is the preferred final gate for agent work. It chooses checks from changed paths or an explicit profile and can record evidence.
+- `auto` closeout uses `scripts-fast` for script/test path edits: skeleton verification, changed-file compile checks, and focused unittest modules. Explicit `scripts` and `all` remain the heavier final gates.
 - `runtime/completion-evidence.jsonl` is written by agents, not users. It records the goal, changed paths, validations, outcome, residual risk, and next action.
 - `runtime/checkpoints.jsonl` stores named mid-task checkpoints. It is not a replacement for closeout evidence.
 - `scripts/security-scan.py` supports `rules/security-scan-allowlist.json` for justified known findings. Suppressed findings are counted separately in JSON output.

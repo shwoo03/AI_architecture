@@ -599,6 +599,29 @@ class TaskCloseoutTests(unittest.TestCase):
         self.assertIn("lsp-diagnostics", scripts_commands)
         self.assertIn("lsp-diagnostics", all_commands)
 
+    def test_auto_script_changes_use_fast_focused_profile(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("task_closeout_under_test", self.SCRIPT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.path.insert(0, str(SCRIPTS))
+        sys.modules[spec.name] = module
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            sys.path.remove(str(SCRIPTS))
+        changed_paths = ["scripts/agent-flow.py"]
+        self.assertEqual(module.infer_profile(changed_paths), "scripts-fast")
+        fast_commands = dict(module.profile_commands(REPO_ROOT, "scripts-fast", changed_paths))
+        self.assertIn("verify-skeleton", fast_commands)
+        self.assertIn("python-syntax-changed", fast_commands)
+        self.assertIn("python-unittest-focused", fast_commands)
+        self.assertIn("tests.test_agent_flow", fast_commands["python-unittest-focused"])
+        self.assertNotIn("security-scan", fast_commands)
+        self.assertNotIn("lsp-diagnostics", fast_commands)
+
     def test_docs_profile_runs_read_only_checks(self) -> None:
         tracked_runtime = [
             REPO_ROOT / "runtime" / "activity-log.jsonl",

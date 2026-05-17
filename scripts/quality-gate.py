@@ -17,9 +17,10 @@ import sys
 import time
 import tokenize
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -656,56 +657,86 @@ def explain_checks(checks: list[GateCheck]) -> list[dict[str, object]]:
     return [explain_check(check) for check in checks if check.status != "OK" and check.status != "SKIP"]
 
 
+CheckThunk = Callable[[], GateCheck | list[GateCheck]]
+
+
+def run_check_thunks(thunks: list[CheckThunk], jobs: int) -> list[GateCheck]:
+    if jobs <= 1 or len(thunks) <= 1:
+        checks: list[GateCheck] = []
+        for thunk in thunks:
+            value = thunk()
+            if isinstance(value, list):
+                checks.extend(value)
+            else:
+                checks.append(value)
+        return checks
+
+    results: list[GateCheck | list[GateCheck] | None] = [None] * len(thunks)
+    max_workers = max(1, min(jobs, len(thunks)))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {executor.submit(thunk): index for index, thunk in enumerate(thunks)}
+        for future in as_completed(future_to_index):
+            results[future_to_index[future]] = future.result()
+    checks = []
+    for value in results:
+        if isinstance(value, list):
+            checks.extend(value)
+        elif value is not None:
+            checks.append(value)
+    return checks
+
+
 def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     root = Path(args.root).resolve() if args.root else repo_root().resolve()
     if not root.is_dir():
         raise SystemExit(f"root not a directory: {root}")
-    checks: list[GateCheck] = []
-    checks.append(check_feature_status(root, args.tier))
+    checks: list[GateCheck] = [check_feature_status(root, args.tier)]
+    thunks: list[CheckThunk] = []
     if not args.skip_skeleton:
-        checks.append(check_verify_skeleton(root, args.timeout))
-    checks.append(check_script_command(root, "agent-autonomy-check.py", ["--strict"], args.timeout))
-    checks.append(check_review_queue(root, args.timeout))
-    checks.append(check_script_command(root, "completion-evidence.py", ["check"], args.timeout))
-    checks.append(check_script_command(root, "security-scan.py", ["--include-runtime", "--strict"], args.timeout))
-    checks.append(relax_runtime_state(check_script_command(root, "resume-readiness.py", ["--strict"] if args.strict else [], args.timeout), strict=args.strict))
-    checks.append(check_script_command(root, "skill-surface-check.py", ["--strict"], args.timeout))
+        thunks.append(lambda: check_verify_skeleton(root, args.timeout))
+    thunks.append(lambda: check_script_command(root, "agent-autonomy-check.py", ["--strict"], args.timeout))
+    thunks.append(lambda: check_review_queue(root, args.timeout))
+    thunks.append(lambda: check_script_command(root, "completion-evidence.py", ["check"], args.timeout))
+    thunks.append(lambda: check_script_command(root, "security-scan.py", ["--include-runtime", "--strict"], args.timeout))
+    thunks.append(lambda: relax_runtime_state(check_script_command(root, "resume-readiness.py", ["--strict"] if args.strict else [], args.timeout), strict=args.strict))
+    thunks.append(lambda: check_script_command(root, "skill-surface-check.py", ["--strict"], args.timeout))
     install_args = ["check", "--strict"] if args.strict else ["check"]
-    checks.append(check_script_command(root, "install-state.py", install_args, args.timeout))
-    checks.append(check_script_command(root, "reference-task-queue.py", ["check"], args.timeout))
-    checks.append(check_json_findings_tool(root, "reference-inventory.py", [], args.timeout, strict=args.strict, name="reference-inventory"))
-    checks.append(check_reference_proposal_lifecycle(root, args.timeout, strict=args.strict))
-    checks.append(relax_non_strict_failure(check_script_command(root, "operational-readiness.py", ["--strict"] if args.strict else [], args.timeout), strict=args.strict))
-    checks.append(check_script_command(root, "skill-lifecycle.py", ["report"], args.timeout))
-    checks.append(check_eval_all(root, args.timeout))
-    checks.append(check_script_command(root, "cost-log.py", ["check"], args.timeout))
-    checks.append(relax_runtime_state(check_script_command(root, "session-snapshot.py", ["check"], args.timeout), strict=args.strict))
-    checks.append(check_script_command(root, "session-recall.py", ["check"], args.timeout))
-    checks.append(check_script_command(root, "checkpoint.py", ["check"], args.timeout))
-    checks.append(check_json_findings_tool(root, "tool-health.py", ["check"], args.timeout, strict=args.strict, name="tool-health"))
-    checks.append(check_tool_guardrail(root, args.timeout, strict=args.strict))
-    checks.append(check_json_findings_tool(root, "mcp-audit.py", ["check"], args.timeout, strict=args.strict, name="mcp-audit"))
-    checks.append(check_script_command(root, "permission-evaluate.py", ["evaluate", "--action", "shell", "--resource", "*"], args.timeout))
-    checks.append(check_script_command(root, "path-safety.py", ["check", "--path", "scripts/agent-flow.py", "--operation", "write"], args.timeout))
-    checks.append(check_script_command(root, "install-profiles.py", ["check"], args.timeout))
-    checks.append(check_script_command(root, "skill-stocktake.py", ["report"], args.timeout))
-    checks.append(check_script_command(root, "plugin-manifest-check.py", ["check"], args.timeout))
-    checks.append(check_script_command(root, "schema-check.py", ["check"], args.timeout))
-    checks.append(check_json_findings_tool(root, "markdown-sanitize.py", ["--check"], args.timeout, strict=args.strict, name="markdown-sanitize"))
-    checks.append(run_command(root, [sys.executable, str(root / "scripts" / "failure-classify.py"), "--text", "timeout while running validation", "--format", "json"], args.timeout))
-    checks.append(check_json_findings_tool(root, "change-drift-check.py", [], args.timeout, strict=args.strict, name="change-drift-check"))
-    checks.append(check_script_command(root, "validate-plans.py", ["--allow-legacy-done"], args.timeout))
-    checks.append(check_script_command(root, "reference-wiki.py", [], args.timeout))
-    checks.append(check_portability(root, args.timeout))
-    checks.append(check_codemap_freshness(root))
-    checks.append(check_lsp_diagnostics(root, args.timeout, strict=args.strict))
+    thunks.append(lambda: check_script_command(root, "install-state.py", install_args, args.timeout))
+    thunks.append(lambda: check_script_command(root, "reference-task-queue.py", ["check"], args.timeout))
+    thunks.append(lambda: check_json_findings_tool(root, "reference-inventory.py", [], args.timeout, strict=args.strict, name="reference-inventory"))
+    thunks.append(lambda: check_reference_proposal_lifecycle(root, args.timeout, strict=args.strict))
+    thunks.append(lambda: relax_non_strict_failure(check_script_command(root, "operational-readiness.py", ["--strict"] if args.strict else [], args.timeout), strict=args.strict))
+    thunks.append(lambda: check_script_command(root, "skill-lifecycle.py", ["report"], args.timeout))
+    thunks.append(lambda: check_eval_all(root, args.timeout))
+    thunks.append(lambda: check_script_command(root, "cost-log.py", ["check"], args.timeout))
+    thunks.append(lambda: relax_runtime_state(check_script_command(root, "session-snapshot.py", ["check"], args.timeout), strict=args.strict))
+    thunks.append(lambda: check_script_command(root, "session-recall.py", ["check"], args.timeout))
+    thunks.append(lambda: check_script_command(root, "checkpoint.py", ["check"], args.timeout))
+    thunks.append(lambda: check_json_findings_tool(root, "tool-health.py", ["check"], args.timeout, strict=args.strict, name="tool-health"))
+    thunks.append(lambda: check_tool_guardrail(root, args.timeout, strict=args.strict))
+    thunks.append(lambda: check_json_findings_tool(root, "mcp-audit.py", ["check"], args.timeout, strict=args.strict, name="mcp-audit"))
+    thunks.append(lambda: check_script_command(root, "permission-evaluate.py", ["evaluate", "--action", "shell", "--resource", "*"], args.timeout))
+    thunks.append(lambda: check_script_command(root, "path-safety.py", ["check", "--path", "scripts/agent-flow.py", "--operation", "write"], args.timeout))
+    thunks.append(lambda: check_script_command(root, "install-profiles.py", ["check"], args.timeout))
+    thunks.append(lambda: check_script_command(root, "skill-stocktake.py", ["report"], args.timeout))
+    thunks.append(lambda: check_script_command(root, "plugin-manifest-check.py", ["check"], args.timeout))
+    thunks.append(lambda: check_script_command(root, "schema-check.py", ["check"], args.timeout))
+    thunks.append(lambda: check_json_findings_tool(root, "markdown-sanitize.py", ["--check"], args.timeout, strict=args.strict, name="markdown-sanitize"))
+    thunks.append(lambda: run_command(root, [sys.executable, str(root / "scripts" / "failure-classify.py"), "--text", "timeout while running validation", "--format", "json"], args.timeout))
+    thunks.append(lambda: check_json_findings_tool(root, "change-drift-check.py", [], args.timeout, strict=args.strict, name="change-drift-check"))
+    thunks.append(lambda: check_script_command(root, "validate-plans.py", ["--allow-legacy-done"], args.timeout))
+    thunks.append(lambda: check_script_command(root, "reference-wiki.py", [], args.timeout))
+    thunks.append(lambda: check_portability(root, args.timeout))
+    thunks.append(lambda: check_codemap_freshness(root))
+    thunks.append(lambda: check_lsp_diagnostics(root, args.timeout, strict=args.strict))
     if args.tier == "all":
-        checks.append(check_agent_run_ledger(root, args.timeout))
-    checks.append(check_python_syntax(root))
+        thunks.append(lambda: check_agent_run_ledger(root, args.timeout))
+    thunks.append(lambda: check_python_syntax(root))
     if not args.skip_tests:
-        checks.append(check_unittest(root, args.test_timeout))
+        thunks.append(lambda: check_unittest(root, args.test_timeout))
     if not args.skip_node:
-        checks.extend(check_node_scripts(root, args.timeout))
+        thunks.append(lambda: check_node_scripts(root, args.timeout))
+    checks.extend(run_check_thunks(thunks, args.jobs))
     return checks
 
 
@@ -759,6 +790,7 @@ def main() -> int:
     parser.add_argument("--skip-tests", action="store_true", help="Skip unittest discovery.")
     parser.add_argument("--skip-node", action="store_true", help="Skip package.json npm scripts.")
     parser.add_argument("--skip-skeleton", action="store_true", help="Skip verify-skeleton.py.")
+    parser.add_argument("--jobs", type=int, default=4, help="Bounded parallel diagnostic jobs for independent checks; use 1 for sequential debugging.")
     parser.add_argument("--explain", action="store_true", help="Include explanations and next commands for non-OK checks in JSON output.")
     args = parser.parse_args()
 

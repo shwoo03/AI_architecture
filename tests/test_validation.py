@@ -388,7 +388,7 @@ class QualityGateTests(unittest.TestCase):
 
     def test_quality_gate_json_is_parseable_without_recursive_tests(self) -> None:
         result = _run(
-            [str(self.SCRIPT), "--root", str(REPO_ROOT), "--skip-tests", "--format", "json"],
+            [str(self.SCRIPT), "--root", str(REPO_ROOT), "--skip-tests", "--jobs", "2", "--format", "json"],
             cwd=REPO_ROOT,
         )
         self.assertEqual(

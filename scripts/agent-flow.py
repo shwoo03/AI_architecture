@@ -1557,7 +1557,7 @@ def infer_closeout_profile(paths: list[str]) -> str:
     if not paths or paths == ["."]:
         return "all"
     if any(path.startswith("scripts/") or path.startswith("tests/") for path in paths):
-        return "scripts"
+        return "scripts-fast"
     if any(path.startswith("research/reference-candidates/") for path in paths):
         return "reference"
     if any(path.startswith("runtime/proposals/reference-adoption/") or path == "runtime/reference-copy-ledger.jsonl" for path in paths):
@@ -1625,7 +1625,7 @@ def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
             "--format",
             "json",
             "--profile",
-            args.profile,
+            effective_profile,
         ]
         for path in args.changed_path or ["."]:
             closeout_command.extend(["--changed-path", path])
@@ -1637,7 +1637,7 @@ def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
         commands.append(closeout_result)
         recorded = closeout_result.ok
     failure_name = next((result.name for result in commands if not result.ok), "")
-    timing_log = append_closeout_timings(root, args.goal, args.profile, commands)
+    timing_log = append_closeout_timings(root, args.goal, effective_profile, commands)
     payload = {
         "root": str(root),
         "goal": args.goal,

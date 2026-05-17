@@ -1,45 +1,37 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-16T19:45:23Z",
+  "ts": "2026-05-16T19:55:35Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-16T19:45:08Z",
+    "ts": "2026-05-16T19:55:05Z",
     "phase": "session",
     "action": "handoff_saved",
     "project": "AI_architecture",
-    "goal_lineage": [
-      "private near-original GitHub mirror policy and push",
-      "AI_architecture operating OS"
-    ],
+    "goal_lineage": [],
     "tool_call": {
-      "tool": "session-handoff",
-      "status": "success",
+      "tool": "codex",
+      "status": "ok",
       "normalized_status": "success",
       "failure_type": "",
       "empty_output": false,
       "duration_ms": null,
-      "summary": "Updated handoff and progress after private near-original mirror policy validation; ready to commit and push."
+      "summary": "Closeout/test validation loop cost reduction handoff refreshed: scripts-fast auto closeout, quality-gate --jobs, timing evidence, validation status."
     },
     "data": {}
   },
   "completion_evidence_last": {
-    "ts": "2026-05-16T19:44:07Z",
-    "goal": "Private near-original GitHub mirror policy and push",
+    "ts": "2026-05-16T19:53:02Z",
+    "goal": "Reduce closeout and validation loop cost",
     "changed_paths": [
-      ".gitignore",
-      "README.md",
-      "docs/NEW_PROJECT_CHECKLIST.md",
-      "rules/common/git-hygiene.md",
-      "rules/common/secrets.md",
-      "scripts/bootstrap/new-project.py",
-      "scripts/bootstrap/README.md",
-      "scripts/README.md",
-      ".codex",
-      ".claude",
-      ".mcp.json",
-      "AGENTS.md"
+      "scripts/agent-flow.py",
+      "scripts/task-closeout.py",
+      "scripts/quality-gate.py",
+      "tests/test_agent_flow.py",
+      "tests/test_runtime.py",
+      "tests/test_validation.py",
+      "scripts/README.md"
     ],
     "validations": [
       {
@@ -50,32 +42,18 @@
         "detail": "skeleton OK: all checks passed"
       },
       {
-        "name": "agent-autonomy-check",
-        "command": "python3 scripts/agent-autonomy-check.py --root . --strict",
+        "name": "python-syntax-changed",
+        "command": "python3 -c import ast,pathlib,sys;[ast.parse(pathlib.Path(p).read_text(encoding='utf-8-sig'), filename=p) for p in sys.argv[1:]] scripts/agent-flow.py scripts/task-closeout.py scripts/quality-gate.py tests/test_agent_flow.py tests/test_runtime.py tests/test_validation.py",
         "status": "OK",
         "exit_code": 0,
-        "detail": "Agent Autonomy Check | root: /Users/shwoo/mydir/AI/AI_architecture | summary: error=0, warn=0, info=0 | scanned_files: 87"
+        "detail": "exit 0"
       },
       {
-        "name": "lsp-diagnostics",
-        "command": "python3 scripts/lsp-diagnostics.py --root . --format json",
+        "name": "python-unittest-focused",
+        "command": "python3 -m unittest tests.test_agent_flow tests.test_validation tests.test_runtime -v",
         "status": "OK",
         "exit_code": 0,
-        "detail": "{ | \"findings\": [], | \"ok\": true, | \"status\": \"SKIP\","
-      },
-      {
-        "name": "python-unittest",
-        "command": "python3 -m unittest discover -s tests -v",
-        "status": "OK",
-        "exit_code": 0,
-        "detail": "test_adopt_does_not_expose_write_or_risky_modes (test_agent_flow.AgentFlowTests.test_adopt_does_not_expose_write_or_risky_modes) ... ok | test_adopt_dry_run_synthesizes_upgrade_and_ownership (test_agent_flow.AgentFlowTests.test_adopt_dry_run_synthesizes_upgrade_and_ownership) ... ok | test_adopt_profile_ready_allows_wiki_links_and_tbd_guidance (test_agent_flow.AgentFlowTests.test_adopt_profile_ready_allows_wiki_links_and_tbd_guidance) ... ok | test_adopt_reads_old_install_state_with_fallback (test_agent_flow.AgentFlowTests.test_adopt_reads_old_install_state_with_fallback) ... ok"
-      },
-      {
-        "name": "security-scan",
-        "command": "python3 scripts/security-scan.py --root . --include-runtime --strict",
-        "status": "OK",
-        "exit_code": 0,
-        "detail": "Security Scan | root: /Users/shwoo/mydir/AI/AI_architecture | summary: critical=0, high=0, medium=0, low=0, info=0, total=0 | scanned_files: 667"
+        "detail": "test_adopt_does_not_expose_write_or_risky_modes (tests.test_agent_flow.AgentFlowTests.test_adopt_does_not_expose_write_or_risky_modes) ... ok | test_adopt_dry_run_synthesizes_upgrade_and_ownership (tests.test_agent_flow.AgentFlowTests.test_adopt_dry_run_synthesizes_upgrade_and_ownership) ... ok | test_adopt_profile_ready_allows_wiki_links_and_tbd_guidance (tests.test_agent_flow.AgentFlowTests.test_adopt_profile_ready_allows_wiki_links_and_tbd_guidance) ... ok | test_adopt_reads_old_install_state_with_fallback (tests.test_agent_flow.AgentFlowTests.test_adopt_reads_old_install_state_with_fallback) ... ok"
       }
     ],
     "outcome": "genuine_success",

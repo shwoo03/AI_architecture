@@ -1369,6 +1369,54 @@ class AgentFlowTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_closeout_auto_script_change_uses_fast_profile(self) -> None:
+        tmp = self._tmp_root("closeout-scripts-fast")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "verify.py").write_text(
+                "from pathlib import Path\nPath('called-verify').write_text('called', encoding='utf-8')\nraise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            (scripts / "quality-gate.py").write_text(
+                "from pathlib import Path\nPath('called-quality').write_text('called', encoding='utf-8')\nraise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            (scripts / "task-closeout.py").write_text(
+                "import json, sys\n"
+                "from pathlib import Path\n"
+                "Path('task-argv.json').write_text(json.dumps(sys.argv), encoding='utf-8')\n"
+                "print('{\"recorded\": true}')\n"
+                "raise SystemExit(0)\n",
+                encoding="utf-8",
+            )
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "closeout",
+                    "--goal",
+                    "script edit closeout",
+                    "--changed-path",
+                    "scripts/agent-flow.py",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["front_checks_required"])
+            self.assertEqual(payload["effective_profile"], "scripts-fast")
+            self.assertEqual([item["name"] for item in payload["commands"]], ["task-closeout"])
+            task_argv = json.loads((tmp / "task-argv.json").read_text(encoding="utf-8"))
+            self.assertIn("--profile", task_argv)
+            self.assertIn("scripts-fast", task_argv)
+            self.assertFalse((tmp / "called-verify").exists())
+            self.assertFalse((tmp / "called-quality").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_closeout_auto_dot_keeps_full_front_checks(self) -> None:
         tmp = self._tmp_root("closeout-auto-dot")
         try:

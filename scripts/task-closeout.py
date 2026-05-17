@@ -24,7 +24,7 @@ except (AttributeError, OSError):
     pass
 
 
-PROFILES = {"auto", "docs", "scripts", "reference", "copy", "runtime", "all"}
+PROFILES = {"auto", "docs", "scripts-fast", "scripts", "reference", "copy", "runtime", "all"}
 DISPOSITIONS = {"auto", "complete", "partial", "blocked", "deferred", "failed"}
 
 
@@ -135,7 +135,7 @@ def infer_profile(paths: list[str]) -> str:
     if not paths or paths == ["."]:
         return "all"
     if any(path.startswith("scripts/") or path.startswith("tests/") for path in paths):
-        return "scripts"
+        return "scripts-fast"
     if any(path.startswith("research/reference-candidates/") for path in paths):
         return "reference"
     if any(path.startswith("runtime/proposals/reference-adoption/") or path == "runtime/reference-copy-ledger.jsonl" for path in paths):
@@ -147,8 +147,54 @@ def infer_profile(paths: list[str]) -> str:
     return "all"
 
 
-def profile_commands(root: Path, profile: str) -> list[tuple[str, list[str]]]:
+def changed_python_files(root: Path, paths: list[str]) -> list[str]:
+    result: list[str] = []
+    for rel in paths:
+        path = root / rel
+        if path.is_file() and path.suffix == ".py":
+            result.append(str(path))
+    return result
+
+
+def unittest_module_for_test_path(path: str) -> str:
+    if not (path.startswith("tests/") and path.endswith(".py")):
+        return ""
+    module = Path(path).with_suffix("").as_posix().replace("/", ".")
+    return module if module.startswith("tests.") else ""
+
+
+def focused_test_modules(paths: list[str]) -> list[str]:
+    modules: list[str] = []
+
+    def add(module: str) -> None:
+        if module and module not in modules:
+            modules.append(module)
+
+    for path in paths:
+        add(unittest_module_for_test_path(path))
+        if path in {"scripts/agent-flow.py", "scripts/task-closeout.py"}:
+            add("tests.test_agent_flow")
+        elif path == "scripts/quality-gate.py" or path == "scripts/diff-quality-gate.py":
+            add("tests.test_validation")
+            add("tests.test_agent_flow")
+        elif path.startswith("scripts/bootstrap/") or path == "scripts/upgrade-from-skeleton.py":
+            add("tests.test_bootstrap_upgrade")
+        elif path == "scripts/session-recall.py":
+            add("tests.test_runtime")
+            add("tests.test_agent_flow")
+        elif "ownership" in path:
+            add("tests.test_ownership")
+            add("tests.test_bootstrap_upgrade")
+        elif path.startswith("scripts/incubating/") or path == "scripts/agent-brief.py":
+            add("tests.test_validation")
+        elif path.startswith("scripts/") and path.endswith(".py"):
+            add("tests.test_validation")
+    return modules
+
+
+def profile_commands(root: Path, profile: str, changed_paths: list[str] | None = None) -> list[tuple[str, list[str]]]:
     py = sys.executable
+    changed_paths = changed_paths or []
     commands: dict[str, list[str]] = {}
 
     def add(name: str, command: list[str]) -> None:
@@ -157,6 +203,25 @@ def profile_commands(root: Path, profile: str) -> list[tuple[str, list[str]]]:
     if profile in {"docs", "all"}:
         add("verify-skeleton", [py, str(root / "scripts" / "verify-skeleton.py"), "--root", str(root)])
         add("agent-autonomy-check", [py, str(root / "scripts" / "agent-autonomy-check.py"), "--root", str(root), "--strict"])
+    if profile in {"scripts-fast"}:
+        add("verify-skeleton", [py, str(root / "scripts" / "verify-skeleton.py"), "--root", str(root)])
+        python_files = changed_python_files(root, changed_paths)
+        if python_files:
+            add(
+                "python-syntax-changed",
+                [
+                    py,
+                    "-c",
+                    (
+                        "import ast,pathlib,sys;"
+                        "[ast.parse(pathlib.Path(p).read_text(encoding='utf-8-sig'), filename=p) for p in sys.argv[1:]]"
+                    ),
+                    *python_files,
+                ],
+            )
+        modules = focused_test_modules(changed_paths)
+        if modules:
+            add("python-unittest-focused", [py, "-m", "unittest", *modules, "-v"])
     if profile in {"scripts"}:
         add("verify-skeleton", [py, str(root / "scripts" / "verify-skeleton.py"), "--root", str(root)])
         add("agent-autonomy-check", [py, str(root / "scripts" / "agent-autonomy-check.py"), "--root", str(root), "--strict"])
@@ -428,7 +493,7 @@ def main() -> int:
     if checks:
         profile = "prevalidated"
     else:
-        checks = [run_command(root, name, command, args.timeout) for name, command in profile_commands(root, profile)]
+        checks = [run_command(root, name, command, args.timeout) for name, command in profile_commands(root, profile, changed_paths)]
     skills = unique_values(args.skill)
     checks_ok = all(check.status == "OK" for check in checks)
     disposition = "complete" if args.disposition == "auto" and checks_ok else "partial" if args.disposition == "auto" else args.disposition

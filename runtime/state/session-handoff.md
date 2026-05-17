@@ -1,42 +1,35 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-16T19:45:08Z
+2026-05-16T19:55:26Z
 
 ## Current Task
-Active goal: private near-original GitHub mirror policy and push. The policy has been changed so private project mirrors may commit generated runtime surfaces (`.claude/`, `.codex/`, `.mcp.json`, `CLAUDE.md`) and explicitly approved `.env` files, while cache/dependency/build artifacts remain excluded.
+Active goal: reduce AI_architecture closeout/test/validation loop cost while preserving final safety gates. Implementation is complete and validated; changes are not yet committed.
 
 ## Last Completed
-- Commit `55dbffb` recorded the Karpathy guidelines reference card, `references.yaml`, and related CODEMAPS only.
-- Commit `3fc7b4c` closed deferred plan 0007 without schema expansion and refreshed the ownership lock.
-- Commit `166e477` absorbed Karpathy guidelines concept-only into canonical code-style, brainstorming, and verification-loop wording without copying skills/plugins.
-- Commit `8f3b76d` documented the ENKI retrofit adoption case study in `docs/SKELETON_UPGRADE.md`.
-- Commit `7109abd` added closeout timing instrumentation and active plan 0028.
-- Commit `36fa515` completed 0028: timing evidence, profile-aware closeout wrapper repair, plan done move, codemaps, and runtime validation evidence.
-- Commit `9f6be35` completed 0029: adopt review classification, unknown-license non-blocking metadata review, install-state fallback UX, preserve candidate reporting, plan done move, and ENKI read-only validation.
-- Generated/local policy cleanup previously removed tracked `.claude/`, `.codex/`, `.mcp.json`, and `CLAUDE.md` artifacts from the git index without deleting local files.
-- Private near-original mirror policy now reverses the commit boundary for private repositories: generated surfaces and explicitly approved local/secret files may be tracked, but they must be regenerated from canonical sources and secret values must not be printed in logs or responses.
-- `.gitignore`, `README.md`, `docs/NEW_PROJECT_CHECKLIST.md`, `rules/common/git-hygiene.md`, `rules/common/secrets.md`, `scripts/README.md`, and `scripts/bootstrap/README.md` now document the near-original private mirror policy.
-- `scripts/bootstrap/new-project.py` no longer unconditionally excludes `.codex/`, `.claude/`, `.env`, or `.claude/settings.local.json`; it still excludes `.git`, cache/dependency/build directories, and skeleton-internal runtime history.
-- `scripts/convert.py --root .` refreshed generated surfaces; `scripts/ownership-lock.py write` added generated surfaces to the ownership baseline; `scripts/generate-codemaps.py --write` refreshed CODEMAPS.
+- Prior timing evidence showed two recent auto closeouts still cost about 59-61s (`Generated/local dirty policy cleanup`, `Private near-original GitHub mirror policy and push`).
+- `scripts/task-closeout.py` now has a `scripts-fast` profile for script/test edits. It runs `verify-skeleton`, AST syntax checks for changed Python files, and focused unittest modules instead of the heavy scripts profile.
+- `scripts/agent-flow.py closeout --profile auto` now infers `scripts-fast` for `scripts/` and `tests/` changes and records the effective profile in `runtime/closeout-timings.jsonl`.
+- `scripts/quality-gate.py` now runs independent checks with bounded parallelism (`--jobs`, default 4; use `--jobs 1` for sequential debugging) while preserving output order.
+- `scripts/README.md` documents the faster closeout/quality-gate behavior and when to use explicit heavy profiles.
+- Codemaps, ownership lock, runtime closeout evidence, and session snapshot were refreshed after the change.
 
 ## Validation
-- 0028 focused closeout tests passed, including full-front `all` behavior, docs-profile delegation, quality-gate explanations, and baseline diff behavior.
-- 0028 stable/all quality gates with `--skip-tests` passed after repair: stable OK=36 SKIP=2, all OK=37 SKIP=2.
-- 0029 full `tests.test_agent_flow` passed: 54 tests.
-- 0029 ENKI read-only adopt validation passed without target writes: recommendation `needs_review`, blocking reviews `0`, non-blocking reviews for unknown license, already-initialized ownership, and manual/risky items.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-plans.py --root . --format json`: passed, 29 plans, no findings.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/ownership-lock.py write && python3 scripts/ownership-lock.py check`: passed, no drift.
+- Focused regression batch passed: `TaskCloseoutTests`, closeout profile tests, and quality-gate jobs parsing coverage.
+- Full focused suites passed: `tests.test_runtime tests.test_agent_flow` (97 tests) and `tests.test_validation.QualityGateTests` (11 tests).
+- Performance measurements: stable quality gate with `--jobs 1` took about 7.31s; `--jobs 4` took about 4.19s. A one-file `scripts-fast` closeout smoke took about 10.70s.
+- Final real closeout for this change recorded `effective_profile=scripts-fast` and `duration_ms=32657`, down from recent 59-61s auto closeouts while still running focused tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/cleanup-ephemeral.py --apply --format json`: no matches after replacing py_compile with AST parsing.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate-codemaps.py --write`: passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify-skeleton.py`: passed after portability path cleanup.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier stable --skip-tests --format json`: passed with OK=36, SKIP=2.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier all --skip-tests --format json`: passed with OK=37, SKIP=2.
-- Final `agent-flow closeout --profile runtime` passed and recorded=true with `task-closeout` only.
-- Generated/local policy validation passed: `verify-parity --brief`, `ownership-lock check`, `verify-skeleton`, `quality-gate --tier stable --skip-tests`, `quality-gate --tier all --skip-tests`, and `agent-flow doctor --format json` all completed with OK status.
-- Private mirror validation passed: `verify-skeleton`, `ownership-lock check`, `security-scan.py --strict --format json`, focused bootstrap/upgrade tests (`tests.test_bootstrap_upgrade`), stable `quality-gate --skip-tests`, `agent-flow doctor --format json`, and closeout all completed with OK status.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/ownership-lock.py write && python3 scripts/ownership-lock.py check`: passed, drift 0.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify-skeleton.py`: passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier stable --skip-tests --skip-node --jobs 4 --format json`: passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/agent-flow.py doctor --format json`: passed with OK status, WARN 0, FAIL 0.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier all --skip-tests --skip-node --jobs 4 --format json`: passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/agent-flow.py closeout --goal "Reduce closeout and validation loop cost" ... --format json`: passed and recorded closeout evidence.
 
 ## Recommended Next Step
-Stage the near-original mirror policy changes, commit them, and push `main` to `origin` as explicitly requested by the user.
+Review the uncommitted closeout-performance change set and commit it if accepted. Push remains out of scope unless explicitly requested.
 
 ## Open Questions / Blockers
 - ENKI target license signal remains unknown; 0029 now classifies this as non-blocking metadata review, not legal clearance.
@@ -44,6 +37,7 @@ Stage the near-original mirror policy changes, commit them, and push `main` to `
 - ENKI full app quality gate without `--skip-node` remains separate from operating OS migration.
 - Do not touch `/Users/shwoo/mydir/Project/ENKI_WIKI`; it is not the active target.
 - Private mirror policy allows generated/local files to be committed when the user explicitly wants a private near-original project mirror. Public publication should re-check `.env` and local config inclusion first.
+- `scripts-fast` is a development-loop profile, not a replacement for explicit final `--profile scripts`, `--profile all`, or full `quality-gate --with-tests` when a release boundary needs broad assurance.
 
 ## Resume Prompt
-Resume in `/Users/shwoo/mydir/AI/AI_architecture` with active goal "private near-original GitHub mirror policy and push." The policy change has been implemented and validated; inspect `git status --short`, stage intended files including generated surfaces, commit, and push `main` to `origin`.
+Resume in `/Users/shwoo/mydir/AI/AI_architecture` with active goal "reduce closeout and validation loop cost." The implementation is complete and validated. Inspect `git status --short`, review `scripts/task-closeout.py`, `scripts/agent-flow.py`, `scripts/quality-gate.py`, and related tests/docs, then commit if accepted. Do not push unless the user explicitly requests it.
