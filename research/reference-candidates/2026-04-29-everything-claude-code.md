@@ -8,7 +8,7 @@
 - `status`: proposed
 - `searched_for`: agent harness performance system, research-first development, skills, hooks, memory, security scanning, Codex Claude compatibility
 - `created_at`: 2026-04-29
-- `reviewed_at`: 2026-04-29
+- `reviewed_at`: 2026-05-21
 - `reviewer`: Codex
 
 ## 왜 보는가
@@ -35,16 +35,22 @@
 
 ## 증거
 
-- `evidence_summary`: README는 ECC를 performance optimization system for AI agent harnesses로 설명하고, skills, memory optimization, continuous learning, security scanning, research-first development, hooks, rules, MCP configs, Codex support, cross-harness parity를 핵심 능력으로 제시한다.
-- `local_clone_path`: runtime/external-repos/github.com/affaan-m__everything-claude-code
-- `checked_revision`: c7c7d37f2946d7497577408d19adaee6a8341ddc
-- `freshness_signal`: 2026-04-29에 GitHub 원본을 shallow clone했고 README와 LICENSE를 확인했다.
+- `evidence_summary`: README는 ECC를 performance optimization system for AI agent harnesses로 설명하고, skills, memory optimization, continuous learning, security scanning, research-first development, hooks, rules, MCP configs, Codex support, cross-harness parity를 핵심 능력으로 제시한다. 2026-05-21 refresh는 ECC 전체가 아니라 `scripts/ci/` 보안/검증 표면만 추가 매핑했다.
+- `local_clone_path`: ../AI_architecture_references/everything-claude-code
+- `checked_revision`: 1e8c7e7994223e0ff337d1626cd08e04a1ae67ed
+- `clone_present_at_review`: yes
+- `freshness_signal`: 2026-05-21에 repo 밖 reference checkout의 HEAD와 `scripts/ci/` 보안/검증 파일 묶음을 확인했다.
 - `maintenance_signal`: README가 release notes, Codex support, Claude plugin, hooks, skills, security, FAQ, cross-harness sections를 폭넓게 유지한다.
 - `documentation_signal`: README가 설치, 아키텍처, skills, hooks, security, Codex support, compatibility caveats를 매우 상세히 제공한다.
 - `validation_signal`: clone revision과 MIT license를 확인했다. 이번 P0에서는 운영 계약과 후보 카드 기준선만 반영한다.
 - `sources`:
   - {"path":"../AI_architecture_references/everything-claude-code/README.md","kind":"readme","evidence":"Agent catalog, command, and workflow examples were reviewed.","hash_or_line_ref":"local-reference"}
   - {"path":"../AI_architecture_references/everything-claude-code/.claude/commands","kind":"command_dir","evidence":"Reusable command pack structure was inspected conceptually.","hash_or_line_ref":"local-reference"}
+  - {"path":"../AI_architecture_references/everything-claude-code/scripts/ci/check-unicode-safety.js","kind":"script","evidence":"Unicode invisible/tag/bidi safety scanner reviewed as security-validation reference.","hash_or_line_ref":"1e8c7e79:function isDangerousInvisibleCodePoint"}
+  - {"path":"../AI_architecture_references/everything-claude-code/tests/scripts/check-unicode-safety.test.js","kind":"test","evidence":"Golden dangerous Unicode codepoint set reviewed for future partial-copy proposal boundary.","hash_or_line_ref":"1e8c7e79:NEWLY_COVERED_RANGES"}
+  - {"path":"../AI_architecture_references/everything-claude-code/scripts/ci/scan-supply-chain-iocs.js","kind":"script","evidence":"Supply-chain IOC scanning surface mapped; not selected for current absorption.","hash_or_line_ref":"1e8c7e79:scanForSuspiciousFiles"}
+  - {"path":"../AI_architecture_references/everything-claude-code/scripts/ci/validate-no-personal-paths.js","kind":"script","evidence":"Personal absolute path validation mapped; not selected for current absorption.","hash_or_line_ref":"1e8c7e79:Validated: no personal absolute paths"}
+  - {"path":"../AI_architecture_references/everything-claude-code/scripts/ci/validate-workflow-security.js","kind":"script","evidence":"Workflow security validation mapped; not selected for current absorption.","hash_or_line_ref":"1e8c7e79:function validateWorkflowSecurity"}
 
 ## 리스크
 
@@ -65,8 +71,8 @@
   - docs/WORKFLOW_CATALOG.md
   - scripts/
 - `adoption_decision`: adapt
-- `decision_reason`: research-first와 cross-harness 운영 품질은 현재 목적과 매우 잘 맞지만 대규모 plugin/skill/hook 전체 도입은 범위 밖이다.
-- `next_action`: 오픈소스 우선 조사와 모듈형 흡수 판단을 P0 운영 계약으로 반영하고, 이후 P1에서 reference discovery workflow를 강화한다.
+- `decision_reason`: research-first와 cross-harness 운영 품질은 현재 목적과 매우 잘 맞지만 대규모 plugin/skill/hook 전체 도입은 범위 밖이다. 2026-05-21 refresh에서는 `scripts/ci/` 보안/검증 묶음 중 Unicode safety만 차기 security/provenance dry-run 근거로 남기고 supply-chain IOC, personal-path, workflow-security, agents/commands/hooks/rules/skills/install validators는 별도 라운드로 보류한다.
+- `next_action`: Unicode invisible-character scanner와 관련 golden cases는 별도 dry-run 제안에서 security-scan/provenance gate로 다룬다. ECC의 hooks, skills, commands, MCP, memory, install, harness-adapter 표면은 이번 카드 정합성 라운드 밖이며 별도 refresh가 필요하다.
 
 ## 점수
 
@@ -101,4 +107,4 @@
   - docs/PROJECT_PROFILE.template.md
 - `validation_result`: candidate card created; validation pending
 - `activity_log_entry`: runtime/activity-log.jsonl p0_open_source_first_contract_applied
-- `notes`: Sources reviewed: local shallow clone at checked revision, README, LICENSE.
+- `notes`: Sources reviewed: local checkout at checked revision, README, LICENSE, and scoped `scripts/ci/` security/validation files. The previous `runtime/external-repos/github.com/affaan-m__everything-claude-code` clone path was empty on 2026-05-21, so this refresh records the actual inspected path plus revision/source anchors instead of relying on path alone.

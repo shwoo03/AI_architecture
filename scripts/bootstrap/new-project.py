@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -84,6 +85,10 @@ EMPTY_EXCEPT_DOCS = {
     "runtime/proposals",
     "runtime/validation",
 }
+PYTHON_CACHE_IGNORE_LINES = (
+    "__pycache__/",
+    "*.py[cod]",
+)
 
 
 def utc_now() -> str:
@@ -187,6 +192,23 @@ def copy_skeleton(source: Path, target: Path) -> None:
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(item, destination)
+
+
+def ensure_python_cache_gitignore(target: Path) -> None:
+    path = target / ".gitignore"
+    existing = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+    lines = existing.splitlines()
+    present = {line.strip() for line in lines}
+    missing = [line for line in PYTHON_CACHE_IGNORE_LINES if line not in present]
+    if not missing:
+        return
+    if existing and not existing.endswith("\n"):
+        existing += "\n"
+    if existing and not existing.endswith("\n\n"):
+        existing += "\n"
+    if not existing:
+        existing = "# Python caches\n"
+    path.write_text(existing + "\n".join(missing) + "\n", encoding="utf-8")
 
 
 def empty_accumulated_dirs(target: Path) -> None:
@@ -549,9 +571,12 @@ def run_project_script(target: Path, rel_script: str, args: list[str]) -> None:
     script = target / rel_script
     if not script.exists():
         raise SystemExit(f"new-project failed: missing seeded script {rel_script}")
+    env = dict(os.environ)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     result = subprocess.run(
         [sys.executable, str(script), "--root", str(target), *args],
         cwd=str(target),
+        env=env,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -587,6 +612,12 @@ def build_generated_artifacts(target: Path) -> None:
 
 def write_initial_session_snapshot(target: Path) -> None:
     run_project_script(target, "scripts/session-snapshot.py", ["write"])
+
+
+def cleanup_python_cache_dirs(target: Path) -> None:
+    script = target / "scripts" / "cleanup-ephemeral.py"
+    if script.exists():
+        run_project_script(target, "scripts/cleanup-ephemeral.py", ["--apply"])
 
 
 NAME_MAX_LEN = 200
@@ -728,6 +759,7 @@ def main() -> int:
     # or an unwritable location.
     try:
         copy_skeleton(source, target)
+        ensure_python_cache_gitignore(target)
         empty_accumulated_dirs(target)
         seed_project_profile(target, source, args.name, args.domain, args.stack, args.owner)
         seed_knowledge(target, args.name)
@@ -739,6 +771,7 @@ def main() -> int:
         record_bootstrap_install_state(target, args.profile)
         build_generated_artifacts(target)
         write_initial_session_snapshot(target)
+        cleanup_python_cache_dirs(target)
     except FileNotFoundError as exc:
         bad = exc.filename or target
         raise SystemExit(

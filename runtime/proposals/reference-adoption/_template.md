@@ -2,12 +2,14 @@
 
 ## 상태
 
-- `status`: proposed | accepted | rejected | applied | deferred
+- `status`: proposed | accepted | rejected | applied | deferred | superseded
 - `created_at`:
 - `candidate_card`:
 - `proposal_type`: reference_adoption_dry_run
 - `approval_required`: yes | no
 - `decision_source`:
+- `supersedes`:
+- `superseded_by`:
 
 ## 한 문장 정의
 
@@ -86,7 +88,7 @@ python scripts/list-open-questions.py --count
 
 ## 최종 결정 기록
 
-- `decision`: pending | accepted | rejected | applied | deferred
+- `decision`: pending | accepted | rejected | applied | deferred | superseded
 - `decided_at`:
 - `decided_by`:
 - `decision_source`:

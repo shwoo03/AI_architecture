@@ -75,3 +75,11 @@
 - Exception scope is limited to creating harness-agnostic spawn-ready packet artifacts from approved and confirmed `DelegationPlan` records.
 - The implementation may reuse existing delegate handoff generation to populate packet units, but must not spawn agents or create a second execution loop.
 - Packets must remain adapter-neutral and must mark auto-spawn, auto-chain, and recursive delegation as disallowed.
+
+## 2026-05-21 15:35 — Reference card carrier round before security gate implementation
+- The user explicitly directed that this round must not jump straight to invisible-character/security gate implementation.
+- Scope is limited to carrier integrity for `everything-claude-code`, `paperclip`, and `opencode` candidate cards plus minimal proposal lifecycle support needed for future split/supersede dry-runs.
+- Candidate cards should rely on checked revision and source anchors, not clone path alone. Workspace-local clone paths remain useful but are not portable trace.
+- ECC refresh is scoped to `scripts/ci/` security/validation surface only; hooks, skills, commands, MCP, memory, install, and harness-adapter surfaces remain unchecked in this round.
+- Paperclip governance/runtime adoption is deferred until concrete agent-team budget, approval, or recovery blocker evidence appears.
+- OpenCode follow-up for read-only CLI smoke and LSP/diagnostic integration stays separate from the ECC Unicode/security provenance proposal.

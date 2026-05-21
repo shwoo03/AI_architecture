@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -27,6 +28,12 @@ REQUIRED_HEADINGS = [
     "## Validation",
 ]
 
+CLOSEOUT_COMMANDS = (
+    "python3 scripts/agent-flow.py closeout",
+    "python scripts/agent-flow.py closeout",
+)
+VALIDATION_COMMAND_RE = r"(?m)^\s*(?:[-*]\s*)?`?(?:PYTHONDONTWRITEBYTECODE=1\s+)?(?:python3|python)\s+scripts/[A-Za-z0-9_./-]+\.py\b"
+
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
@@ -48,9 +55,17 @@ def is_legacy_done_plan(root: Path, path: Path, text: str) -> bool:
         return False
     if not rel.startswith("plans/done/"):
         return False
-    if all(heading in text for heading in REQUIRED_HEADINGS):
+    if text.lstrip().startswith("# Plan ") or "| seq |" in text:
+        return True
+    if not all(heading in text for heading in REQUIRED_HEADINGS):
         return False
-    return text.lstrip().startswith("# Plan ") or "| seq |" in text
+    if any(command in text for command in CLOSEOUT_COMMANDS):
+        return False
+    validation_index = text.find("## Validation")
+    if validation_index < 0:
+        return False
+    validation_block = text[validation_index:]
+    return bool(re.search(VALIDATION_COMMAND_RE, validation_block))
 
 
 def validate_file(root: Path, path: Path, *, allow_legacy_done: bool = False) -> tuple[list[str], bool]:

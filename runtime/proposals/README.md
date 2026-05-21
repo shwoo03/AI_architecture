@@ -22,7 +22,7 @@
 - 위험
 - 되돌림 방법
 - 신뢰도
-- 상태: `proposed`, `accepted`, `rejected`, `applied`
+- 상태: `proposed`, `accepted`, `rejected`, `applied`, `deferred`, `superseded`
 
 ## 어떻게 동작하는가
 

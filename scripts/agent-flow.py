@@ -71,6 +71,43 @@ REPO_MARKERS = {
     "go.mod",
 }
 REPO_DIR_MARKERS = {".git", "scripts", "src", "tests"}
+HEALTH_DOMAINS = {"skeleton", "project", "environment", "security"}
+OVERLAY_SURFACE_PATHS = (
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".codex",
+    ".claude",
+    ".mcp.json",
+    "rules",
+    "skills",
+    "agents",
+    "scripts",
+    "runtime",
+    "state",
+)
+RUNTIME_STATE_PATHS = (
+    "runtime/state/session-handoff.md",
+    "state/progress.md",
+    "runtime/activity-log.jsonl",
+    "runtime/completion-evidence.jsonl",
+)
+NAMESPACE_COLLISION_MARKERS = {
+    "scripts": {
+        "skeleton": {"agent-flow.py", "quality-gate.py", "verify-skeleton.py", "verify-parity.py"},
+        "project_suffixes": (".js", ".ts"),
+        "project_names": {"deploy.py", "deploy-app.py", "seed.py", "migrate.py"},
+    },
+    "tests": {
+        "skeleton": {"test_agent_flow.py", "test_validation.py", "test_operational_tools.py"},
+        "project_suffixes": (".js", ".ts", ".tsx", ".jsx"),
+        "project_names": {"test_app.py", "test_api.py"},
+    },
+    "research": {
+        "skeleton": {"reference-candidates", "reference-adoption"},
+        "project_suffixes": (".csv", ".json", ".ipynb"),
+        "project_names": {"data", "notebooks", "experiments"},
+    },
+}
 REFERENCE_ALIASES: dict[str, tuple[str, ...]] = {
     "ecc": ("everything-claude-code",),
     "everything claude code": ("everything-claude-code",),
@@ -630,6 +667,314 @@ def load_catalog_modes(root: Path) -> dict[str, dict[str, Any]]:
     return modes
 
 
+def parse_project_intent_scalar(value: str) -> Any:
+    stripped = value.strip()
+    if not stripped:
+        return ""
+    if stripped in {"true", "false"}:
+        return stripped == "true"
+    if stripped.startswith("[") and stripped.endswith("]"):
+        inner = stripped[1:-1].strip()
+        if not inner:
+            return []
+        items: list[str] = []
+        for part in inner.split(","):
+            item = part.strip().strip('"').strip("'")
+            if item:
+                items.append(item)
+        return items
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
+        return stripped[1:-1]
+    return stripped
+
+
+def load_project_intents(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    path = root / "config" / "project-intents.yaml"
+    if not path.exists():
+        return [], {"source": "absent", "ok": True, "path": rel_to_root(root, path), "detail": "config/project-intents.yaml not found"}
+    intents: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    current_list_key = ""
+    try:
+        for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not raw.strip() or raw.lstrip().startswith("#"):
+                continue
+            indent = len(raw) - len(raw.lstrip(" "))
+            stripped = raw.strip()
+            if indent == 2 and stripped.startswith("- "):
+                if current:
+                    intents.append(current)
+                current = {}
+                current_list_key = ""
+                rest = stripped[2:].strip()
+                if ":" in rest:
+                    key, value = rest.split(":", 1)
+                    current[key.strip()] = parse_project_intent_scalar(value)
+                continue
+            if current is None:
+                continue
+            if indent == 4 and ":" in stripped:
+                key, value = stripped.split(":", 1)
+                key = key.strip()
+                value = value.strip()
+                if value:
+                    current[key] = parse_project_intent_scalar(value)
+                    current_list_key = ""
+                else:
+                    current[key] = []
+                    current_list_key = key
+                continue
+            if indent == 6 and current_list_key and stripped.startswith("- "):
+                target = current.setdefault(current_list_key, [])
+                if isinstance(target, list):
+                    target.append(parse_project_intent_scalar(stripped[2:]))
+        if current:
+            intents.append(current)
+    except OSError as exc:
+        return [], {"source": rel_to_root(root, path), "ok": False, "path": rel_to_root(root, path), "detail": str(exc)}
+
+    valid: list[dict[str, Any]] = []
+    findings: list[str] = []
+    for index, intent in enumerate(intents):
+        intent_id = str(intent.get("id") or "").strip()
+        patterns = intent.get("patterns") if isinstance(intent.get("patterns"), list) else []
+        mode = str(intent.get("mode") or "").strip()
+        policy = str(intent.get("write_policy") or "").strip()
+        health_domain = str(intent.get("health_domain") or "project").strip()
+        if not intent_id:
+            findings.append(f"intent[{index}] missing id")
+            continue
+        if not patterns:
+            findings.append(f"intent[{intent_id}] missing patterns")
+            continue
+        if mode not in MODES:
+            findings.append(f"intent[{intent_id}] invalid mode: {mode}")
+            continue
+        if policy not in WRITE_POLICIES:
+            findings.append(f"intent[{intent_id}] invalid write_policy: {policy}")
+            continue
+        if health_domain not in HEALTH_DOMAINS:
+            findings.append(f"intent[{intent_id}] invalid health_domain: {health_domain}")
+            continue
+        valid.append(intent)
+    status = {
+        "source": rel_to_root(root, path),
+        "ok": not findings,
+        "path": rel_to_root(root, path),
+        "detail": "parsed" if not findings else "; ".join(findings[:3]),
+        "intent_count": len(valid),
+        "findings": findings,
+    }
+    return valid, status
+
+
+def pattern_matches(pattern: str, goal: str) -> bool:
+    try:
+        return bool(re.search(pattern, goal, re.IGNORECASE))
+    except re.error:
+        return pattern.lower() in goal.lower()
+
+
+def match_project_intent(root: Path, goal: str) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    intents, status = load_project_intents(root)
+    if not goal or not intents:
+        return None, status
+    for intent in intents:
+        patterns = [str(item) for item in intent.get("patterns", [])]
+        matched = next((pattern for pattern in patterns if pattern_matches(pattern, goal)), "")
+        if matched:
+            result = dict(intent)
+            result["matched_pattern"] = matched
+            return result, status
+    return None, status
+
+
+def overlay_surface_status(target: Path) -> dict[str, Any]:
+    present = [rel for rel in OVERLAY_SURFACE_PATHS if (target / rel).exists()]
+    missing = [rel for rel in OVERLAY_SURFACE_PATHS if not (target / rel).exists()]
+    return {"present": present, "missing": missing, "required": list(OVERLAY_SURFACE_PATHS)}
+
+
+def read_jsonl_status(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"exists": False, "line_count": 0, "valid_json_lines": 0, "invalid_lines": []}
+    invalid: list[dict[str, Any]] = []
+    valid = 0
+    lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+    for index, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            json.loads(line)
+            valid += 1
+        except json.JSONDecodeError as exc:
+            invalid.append({"line": index, "detail": str(exc)})
+    return {"exists": True, "line_count": len(lines), "valid_json_lines": valid, "invalid_lines": invalid}
+
+
+def runtime_state_status(target: Path) -> dict[str, Any]:
+    status: dict[str, Any] = {}
+    for rel in RUNTIME_STATE_PATHS:
+        path = target / rel
+        if rel.endswith(".jsonl"):
+            status[rel] = read_jsonl_status(path)
+        else:
+            status[rel] = {
+                "exists": path.exists(),
+                "size_bytes": path.stat().st_size if path.exists() else 0,
+            }
+    return status
+
+
+def namespace_collision_status(target: Path) -> list[dict[str, Any]]:
+    collisions: list[dict[str, Any]] = []
+    for rel, markers in NAMESPACE_COLLISION_MARKERS.items():
+        base = target / rel
+        if not base.is_dir():
+            continue
+        entries = {path.name for path in base.iterdir()}
+        skeleton_hits = sorted(entries & set(markers["skeleton"]))
+        project_hits = sorted(entries & set(markers["project_names"]))
+        suffixes = tuple(markers["project_suffixes"])
+        project_hits.extend(sorted(name for name in entries if name.endswith(suffixes) and name not in skeleton_hits))
+        if skeleton_hits and project_hits:
+            collisions.append(
+                {
+                    "path": rel,
+                    "status": "possible_collision",
+                    "skeleton_indicators": skeleton_hits,
+                    "project_indicators": sorted(set(project_hits)),
+                    "detail": f"{rel}/ contains both skeleton-operating and project-owned names",
+                }
+            )
+    return collisions
+
+
+def git_overlay_status(target: Path, timeout: int) -> dict[str, Any]:
+    if not (target / ".git").exists():
+        return {"available": False, "clean": None, "modified": [], "deleted": [], "detail": "not a git repository"}
+    result = run_command(target, "git-status", ["git", "status", "--short"], timeout)
+    modified: list[str] = []
+    deleted: list[str] = []
+    for line in result.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        code = line[:2]
+        path = line[3:]
+        if "D" in code:
+            deleted.append(path)
+        else:
+            modified.append(path)
+    return {
+        "available": True,
+        "clean": result.ok and not result.stdout.strip(),
+        "modified": modified,
+        "deleted": deleted,
+        "command": result_payload(result),
+    }
+
+
+def optional_target_check(target: Path, name: str, script_rel: str, args: list[str], timeout: int) -> dict[str, Any]:
+    script = target / script_rel
+    if not script.exists():
+        return {"name": name, "available": False, "ok": None, "detail": f"{script_rel} not found"}
+    command = [sys.executable, str(script), "--root", str(target), *args]
+    result = run_command(target, name, command, timeout)
+    payload = result_payload(result)
+    payload["available"] = True
+    try:
+        parsed = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, (dict, list)):
+        payload["json"] = parsed
+    return payload
+
+
+def overlay_validation_checks(target: Path, timeout: int) -> list[dict[str, Any]]:
+    return [
+        optional_target_check(target, "verify-skeleton", "scripts/verify-skeleton.py", [], timeout),
+        optional_target_check(target, "verify-parity", "scripts/verify-parity.py", ["--format", "json", "--brief"], timeout),
+        optional_target_check(target, "resume-readiness", "scripts/resume-readiness.py", ["--strict", "--format", "json"], timeout),
+        optional_target_check(target, "security-scan", "scripts/security-scan.py", ["--include-runtime", "--strict", "--format", "json"], timeout),
+        optional_target_check(target, "quality-gate", "scripts/quality-gate.py", ["--format", "json", "--skip-tests", "--skip-node"], timeout),
+    ]
+
+
+def generated_surface_status(checks: list[dict[str, Any]]) -> dict[str, Any]:
+    parity = next((check for check in checks if check.get("name") == "verify-parity"), {})
+    if not parity.get("available"):
+        return {"status": "unavailable", "detail": parity.get("detail", "verify-parity unavailable")}
+    if parity.get("ok"):
+        return {"status": "match", "detail": "verify-parity passed", "check": parity}
+    return {"status": "mismatch", "detail": "verify-parity reported drift", "check": parity}
+
+
+def health_domain_status(checks: list[dict[str, Any]]) -> dict[str, Any]:
+    quality = next((check for check in checks if check.get("name") == "quality-gate"), {})
+    parsed = quality.get("json")
+    if isinstance(parsed, dict) and isinstance(parsed.get("domain_summary"), dict):
+        return parsed["domain_summary"]
+    return {domain: {"available": False} for domain in sorted(HEALTH_DOMAINS)}
+
+
+def build_overlay_audit(root: Path, target: Path, timeout: int) -> dict[str, Any]:
+    checks = overlay_validation_checks(target, timeout)
+    surface = overlay_surface_status(target)
+    payload = {
+        "schema_version": "ai-architecture.overlay-audit.v1",
+        "root": str(root),
+        "target": str(target),
+        "read_only": True,
+        "surface": surface,
+        "generated_surface": generated_surface_status(checks),
+        "git_status": git_overlay_status(target, timeout),
+        "runtime_state": runtime_state_status(target),
+        "namespace_collisions": namespace_collision_status(target),
+        "health_domains": health_domain_status(checks),
+        "checks": checks,
+    }
+    payload["ok"] = (
+        not surface["missing"]
+        and payload["generated_surface"].get("status") in {"match", "unavailable"}
+        and not payload["namespace_collisions"]
+    )
+    return payload
+
+
+def render_overlay_audit_markdown(payload: dict[str, Any]) -> str:
+    surface = payload["surface"]
+    lines = [
+        "## Overlay Audit",
+        f"- target: {payload['target']}",
+        f"- read_only: {payload['read_only']}",
+        f"- ok: {payload['ok']}",
+        "",
+        "## Surface",
+        f"- present: {', '.join(surface['present']) or '-'}",
+        f"- missing: {', '.join(surface['missing']) or '-'}",
+        "",
+        "## Generated Surface",
+        f"- status: {payload['generated_surface'].get('status')}",
+        f"- detail: {payload['generated_surface'].get('detail')}",
+        "",
+        "## Namespace Collisions",
+    ]
+    collisions = payload["namespace_collisions"]
+    if collisions:
+        lines.extend(f"- {item['path']}: {item['detail']}" for item in collisions)
+    else:
+        lines.append("- none")
+    lines.append("")
+    lines.append("## Checks")
+    for check in payload["checks"]:
+        status = "OK" if check.get("ok") else "FAIL"
+        if not check.get("available"):
+            status = "SKIP"
+        lines.append(f"- {check.get('name')}: {status}")
+    return "\n".join(lines)
+
+
 def command_requires_confirmation(command: str, configured: bool) -> bool:
     if configured:
         return True
@@ -797,6 +1142,37 @@ def classify_start(
             "signals": [*base_signals, "goal_mentions_maintain", "goal_mentions_reference", "reference_review_required"],
             "catalog_status": catalog_status,
         }
+    project_intent, project_intent_status = match_project_intent(root, goal)
+    if project_intent:
+        mode = str(project_intent.get("mode") or "build")
+        command_hint = str(project_intent.get("command_hint") or "").strip()
+        next_command = f"manual: {command_hint}" if command_hint else format_catalog_command(
+            str(catalog_modes.get(mode, {}).get("next_command") or DEFAULT_MODE_CONFIGS[mode]["next_command"]),
+            goal=goal,
+        )
+        write_policy = str(project_intent.get("write_policy") or write_policy_for(catalog_modes.get(mode, {}), mode))
+        requires_confirmation = route_requires_confirmation(next_command, False, write_policy)
+        intent_id = str(project_intent.get("id") or "")
+        return {
+            "mode": mode,
+            "reason": f"config/project-intents.yaml matched project intent `{intent_id}` before generic routing.",
+            "next_command": next_command,
+            "next_action_type": next_action_type_for(mode, next_command, requires_confirmation=requires_confirmation),
+            "confidence": "high",
+            "requires_confirmation": requires_confirmation,
+            "write_policy": write_policy,
+            "signals": [*base_signals, f"project_intent:{intent_id}"],
+            "catalog_status": catalog_status,
+            "project_intent_status": project_intent_status,
+            "project_intent_match": {
+                "id": intent_id,
+                "matched_pattern": str(project_intent.get("matched_pattern") or ""),
+                "mode": mode,
+                "write_policy": write_policy,
+                "command_hint": command_hint,
+                "health_domain": str(project_intent.get("health_domain") or "project"),
+            },
+        }
     if is_read_only_inspection_goal(goal):
         config = catalog_modes["research"]
         next_command = format_catalog_command("python3 scripts/agent-flow.py research --auto --goal \"{goal}\" --format json", goal=goal)
@@ -920,6 +1296,9 @@ def render_start_text(payload: dict[str, Any]) -> str:
     if payload.get("suggested_questions"):
         lines.append("suggested_questions:")
         lines.extend(f"  - {question}" for question in payload["suggested_questions"])
+    if payload.get("project_intent_match"):
+        match = payload["project_intent_match"]
+        lines.append(f"project_intent_match: {match.get('id')} ({match.get('health_domain')})")
     if payload["handoff"].get("summary"):
         lines.append(f"handoff_summary: {payload['handoff']['summary']}")
     return "\n".join(lines)
@@ -956,6 +1335,19 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(render_start_text(payload))
+    return 0
+
+
+def cmd_audit_overlay(root: Path, args: argparse.Namespace) -> int:
+    target = Path(args.target).resolve()
+    if not target.is_dir():
+        print(f"target not a directory: {target}", file=sys.stderr)
+        return 2
+    payload = build_overlay_audit(root, target, args.timeout)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(render_overlay_audit_markdown(payload))
     return 0
 
 
@@ -2988,6 +3380,12 @@ def build_parser() -> argparse.ArgumentParser:
     start.add_argument("--format", choices=("text", "json"), default="text")
     start.add_argument("--timeout", type=int, default=60)
     start.set_defaults(func=cmd_start)
+
+    audit_overlay = sub.add_parser("audit-overlay", help="Read-only audit of a skeleton overlay in an existing project.")
+    audit_overlay.add_argument("--target", required=True, help="Project directory to audit.")
+    audit_overlay.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    audit_overlay.add_argument("--timeout", type=int, default=120)
+    audit_overlay.set_defaults(func=cmd_audit_overlay)
 
     research = sub.add_parser("research", help="Analyze a local reference and optionally create proposal artifacts.")
     research.add_argument("--local-path", default="", help="Local reference path inside the project root.")

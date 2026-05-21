@@ -59,6 +59,13 @@ class BootstrapIntegrationTests(unittest.TestCase):
             self.assertTrue((target / "runtime" / "skill-lifecycle.jsonl").exists())
             self.assertTrue((target / "runtime" / "session-snapshot.json").exists())
             self.assertTrue((target / "runtime" / "external-repos" / "README.md").exists())
+            gitignore = (target / ".gitignore").read_text(encoding="utf-8")
+            self.assertIn("__pycache__/", gitignore)
+            self.assertIn("*.py[cod]", gitignore)
+            self.assertFalse(
+                any(target.rglob("__pycache__")),
+                "bootstrap should not leave Python cache directories in the target",
+            )
             self.assertFalse(
                 (target / "runtime" / "external-repos" / "test.invalid").exists(),
                 "bootstrap must not copy external repo clones into new projects",
@@ -355,6 +362,32 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
             }
             self.assertIn("docs/REFERENCE_REVIEW.template.md", applied)
             self.assertNotIn("AGENTS.md", applied)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_safe_apply_appends_python_cache_ignore_without_overwriting_custom_gitignore(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-gitignore")
+        try:
+            target = tmp / "proj"
+            target.mkdir(parents=True)
+            (target / ".gitignore").write_text("custom.log\n", encoding="utf-8")
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--target",
+                    str(target),
+                    "--apply",
+                    "--safe-only",
+                    "--format",
+                    "json",
+                ],
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            gitignore = (target / ".gitignore").read_text(encoding="utf-8")
+            self.assertIn("custom.log", gitignore)
+            self.assertIn("__pycache__/", gitignore)
+            self.assertIn("*.py[cod]", gitignore)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

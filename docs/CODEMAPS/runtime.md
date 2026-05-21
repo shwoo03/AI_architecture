@@ -1,7 +1,7 @@
 # Codemap: runtime
 
-- `files`: 28
-- `line_count`: 7074
+- `files`: 29
+- `line_count`: 7294
 - `directories`: 9
 
 ## Navigation Entry Points
@@ -28,6 +28,7 @@
 - `runtime/agent-briefs/2026-05-13-phase-1b-agent-run-docs-sync-auditor-01.json`
 - `runtime/agent-briefs/2026-05-14-adhoc-docs-sync-auditor-01.json`
 - `runtime/agent-briefs/2026-05-14-adhoc-docs-sync-auditor-02.json`
+- `runtime/ai-architecture-overlay-audit-prompt.md`
 - `runtime/ownership-classification.lock.json`
 - `runtime/proposals/README.md`
 - `runtime/proposals/reference-adoption/2026-04-27-example-resume-safe-checkpoint.md`

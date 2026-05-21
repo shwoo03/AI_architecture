@@ -1,7 +1,7 @@
 # Codemap: docs
 
-- `files`: 56
-- `line_count`: 4754
+- `files`: 57
+- `line_count`: 4784
 - `directories`: 8
 
 ## Navigation Entry Points
@@ -59,6 +59,7 @@
 - `docs/_meta/NOTION_SOURCE_ASSESSMENT.md`
 - `docs/_meta/SPECIALIST_AGENT_USAGE_BEST_PRACTICES.md`
 - `docs/_meta/SPECIALIST_OVERLAY_AUDIT.md`
+- `docs/commands/audit-overlay.md`
 - `docs/commands/closeout.md`
 - `docs/commands/decide.md`
 - `docs/commands/research.md`

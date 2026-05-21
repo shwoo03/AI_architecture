@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lib_ownership
+
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -114,11 +117,13 @@ def parse_handoff(root: Path, findings: list[Finding]) -> tuple[Optional[datetim
         findings.append(Finding("ERROR", "handoff_missing", "runtime/state/session-handoff.md missing"))
         return None, latest
     text = path.read_text(encoding="utf-8-sig", errors="replace")
+    ownership_deferred = bool(re.search(r"ownership(?:\s+lock)?\s+drift\s*:\s*deferred", text, flags=re.IGNORECASE))
     sections = {
         match.group(1).strip(): match.start()
         for match in re.finditer(r"^##\s+(.+?)\s*$", text, flags=re.MULTILINE)
     }
     latest["sections"] = sorted(sections)
+    latest["ownership_drift_deferred"] = ownership_deferred
     for section in REQUIRED_HANDOFF_SECTIONS:
         if section not in sections:
             findings.append(Finding("ERROR", "handoff_section_missing", f"handoff missing section `{section}`"))
@@ -133,6 +138,76 @@ def parse_handoff(root: Path, findings: list[Finding]) -> tuple[Optional[datetim
         findings.append(Finding("ERROR", "handoff_timestamp_invalid", f"handoff Last Updated is not UTC ISO timestamp: {raw_ts}"))
         return None, latest
     return parsed, latest
+
+
+def check_ownership_lock_state(root: Path, handoff_latest: dict[str, object], findings: list[Finding]) -> dict[str, object]:
+    config_path = root / "config" / "ownership.yaml"
+    lock_path = root / "runtime" / "ownership-classification.lock.json"
+    latest: dict[str, object] = {
+        "config": config_path.relative_to(root).as_posix(),
+        "lock": lock_path.relative_to(root).as_posix(),
+        "checked": False,
+        "lock_addition": 0,
+        "lock_removal": 0,
+        "classification_drift": 0,
+        "deferred": bool(handoff_latest.get("ownership_drift_deferred")),
+    }
+    if not config_path.exists() and not lock_path.exists():
+        latest["detail"] = "ownership lock not initialized for this root"
+        return latest
+    if not config_path.exists() or not lock_path.exists():
+        findings.append(
+            Finding(
+                "WARN",
+                "ownership_lock_incomplete",
+                "ownership config or lock is missing; run scripts/ownership-lock.py write when ownership is enabled",
+            )
+        )
+        latest["detail"] = "ownership config or lock missing"
+        return latest
+    try:
+        config = lib_ownership.load_ownership_config(config_path)
+        report = lib_ownership.classify_self(root, config)
+        if report.unknown:
+            findings.append(
+                Finding(
+                    "ERROR",
+                    "ownership_unknown_path",
+                    f"{len(report.unknown)} ownership-unknown path(s); update config/ownership.yaml and refresh the lock",
+                )
+            )
+        changes = lib_ownership.compare_lock(report.classifications, lib_ownership.load_lock(lock_path))
+    except (OSError, ValueError, lib_ownership.OwnershipConfigError) as exc:
+        findings.append(Finding("ERROR", "ownership_lock_check", str(exc)))
+        latest["detail"] = str(exc)
+        return latest
+    latest["checked"] = True
+    additions = sum(1 for change in changes if change.kind == "lock_addition")
+    removals = sum(1 for change in changes if change.kind == "lock_removal")
+    drift = [change for change in changes if change.kind == "classification_drift"]
+    latest["lock_addition"] = additions
+    latest["lock_removal"] = removals
+    latest["classification_drift"] = len(drift)
+    for change in drift[:5]:
+        findings.append(
+            Finding(
+                "ERROR",
+                "ownership_classification_drift",
+                f"{change.path}: {change.previous_owner}/{change.previous_action} -> {change.current_owner}/{change.current_action}",
+            )
+        )
+    if len(drift) > 5:
+        findings.append(Finding("ERROR", "ownership_classification_drift", f"{len(drift) - 5} more ownership drift(s) not shown"))
+    if (additions or removals) and not latest["deferred"]:
+        findings.append(
+            Finding(
+                "WARN",
+                "ownership_lock_refresh_needed",
+                f"{additions} lock addition(s), {removals} lock removal(s); run scripts/ownership-lock.py write or record `ownership lock drift: deferred` in handoff",
+            )
+        )
+    latest["detail"] = "ownership lock checked"
+    return latest
 
 
 def latest_timestamp(records: list[dict[str, Any]]) -> Optional[datetime]:
@@ -267,6 +342,7 @@ def run_check(root: Path) -> ReadinessResult:
     compare_not_newer(handoff_ts, evidence_ts, "completion_evidence", findings)
     compare_not_newer(handoff_ts, checkpoint_ts, "checkpoint", findings)
     progress_latest = check_progress_state(root, handoff_ts, evidence_ts, findings)
+    ownership_latest = check_ownership_lock_state(root, handoff_latest, findings)
 
     latest = {
         "handoff": handoff_latest,
@@ -285,6 +361,7 @@ def run_check(root: Path) -> ReadinessResult:
             "latest_approval_state": latest_record(checkpoint_records).get("approval_state") if latest_record(checkpoint_records) else None,
         },
         "progress": progress_latest,
+        "ownership_lock": ownership_latest,
     }
     summary = dict(Counter(finding.severity for finding in findings))
     for severity in ("ERROR", "WARN", "INFO"):

@@ -1,57 +1,49 @@
 {
   "schema_version": "ai-architecture.session-snapshot.v1",
-  "ts": "2026-05-17T03:25:43Z",
+  "ts": "2026-05-21T06:40:05Z",
   "project": "common-ai-architecture",
   "handoff_path": "runtime/state/session-handoff.md",
   "handoff_exists": true,
   "activity_log_last": {
-    "ts": "2026-05-17T03:25:43Z",
+    "ts": "2026-05-21T06:40:04Z",
     "phase": "closeout",
     "action": "task_closeout",
-    "goal": "Push private near-original mirror including env and generated runtime surfaces, excluding only caches and dependency/build artifacts",
+    "goal": "reference card integrity carrier round",
     "result": "recording"
   },
   "completion_evidence_last": {
-    "ts": "2026-05-17T03:25:43Z",
-    "goal": "Push private near-original mirror including env and generated runtime surfaces, excluding only caches and dependency/build artifacts",
+    "ts": "2026-05-21T06:40:05Z",
+    "goal": "reference card integrity carrier round",
     "changed_paths": [
-      ".claude/settings.local.json",
-      "runtime/ownership-classification.lock.json"
+      "research/reference-candidates/2026-04-29-everything-claude-code.md",
+      "research/reference-candidates/2026-05-13-paperclip.md",
+      "research/reference-candidates/2026-05-13-opencode.md",
+      "research/reference-candidates/README.md",
+      "runtime/proposals/reference-adoption/_template.md",
+      "runtime/proposals/README.md",
+      "scripts/validate-reference-proposals.py",
+      "tests/test_reference_security.py"
     ],
     "validations": [
       {
-        "name": "verify-skeleton",
-        "command": "python3 scripts/verify-skeleton.py --root .",
+        "name": "validate-reference-candidates",
+        "command": "python3 scripts/validate-reference-candidates.py --root .",
         "status": "OK",
         "exit_code": 0,
-        "detail": "skeleton OK: all checks passed"
+        "detail": "reference candidates OK: 9 candidate card(s) checked"
       },
       {
-        "name": "completion-evidence",
-        "command": "python3 scripts/completion-evidence.py --root . check",
+        "name": "validate-reference-proposals",
+        "command": "python3 scripts/validate-reference-proposals.py --root .",
         "status": "OK",
         "exit_code": 0,
-        "detail": "completion evidence OK: 55 record(s) checked"
-      },
-      {
-        "name": "resume-readiness",
-        "command": "python3 scripts/resume-readiness.py --root . --strict",
-        "status": "OK",
-        "exit_code": 0,
-        "detail": "Resume Readiness | root: /Users/shwoo/mydir/AI/AI_architecture | summary: error=0, warn=0, info=0 | OK next agent can resume from current handoff and ledgers"
-      },
-      {
-        "name": "skill-surface",
-        "command": "python3 scripts/skill-surface-check.py --root . --strict",
-        "status": "OK",
-        "exit_code": 0,
-        "detail": "Skill Surface Check | root: /Users/shwoo/mydir/AI/AI_architecture | summary: error=0, warn=0, info=0 | active_skills: 13"
+        "detail": "reference proposals OK: 2 proposal(s) checked"
       }
     ],
     "outcome": "genuine_success",
     "disposition": "complete",
     "residual_risk": "",
-    "next_action": "",
+    "next_action": "Wait for user approval before writing the next security/provenance dry-run proposal; do not start invisible-character gate implementation in this round.",
     "notes": "",
     "agent": "codex",
     "artifacts": []

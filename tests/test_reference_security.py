@@ -313,6 +313,171 @@ python scripts/validate-reference-proposals.py
         finally:
             scratch.unlink(missing_ok=True)
 
+    def test_superseded_proposal_requires_replacement_link(self) -> None:
+        scratch = (
+            REPO_ROOT
+            / "runtime"
+            / "proposals"
+            / "reference-adoption"
+            / "_tmp_superseded_missing_link.md"
+        )
+        scratch.write_text(
+            """# Superseded Proposal Smoke
+
+## 상태
+
+- `status`: superseded
+- `created_at`: 2026-05-21
+- `candidate_card`: `research/reference-candidates/2026-04-27-langgraph.md`
+- `proposal_type`: reference_refresh
+- `approval_required`: yes
+- `decision_source`: split into narrower proposals
+- `decision`: superseded
+- `decided_at`: 2026-05-21
+- `decided_by`: tester
+- `applied_in`: not applicable
+- `validation_result`: split before implementation
+
+## 한 문장 정의
+
+Superseded proposal.
+
+## 근거
+
+- Split requested.
+
+## 제안 변경
+
+- No longer active.
+
+## 검증 계획
+
+```powershell
+python scripts/verify-skeleton.py
+python scripts/validate-reference-proposals.py
+```
+
+## 최종 결정 기록
+
+- Superseded by a narrower proposal.
+""",
+            encoding="utf-8",
+        )
+        try:
+            result = _run([str(self.SCRIPT), "--root", str(REPO_ROOT)])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("superseded proposal requires non-blank field `superseded_by`", result.stdout)
+        finally:
+            scratch.unlink(missing_ok=True)
+
+    def test_superseded_proposal_with_replacement_link_is_valid(self) -> None:
+        old = (
+            REPO_ROOT
+            / "runtime"
+            / "proposals"
+            / "reference-adoption"
+            / "_tmp_superseded_old.md"
+        )
+        new = (
+            REPO_ROOT
+            / "runtime"
+            / "proposals"
+            / "reference-adoption"
+            / "_tmp_superseded_new.md"
+        )
+        old.write_text(
+            """# Superseded Proposal Smoke
+
+## 상태
+
+- `status`: superseded
+- `created_at`: 2026-05-21
+- `candidate_card`: `research/reference-candidates/2026-04-27-langgraph.md`
+- `proposal_type`: reference_refresh
+- `approval_required`: yes
+- `decision_source`: split into narrower proposals
+- `superseded_by`: `runtime/proposals/reference-adoption/_tmp_superseded_new.md`
+- `decision`: superseded
+- `decided_at`: 2026-05-21
+- `decided_by`: tester
+- `applied_in`: not applicable
+- `validation_result`: split before implementation
+
+## 한 문장 정의
+
+Superseded proposal.
+
+## 근거
+
+- Split requested.
+
+## 제안 변경
+
+- No longer active.
+
+## 검증 계획
+
+```powershell
+python scripts/verify-skeleton.py
+python scripts/validate-reference-proposals.py
+```
+
+## 최종 결정 기록
+
+- Superseded by narrower proposal.
+""",
+            encoding="utf-8",
+        )
+        new.write_text(
+            """# Replacement Proposal Smoke
+
+## 상태
+
+- `status`: proposed
+- `created_at`: 2026-05-21
+- `candidate_card`: `research/reference-candidates/2026-04-27-langgraph.md`
+- `proposal_type`: reference_refresh
+- `approval_required`: yes
+- `decision_source`:
+- `supersedes`: `runtime/proposals/reference-adoption/_tmp_superseded_old.md`
+- `decision`: pending
+- `decided_at`:
+- `decided_by`:
+- `applied_in`:
+- `validation_result`:
+
+## 한 문장 정의
+
+Replacement proposal.
+
+## 근거
+
+- Split from a broader proposal.
+
+## 제안 변경
+
+- Review narrower scope.
+
+## 검증 계획
+
+```powershell
+python scripts/verify-skeleton.py
+python scripts/validate-reference-proposals.py
+```
+
+## 최종 결정 기록
+
+- Pending user approval.
+""",
+            encoding="utf-8",
+        )
+        try:
+            result = _run([str(self.SCRIPT), "--root", str(REPO_ROOT)])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        finally:
+            old.unlink(missing_ok=True)
+            new.unlink(missing_ok=True)
+
     def test_reference_refresh_missing_required_field_is_rejected(self) -> None:
         scratch = (
             REPO_ROOT

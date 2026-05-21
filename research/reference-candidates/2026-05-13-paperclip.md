@@ -5,10 +5,10 @@
 - `name`: paperclip
 - `url`: https://github.com/paperclipai/paperclip.git
 - `source_type`: repository
-- `status`: reviewing
+- `status`: deferred
 - `searched_for`: AI agent company model, org chart, budgets, approvals, activity, routines, plugin system
 - `created_at`: 2026-05-13
-- `reviewed_at`: 2026-05-13
+- `reviewed_at`: 2026-05-21
 - `reviewer`: codex
 
 ## 왜 보는가
@@ -36,8 +36,9 @@
 
 - `evidence_summary`: README는 Paperclip을 agents as company model로 설명하고, identity/access, org chart, work/task, heartbeat execution, governance, budgets, routines, plugins, secrets, activity, portability를 핵심 시스템으로 제시한다.
 - `local_clone_path`: ../AI_architecture_references/paperclip
-- `checked_revision`: 42a299fb9d66fa0c136eae73bf166cad2c2c3e3e
-- `freshness_signal`: tracked in references.yaml with local clone revision.
+- `checked_revision`: c91a06232625d1939858fcdfbdc0c9b3a64a8296
+- `clone_present_at_review`: yes
+- `freshness_signal`: 2026-05-21에 repo 밖 reference checkout의 HEAD를 확인했다.
 - `maintenance_signal`: README includes quickstart, development commands, roadmap, community, telemetry, and license.
 - `documentation_signal`: README explains product boundaries and system components in detail.
 - `validation_signal`: Local README and license were inspected; no code copied.
@@ -62,9 +63,9 @@
   - runtime/agent-runs.jsonl
   - scripts/agent-brief.py
   - scripts/task-closeout.py
-- `adoption_decision`: adapt
-- `decision_reason`: Operational governance patterns fit, but product runtime and database model are out of scope.
-- `next_action`: Use as reference for agent team ledger, budget/approval boundaries, and recovery semantics.
+- `adoption_decision`: defer
+- `decision_reason`: Operational governance patterns are useful, but the current lightweight skeleton does not yet need Paperclip's product-runtime governance stack, budgets, approval UI, secrets, database, or recovery semantics as a bundled feature.
+- `next_action`: Revisit only when a concrete agent-team governance, budget, approval, or recovery blocker appears in runtime evidence. Do not use this card to justify near-term schema or runtime expansion.
 
 ## 점수
 
@@ -81,21 +82,19 @@
 
 ## Dry-Run 제안
 
-- `proposal_needed`: yes
+- `proposal_needed`: no
 - `files_to_change`:
-  - docs/AGENT_REGISTRY.md
-  - scripts/agent-brief.py
-  - runtime/agent-runs.jsonl
-- `behavior_change`: Treat repeated specialist agents as governed runtime actors with audit, approval, and recovery metadata.
-- `validation_plan`: python scripts/validate-reference-candidates.py && python scripts/validate-reference-proposals.py && python scripts/quality-gate.py --skip-tests --format json
-- `rollback_or_stop_condition`: Stop if design requires DB/server/product runtime adoption instead of lightweight ledger contracts.
-- `approval_required`: yes
+  - not currently proposed
+- `behavior_change`: None in this round. The card is deferred to avoid importing heavyweight product-runtime governance into the common skeleton without active blocker evidence.
+- `validation_plan`: python scripts/validate-reference-candidates.py
+- `rollback_or_stop_condition`: Reopen only if runtime evidence shows the current specialist ledger, approval, or recovery flow is insufficient.
+- `approval_required`: no
 
 ## 최종 기록
 
-- `final_status`: reviewing
+- `final_status`: deferred
 - `implemented_in`:
   - not implemented
-- `validation_result`: candidate card only
+- `validation_result`: candidate card deferred during 2026-05-21 card integrity round
 - `activity_log_entry`: not recorded
-- `notes`: No code copied; use as governance reference for specialist team runtime.
+- `notes`: No code copied. This card remains a useful governance reference, but it is not a current adoption driver.

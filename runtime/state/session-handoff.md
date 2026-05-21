@@ -1,43 +1,40 @@
 # Session Handoff
 
 ## Last Updated
-2026-05-16T19:55:26Z
+2026-05-21T06:40:30Z
 
 ## Current Task
-Active goal: reduce AI_architecture closeout/test/validation loop cost while preserving final safety gates. Implementation is complete and validated; changes are not yet committed.
+Active goal: reference card integrity carrier round before security gate implementation. The carrier round is complete, closeout evidence is recorded, and plan 0031 has moved to done.
 
 ## Last Completed
-- Prior timing evidence showed two recent auto closeouts still cost about 59-61s (`Generated/local dirty policy cleanup`, `Private near-original GitHub mirror policy and push`).
-- `scripts/task-closeout.py` now has a `scripts-fast` profile for script/test edits. It runs `verify-skeleton`, AST syntax checks for changed Python files, and focused unittest modules instead of the heavy scripts profile.
-- `scripts/agent-flow.py closeout --profile auto` now infers `scripts-fast` for `scripts/` and `tests/` changes and records the effective profile in `runtime/closeout-timings.jsonl`.
-- `scripts/quality-gate.py` now runs independent checks with bounded parallelism (`--jobs`, default 4; use `--jobs 1` for sequential debugging) while preserving output order.
-- `scripts/README.md` documents the faster closeout/quality-gate behavior and when to use explicit heavy profiles.
-- Codemaps, ownership lock, runtime closeout evidence, and session snapshot were refreshed after the change.
+- Preserved the stale untracked 0001 plan as `plans/done/0030-common-skeleton-hygiene-readiness-improvements.md` instead of leaving it outside the plan lifecycle.
+- Created active plan `plans/active/0031-reference-card-integrity-carrier-round.md` for this card-integrity round.
+- Added `superseded` lifecycle support to reference adoption proposals, including template fields and validator/tests for replacement links.
+- Refreshed `research/reference-candidates/2026-04-29-everything-claude-code.md` with the actual inspected clone path, current revision, clone-present marker, and scoped `scripts/ci/` security/validation anchors.
+- Deferred `research/reference-candidates/2026-05-13-paperclip.md` so heavyweight product-runtime governance does not drive near-term skeleton expansion without blocker evidence.
+- Updated `research/reference-candidates/2026-05-13-opencode.md` to distinguish already absorbed role/write-policy/LSP diagnostic ideas from future read-only smoke/diagnostic proposals.
+- Recorded checked/unchecked cards in `research/reference-candidates/README.md` and appended the scope decision to `state/decisions.md`.
+- No invisible-character security scan, reference-copy-ledger gate, closeout summary, or upgrade post-apply verify implementation was started.
 
 ## Validation
-- Focused regression batch passed: `TaskCloseoutTests`, closeout profile tests, and quality-gate jobs parsing coverage.
-- Full focused suites passed: `tests.test_runtime tests.test_agent_flow` (97 tests) and `tests.test_validation.QualityGateTests` (11 tests).
-- Performance measurements: stable quality gate with `--jobs 1` took about 7.31s; `--jobs 4` took about 4.19s. A one-file `scripts-fast` closeout smoke took about 10.70s.
-- Final real closeout for this change recorded `effective_profile=scripts-fast` and `duration_ms=32657`, down from recent 59-61s auto closeouts while still running focused tests.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/cleanup-ephemeral.py --apply --format json`: no matches after replacing py_compile with AST parsing.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate-codemaps.py --write`: passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/ownership-lock.py write && python3 scripts/ownership-lock.py check`: passed, drift 0.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify-skeleton.py`: passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier stable --skip-tests --skip-node --jobs 4 --format json`: passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/agent-flow.py doctor --format json`: passed with OK status, WARN 0, FAIL 0.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/quality-gate.py --root . --tier all --skip-tests --skip-node --jobs 4 --format json`: passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/agent-flow.py closeout --goal "Reduce closeout and validation loop cost" ... --format json`: passed and recorded closeout evidence.
+- `python3 scripts/validate-reference-candidates.py`: passed, 9 candidate cards checked.
+- `python3 scripts/validate-reference-proposals.py`: passed, 2 proposals checked.
+- `python3 -m unittest tests.test_reference_security.ReferenceProposalTests -v`: passed, 8 tests.
+- `python3 scripts/validate-plans.py --allow-legacy-done`: passed, 31 plans checked.
+- `python3 scripts/verify-skeleton.py`: passed with 0 errors and warnings for temporary `scripts/__pycache__` plus ownership lock drift.
+- `python3 scripts/cleanup-ephemeral.py --apply --format json`: removed `scripts/__pycache__`.
+- `python3 scripts/resume-readiness.py --strict`: passed with 0 warnings after handoff/progress alignment.
+- `python3 scripts/task-closeout.py --goal "reference card integrity carrier round" --record --format json --profile reference --disposition complete ...`: passed and recorded completion evidence.
+- A scripts-fast closeout attempt failed because `tests.test_validation` is not runnable under system Python 3.9 due existing `str | None` type syntax; this is recorded as an unrelated residual validation issue, not fixed in this card round.
 
 ## Recommended Next Step
-Review the uncommitted closeout-performance change set and commit it if accepted. Push remains out of scope unless explicitly requested.
+Wait for user approval before writing the next security/provenance dry-run proposal. That next proposal should cover Unicode detection, copy-ledger gating, proposal warning, and partial-copy golden case ledger handling. Do not start invisible-character gate implementation yet.
 
 ## Open Questions / Blockers
-- ENKI target license signal remains unknown; 0029 now classifies this as non-blocking metadata review, not legal clearance.
-- ENKI dry-run currently reports manual/risky preserve candidates for target-owned or newly changed skeleton files. Review them slice-by-slice before any future apply.
-- ENKI full app quality gate without `--skip-node` remains separate from operating OS migration.
-- Do not touch `/Users/shwoo/mydir/Project/ENKI_WIKI`; it is not the active target.
-- Private mirror policy allows generated/local files to be committed when the user explicitly wants a private near-original project mirror. Public publication should re-check `.env` and local config inclusion first.
-- `scripts-fast` is a development-loop profile, not a replacement for explicit final `--profile scripts`, `--profile all`, or full `quality-gate --with-tests` when a release boundary needs broad assurance.
+- `agent-flow start` classified this card-editing goal as `write_policy=read_only`; the user explicitly instructed this carrier round to start, and active plan 0031 records that write boundary.
+- ownership lock drift: deferred. The current ownership lock additions/removal are outside this reference-card carrier round and should be reviewed in a separate ownership hygiene slice.
+- Existing unrelated dirty files were present before this work (`config/install-profiles.yaml`, `scripts/agent-flow.py`, `scripts/catalog.yaml`, generated codemaps/rules, several tests, `docs/commands/audit-overlay.md`, `runtime/ai-architecture-overlay-audit-prompt.md`). This task did not revert them.
+- Push and commit remain out of scope unless explicitly requested.
 
 ## Resume Prompt
-Resume in `/Users/shwoo/mydir/AI/AI_architecture` with active goal "reduce closeout and validation loop cost." The implementation is complete and validated. Inspect `git status --short`, review `scripts/task-closeout.py`, `scripts/agent-flow.py`, `scripts/quality-gate.py`, and related tests/docs, then commit if accepted. Do not push unless the user explicitly requests it.
+Resume in `/Users/shwoo/mydir/AI/AI_architecture` after the completed "reference card integrity carrier round." Inspect `git status --short`. Do not start invisible-character gate implementation or write security/provenance dry-run proposals until the user approves the next round. Do not modify unrelated dirty files or push unless requested.

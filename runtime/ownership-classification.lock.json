@@ -2534,6 +2534,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "docs/commands/audit-overlay.md": {
+      "action": "manual_merge",
+      "matched_pattern": "docs/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "docs/commands/closeout.md": {
       "action": "manual_merge",
       "matched_pattern": "docs/**",
@@ -2996,6 +3003,20 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "plans/done/0030-common-skeleton-hygiene-readiness-improvements.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0031-reference-card-integrity-carrier-round.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "plans/failed/.gitkeep": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
@@ -3309,6 +3330,13 @@
       "matched_pattern": "runtime/agent-runs.legacy.jsonl",
       "owner": "protected",
       "reason": "protected",
+      "system_locked": false
+    },
+    "runtime/ai-architecture-overlay-audit-prompt.md": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
       "system_locked": false
     },
     "runtime/checkpoints.jsonl": {
@@ -4959,5 +4987,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 708
+  "total": 712
 }

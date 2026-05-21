@@ -83,7 +83,7 @@
 - `scripts/notion-doc-quality-check.py`: Notion에 올릴 Markdown 초안이 기능 중심 섹션, 입력/출력, 성공/실패 신호, 판단 기준을 갖췄는지 검사합니다. 짧은 changelog나 파일 목록 중심 문서를 완료 문서로 올리지 않기 위한 사전 점검입니다.
 - `scripts/skeleton-doctor.py`: 프로젝트가 바로 문서화, reference review, runtime startup, 로그/인수인계, 구조 검증을 수행할 준비가 되었는지 `OK/WARN/FAIL/INFO`로 진단합니다. 기본은 read-only이며 `--format json`과 선택적 `--projects-root` 전파 상태 점검을 지원합니다.
 - `scripts/agent-flow.py doctor`: 흩어진 운영 진단을 한 번에 보는 public UX wrapper입니다. `skeleton-doctor`, `verify-skeleton`, `ownership-lock check`, `resume-readiness --strict`, `quality-gate`를 read-only로 실행하고 `OK/WARN/FAIL` JSON/text summary를 냅니다. 기본은 빠른 확인을 위해 quality-gate에 `--skip-tests`를 붙이며, `--with-tests`로 풀 테스트를 허용합니다.
-- `scripts/resume-readiness.py`: 다음 에이전트가 handoff, activity log, completion evidence를 보고 추측 없이 이어받을 수 있는지 검사합니다. `--strict`에서는 handoff보다 최신인 runtime 기록도 실패로 올립니다.
+- `scripts/resume-readiness.py`: 다음 에이전트가 handoff, activity log, completion evidence, ownership lock 상태를 보고 추측 없이 이어받을 수 있는지 검사합니다. `--strict`에서는 handoff보다 최신인 runtime 기록과 미처리 ownership lock drift를 실패로 올립니다. 의도적으로 미룰 때는 handoff에 `ownership lock drift: deferred`를 남깁니다.
 - `scripts/skill-surface-check.py`: `skills/active`를 canonical로 두고 `.codex/skills`, `.claude/skills` 생성물이 동기화됐는지 검사합니다.
 - `scripts/install-state.py`: bootstrap/convert 결과를 `runtime/install-state.jsonl`에 append-only로 기록하고 검증합니다.
 - `scripts/install-profiles.py`: `config/install-profiles.yaml`을 읽어 bootstrap profile과 component 목록을 계획/검증합니다.
@@ -93,7 +93,7 @@
 - `scripts/cost-log.py`: `state/cost-log.jsonl` 비용 이벤트를 추가, 검증, 요약합니다.
 - `scripts/session-snapshot.py`: `runtime/session-snapshot.json`을 생성하고 검증합니다. 사람이 읽는 handoff를 대체하지 않는 machine-readable 현재 상태입니다.
 - `scripts/security-scan.py`: 운영 문서, scripts, hooks, agent/skill 설정, reference adoption 산출물을 read-only로 훑어 secret, 위험한 명령, 위험한 hook/config, 코드 복사 governance 누락을 찾습니다. 기본은 보고 전용이며 `--strict`에서 HIGH/CRITICAL finding이 있으면 실패합니다.
-- `scripts/cleanup-ephemeral.py`: 기본 preview 모드로 repo 내부 `__pycache__`를 찾고, closeout의 승인된 `--apply` 경로에서만 안전한 Python cache 디렉터리를 삭제합니다.
+- `scripts/cleanup-ephemeral.py`: 기본 preview 모드로 repo 내부 `__pycache__`를 찾고, closeout의 승인된 `--apply` 경로에서만 안전한 Python cache 디렉터리를 삭제합니다. 이미 git에 tracked 된 `.pyc/.pyo/.pyd`는 `verify-skeleton.py`가 오류로 보고하고, 추적 해제는 별도 git 작업으로 처리합니다.
 
 이 스크립트들은 사용자가 직접 실행해야 하는 UI가 아닙니다. 에이전트가 구조 검증, 반복 작업, 승인 후 반영을 안정적으로 수행하기 위해 사용하는 내부 운영 도구입니다.
 

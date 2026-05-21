@@ -1,5 +1,6 @@
 from tests.test_support import *
 import sqlite3
+from typing import Optional
 
 
 class RotateActivityLogDryRunTests(unittest.TestCase):
@@ -98,7 +99,7 @@ class PostToolUseLogTests(unittest.TestCase):
             prefix="skeleton-sidecar-", suffix=".jsonl", dir=str(scratch_dir), delete=False
         ) as tmpfile:
             log_path = Path(tmpfile.name)
-        created_sidecar: Path | None = None
+        created_sidecar: Optional[Path] = None
         try:
             log_path.write_bytes(b"")
             payload = {"tool": "Bash", "status": "completed", "summary": "alpha " + ("needle " * 200)}
@@ -219,6 +220,42 @@ class ResumeReadinessTests(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["summary"]["ERROR"], 0)
             self.assertEqual(payload["summary"]["WARN"], 0)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_strict_readiness_reports_ownership_lock_addition(self) -> None:
+        tmp = self._make_root()
+        try:
+            (tmp / "config").mkdir()
+            shutil.copyfile(REPO_ROOT / "config" / "ownership.yaml", tmp / "config" / "ownership.yaml")
+            write = _run([str(SCRIPTS / "ownership-lock.py"), "--root", str(tmp), "write"])
+            self.assertEqual(write.returncode, 0, write.stdout + write.stderr)
+            (tmp / "scripts").mkdir()
+            (tmp / "scripts" / "new-tool.py").write_text("print('new')\n", encoding="utf-8")
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--strict", "--format", "json"])
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            self.assertGreaterEqual(payload["latest"]["ownership_lock"]["lock_addition"], 1)
+            self.assertTrue(any(item["check"] == "ownership_lock_refresh_needed" for item in payload["findings"]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_handoff_can_defer_ownership_lock_addition(self) -> None:
+        tmp = self._make_root()
+        try:
+            handoff = tmp / "runtime" / "state" / "session-handoff.md"
+            handoff.write_text(handoff.read_text(encoding="utf-8") + "\nownership lock drift: deferred\n", encoding="utf-8")
+            (tmp / "config").mkdir()
+            shutil.copyfile(REPO_ROOT / "config" / "ownership.yaml", tmp / "config" / "ownership.yaml")
+            write = _run([str(SCRIPTS / "ownership-lock.py"), "--root", str(tmp), "write"])
+            self.assertEqual(write.returncode, 0, write.stdout + write.stderr)
+            (tmp / "scripts").mkdir()
+            (tmp / "scripts" / "new-tool.py").write_text("print('new')\n", encoding="utf-8")
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--strict", "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertGreaterEqual(payload["latest"]["ownership_lock"]["lock_addition"], 1)
+            self.assertTrue(payload["latest"]["ownership_lock"]["deferred"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

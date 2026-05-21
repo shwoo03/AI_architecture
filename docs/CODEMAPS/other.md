@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 137
-- `line_count`: 16485
+- `files`: 139
+- `line_count`: 16597
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -218,6 +218,8 @@
 - `plans/done/0027-enki-manual-risky-system-review.md`
 - `plans/done/0028-closeout-wrapper-timing.md`
 - `plans/done/0029-adoption-semantics-install-state.md`
+- `plans/done/0030-common-skeleton-hygiene-readiness-improvements.md`
+- `plans/done/0031-reference-card-integrity-carrier-round.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

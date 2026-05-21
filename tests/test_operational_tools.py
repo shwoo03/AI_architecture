@@ -120,6 +120,31 @@ class OperationalToolTests(unittest.TestCase):
         self.assertEqual(payload["profile"], "cli")
         self.assertIn("cli", payload["components"])
 
+    def test_install_profiles_private_mirror_full_is_optional(self) -> None:
+        check = _run([str(SCRIPTS / "install-profiles.py"), "--root", str(REPO_ROOT), "--format", "json", "check"])
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        check_payload = json.loads(check.stdout)
+        self.assertEqual(check_payload["default_profile"], "full-canonical")
+        self.assertIn("private-mirror-full", check_payload["profiles"])
+
+        plan = _run(
+            [
+                str(SCRIPTS / "install-profiles.py"),
+                "--root",
+                str(REPO_ROOT),
+                "--format",
+                "json",
+                "plan",
+                "--profile",
+                "private-mirror-full",
+            ]
+        )
+        self.assertEqual(plan.returncode, 0, plan.stdout + plan.stderr)
+        plan_payload = json.loads(plan.stdout)
+        self.assertEqual(plan_payload["profile"], "private-mirror-full")
+        self.assertEqual(plan_payload["default_profile"], "full-canonical")
+        self.assertIn("security scan", plan_payload["description"].lower())
+
     def test_skill_stocktake_reports_improve_and_merge(self) -> None:
         tmp = REPO_ROOT / "runtime" / f"skill-stocktake-{uuid.uuid4().hex}"
         try:

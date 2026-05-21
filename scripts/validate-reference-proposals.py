@@ -52,10 +52,10 @@ REFRESH_REQUIRED_FIELDS = [
     "validation_result",
 ]
 COMMON_ALLOWED_VALUES = {
-    "status": {"proposed", "accepted", "rejected", "applied", "deferred"},
+    "status": {"proposed", "accepted", "rejected", "applied", "deferred", "superseded"},
     "proposal_type": {"reference_adoption_dry_run", "reference_refresh"},
     "approval_required": {"yes", "no"},
-    "decision": {"pending", "accepted", "rejected", "applied", "deferred"},
+    "decision": {"pending", "accepted", "rejected", "applied", "deferred", "superseded"},
 }
 ADOPTION_ALLOWED_VALUES = {
     "absorption_mode": {
@@ -155,6 +155,7 @@ def validate_headings(path: Path, text: str, headings: list[str], findings: list
 
 def validate_fields(root: Path, path: Path, fields: dict[str, str], proposal_type: str, findings: list[Finding]) -> None:
     decision = clean_value(fields.get("decision", ""))
+    status = clean_value(fields.get("status", ""))
     absorption_mode = clean_value(fields.get("absorption_mode", ""))
     required_fields = REFRESH_REQUIRED_FIELDS if proposal_type == "reference_refresh" else ADOPTION_REQUIRED_FIELDS
     for field in required_fields:
@@ -182,6 +183,14 @@ def validate_fields(root: Path, path: Path, fields: dict[str, str], proposal_typ
     candidate = clean_value(fields.get("candidate_card", ""))
     if candidate and not is_blank(candidate) and not (root / candidate).exists():
         findings.append(Finding(path, f"candidate_card target does not exist: `{candidate}`"))
+    superseded_by = clean_value(fields.get("superseded_by", ""))
+    supersedes = clean_value(fields.get("supersedes", ""))
+    if status == "superseded" or decision == "superseded":
+        if is_blank(superseded_by):
+            findings.append(Finding(path, "superseded proposal requires non-blank field `superseded_by`"))
+    for field, value in (("superseded_by", superseded_by), ("supersedes", supersedes)):
+        if value and not is_blank(value) and not (root / value).exists():
+            findings.append(Finding(path, f"{field} target does not exist: `{value}`"))
     if proposal_type == "reference_adoption_dry_run" and absorption_mode == "partial_copy":
         copy_boundary = clean_value(fields.get("copy_boundary", ""))
         if is_blank(copy_boundary):

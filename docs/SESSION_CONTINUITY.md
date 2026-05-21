@@ -84,6 +84,18 @@ AI 작업은 세션이 끊기면 맥락을 잃기 쉽습니다. 대화 기록만
 
 인수인계 파일도 `Next step` 필드도 비어 있고 활동 로그도 bootstrap 이벤트만 있는 **신규 프로젝트 cold start**라면, 에이전트는 `docs/PROJECT_PROFILE.md`(있는 경우 그 빈 필드)와 `docs/PROJECT_PROFILE.template.md`의 "대화 질문 순서"를 참고해 사용자에게 첫 질문을 던지고 **답을 받을 때까지 기다립니다.** PROFILE.md 자체가 없으면(수동 복사 케이스) 템플릿을 기반으로 `docs/PROJECT_PROFILE.md`를 먼저 만듭니다. 추측으로 필드를 채우지 않고, 사용자 응답이 있을 때만 다음 행동을 결정합니다.
 
+`resume-readiness.py --strict`는 handoff, activity log, completion evidence뿐 아니라 ownership lock 상태도 확인합니다. 새 파일 추가나 삭제 때문에 `runtime/ownership-classification.lock.json`에 addition/removal drift가 생기면 다음 세션이 놓치지 않도록 경고합니다. 세션 종료 전에 `python3 scripts/ownership-lock.py write`로 lock을 갱신하는 것이 기본입니다. 이번 세션에서 의도적으로 미루는 경우에는 인수인계 본문에 `ownership lock drift: deferred`를 명시하고, 다음 단계에 갱신 이유와 수행 명령을 적습니다.
+
+## Machine-local path 정책 보류
+
+durable state에 머신 전용 절대경로를 어떻게 남길지는 아직 정책 결정이 필요합니다. 구현 전 선택지는 다음 셋입니다.
+
+1. `state/*`와 `runtime/state/*` 모두 `$HOME/...` 형태로 치환한다.
+2. `state/*`는 portable하게 강제하고, `runtime/*`는 디버깅 증거로 exact path를 허용한다.
+3. `portability-scan` allowlist로 예외를 관리한다.
+
+정책이 확정될 때까지 scanner와 closeout 문서는 현재 동작을 유지하고, 새 규칙을 임의로 적용하지 않습니다.
+
 ## 결과는 무엇인가
 
 세션 연속성을 지키면 다음 효과가 생깁니다.

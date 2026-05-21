@@ -53,6 +53,10 @@ SKIP_DIR_NAMES = {
 SKIP_FILE_NAMES = {".DS_Store", "Thumbs.db"}
 SKIP_NAME_PREFIXES = ("tmp-", "scratch-")
 SKIP_NAME_CONTAINS = ("-smoke-",)
+PYTHON_CACHE_IGNORE_LINES = (
+    "__pycache__/",
+    "*.py[cod]",
+)
 
 PROJECT_STATE_EXACT = {
     ".claude/settings.local.json",
@@ -317,6 +321,29 @@ def is_safe_missing(rel: str) -> bool:
         or (rel.startswith("scripts/") and "/" not in rel.removeprefix("scripts/"))
         or path.name.endswith(SAFE_MISSING_SUFFIXES)
     )
+
+
+def gitignore_missing_python_cache_lines(target: Path) -> list[str]:
+    path = target / ".gitignore"
+    text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+    present = {line.strip() for line in text.splitlines()}
+    return [line for line in PYTHON_CACHE_IGNORE_LINES if line not in present]
+
+
+def ensure_python_cache_gitignore(target: Path) -> list[str]:
+    missing = gitignore_missing_python_cache_lines(target)
+    if not missing:
+        return []
+    path = target / ".gitignore"
+    existing = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+    if existing and not existing.endswith("\n"):
+        existing += "\n"
+    if existing and not existing.endswith("\n\n"):
+        existing += "\n"
+    if not existing:
+        existing = "# Python caches\n"
+    path.write_text(existing + "\n".join(missing) + "\n", encoding="utf-8")
+    return missing
 
 
 def path_profile_excluded(rel: str, profile: str) -> bool:
@@ -765,6 +792,7 @@ def main() -> int:
                 safe_only=args.safe_only,
                 include_risky=args.include_risky,
             )
+            ensure_python_cache_gitignore(target)
             append_upgrade_log(target, actions)
 
     output_format = "json" if args.json else (args.format or "text")
@@ -773,6 +801,13 @@ def main() -> int:
             "source": str(source),
             "dry_run": not args.apply,
             "summary": summarize(all_actions),
+            "gitignore_policy": {
+                str(target): {
+                    "python_cache_missing": gitignore_missing_python_cache_lines(target),
+                    "applied": bool(args.apply),
+                }
+                for target in deduped
+            },
             "actions": [action_payload(action) for action in all_actions],
         }
         if args.brief:

@@ -20,7 +20,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -65,6 +65,51 @@ class GateCheck:
     detail: str
     command: list[str]
     duration_s: float = 0.0
+    domain: str = "skeleton"
+
+
+HEALTH_DOMAINS = ("skeleton", "project", "environment", "security")
+HEALTH_STATUSES = ("FAIL", "WARN", "OK", "SKIP")
+CHECK_DOMAINS = {
+    "verify-skeleton": "skeleton",
+    "verify-parity": "skeleton",
+    "resume-readiness": "skeleton",
+    "skill-surface": "skeleton",
+    "schema-check": "skeleton",
+    "install-state": "skeleton",
+    "codemap-freshness": "skeleton",
+    "security-scan": "security",
+    "mcp-audit": "security",
+    "permission-evaluate": "security",
+    "path-safety": "security",
+    "lsp-diagnostics": "environment",
+    "python-syntax": "environment",
+    "python-unittest": "project",
+    "npm-test": "project",
+    "npm-build": "project",
+    "node-scripts": "project",
+}
+
+
+def domain_for_check(name: str) -> str:
+    return CHECK_DOMAINS.get(name, "skeleton")
+
+
+def attach_domains(checks: list[GateCheck]) -> list[GateCheck]:
+    for check in checks:
+        if check.domain not in HEALTH_DOMAINS:
+            check.domain = domain_for_check(check.name)
+        elif check.domain == "skeleton" and check.name in CHECK_DOMAINS:
+            check.domain = domain_for_check(check.name)
+    return checks
+
+
+def summarize_by_domain(checks: list[GateCheck]) -> dict[str, dict[str, int]]:
+    summary: dict[str, dict[str, int]] = {}
+    for domain in HEALTH_DOMAINS:
+        counts = Counter(check.status for check in checks if check.domain == domain)
+        summary[domain] = {status: counts.get(status, 0) for status in HEALTH_STATUSES}
+    return summary
 
 
 def repo_root() -> Path:
@@ -657,7 +702,7 @@ def explain_checks(checks: list[GateCheck]) -> list[dict[str, object]]:
     return [explain_check(check) for check in checks if check.status != "OK" and check.status != "SKIP"]
 
 
-CheckThunk = Callable[[], GateCheck | list[GateCheck]]
+CheckThunk = Callable[[], Union[GateCheck, list[GateCheck]]]
 
 
 def run_check_thunks(thunks: list[CheckThunk], jobs: int) -> list[GateCheck]:
@@ -671,7 +716,7 @@ def run_check_thunks(thunks: list[CheckThunk], jobs: int) -> list[GateCheck]:
                 checks.append(value)
         return checks
 
-    results: list[GateCheck | list[GateCheck] | None] = [None] * len(thunks)
+    results: list[Union[GateCheck, list[GateCheck], None]] = [None] * len(thunks)
     max_workers = max(1, min(jobs, len(thunks)))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_index = {executor.submit(thunk): index for index, thunk in enumerate(thunks)}
@@ -710,7 +755,7 @@ def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     thunks.append(lambda: check_eval_all(root, args.timeout))
     thunks.append(lambda: check_script_command(root, "cost-log.py", ["check"], args.timeout))
     thunks.append(lambda: relax_runtime_state(check_script_command(root, "session-snapshot.py", ["check"], args.timeout), strict=args.strict))
-    thunks.append(lambda: check_script_command(root, "session-recall.py", ["check"], args.timeout))
+    thunks.append(lambda: relax_runtime_state(check_script_command(root, "session-recall.py", ["check"], args.timeout), strict=args.strict))
     thunks.append(lambda: check_script_command(root, "checkpoint.py", ["check"], args.timeout))
     thunks.append(lambda: check_json_findings_tool(root, "tool-health.py", ["check"], args.timeout, strict=args.strict, name="tool-health"))
     thunks.append(lambda: check_tool_guardrail(root, args.timeout, strict=args.strict))
@@ -737,7 +782,7 @@ def run_gate(args: argparse.Namespace) -> list[GateCheck]:
     if not args.skip_node:
         thunks.append(lambda: check_node_scripts(root, args.timeout))
     checks.extend(run_check_thunks(thunks, args.jobs))
-    return checks
+    return attach_domains(checks)
 
 
 def render_text(root: Path, checks: list[GateCheck], strict: bool, tier: str) -> str:
@@ -750,7 +795,7 @@ def render_text(root: Path, checks: list[GateCheck], strict: bool, tier: str) ->
     ]
     for check in checks:
         command = " ".join(check.command) if check.command else "-"
-        lines.append(f"  {check.status:<4} {check.name}: {check.detail}")
+        lines.append(f"  {check.status:<4} [{check.domain}] {check.name}: {check.detail}")
         lines.append(f"       command: {command}")
     if strict and counts.get("WARN", 0):
         lines.append("strict mode: warnings make the gate fail")
@@ -772,6 +817,7 @@ def render_json(root: Path, checks: list[GateCheck], *, explain: bool = False, t
         },
         "skipped_by_tier": feature_manifest.get("skipped_by_tier", []),
         "summary": dict(sorted(Counter(check.status for check in checks).items())),
+        "domain_summary": summarize_by_domain(checks),
         "checks": [asdict(check) for check in checks],
     }
     if explain:

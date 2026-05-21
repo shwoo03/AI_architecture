@@ -21,3 +21,7 @@ profiles:
   full-canonical:
     description: "Full reusable AI architecture skeleton. This preserves current behavior."
     components: [core, validation, runtime, reference, wiki, skills, agents, docs, bootstrap]
+
+  private-mirror-full:
+    description: "Private repo mirror profile that permits tracking local/generated surfaces such as .codex, .claude, .mcp.json, and adapter files; security scan is required before push."
+    components: [core, validation, runtime, reference, wiki, skills, agents, docs, bootstrap]

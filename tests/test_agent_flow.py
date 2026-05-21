@@ -1,5 +1,6 @@
 from tests.test_support import *
 import re
+from typing import Optional
 
 
 class AgentFlowTests(unittest.TestCase):
@@ -43,8 +44,8 @@ class AgentFlowTests(unittest.TestCase):
         *,
         candidate_paths: int = 0,
         safe_additions: int = 1,
-        manual_paths: list[str] | None = None,
-        risky_paths: list[str] | None = None,
+        manual_paths: Optional[list[str]] = None,
+        risky_paths: Optional[list[str]] = None,
     ) -> None:
         scripts = root / "scripts"
         scripts.mkdir(parents=True, exist_ok=True)
@@ -192,6 +193,67 @@ class AgentFlowTests(unittest.TestCase):
             self.assertIn("프로젝트 타입", questions)
             self.assertIn("레퍼런스", questions)
             self.assertIn("MVP", questions)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_start_project_intent_overrides_generic_research_pattern(self) -> None:
+        tmp = self._tmp_root("project-intent")
+        try:
+            self._copy_scripts(tmp, ["review-queue.py"])
+            (tmp / "config").mkdir()
+            (tmp / "config" / "project-intents.yaml").write_text(
+                "version: 1\n"
+                "intents:\n"
+                "  - id: frontend_clone_run\n"
+                "    patterns: [\"클론\", \"clone\"]\n"
+                "    mode: build\n"
+                "    write_policy: manual_work_required\n"
+                "    command_hint: \"npm run clone -- <url>\"\n"
+                "    health_domain: project\n",
+                encoding="utf-8",
+            )
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "start",
+                    "--goal",
+                    "https://example.com 사이트를 클론해줘",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["mode"], "build")
+            self.assertEqual(payload["write_policy"], "manual_work_required")
+            self.assertEqual(payload["next_action_type"], "manual_work_required")
+            self.assertEqual(payload["project_intent_match"]["id"], "frontend_clone_run")
+            self.assertEqual(payload["project_intent_match"]["health_domain"], "project")
+            self.assertIn("project_intent:frontend_clone_run", payload["signals"])
+            self.assertIn("npm run clone", payload["next_command"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_audit_overlay_reports_missing_surface_and_namespace_collision(self) -> None:
+        tmp = self._tmp_root("audit-overlay")
+        try:
+            (tmp / "scripts").mkdir()
+            (tmp / "tests").mkdir()
+            (tmp / "research").mkdir()
+            (tmp / "AGENTS.md").write_text("# Agents\n", encoding="utf-8")
+            (tmp / "scripts" / "agent-flow.py").write_text("print('skeleton tool')\n", encoding="utf-8")
+            (tmp / "scripts" / "deploy-app.py").write_text("print('project tool')\n", encoding="utf-8")
+            (tmp / "tests" / "test_agent_flow.py").write_text("# skeleton test\n", encoding="utf-8")
+            (tmp / "tests" / "app.test.js").write_text("// project test\n", encoding="utf-8")
+            result = _run([str(self.SCRIPT), "audit-overlay", "--target", str(tmp), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["read_only"])
+            self.assertIn(".codex", payload["surface"]["missing"])
+            self.assertIn("scripts", {item["path"] for item in payload["namespace_collisions"]})
+            self.assertIn("tests", {item["path"] for item in payload["namespace_collisions"]})
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

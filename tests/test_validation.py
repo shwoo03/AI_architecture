@@ -1,4 +1,5 @@
 import hashlib
+from typing import Optional
 
 from tests.test_support import *
 
@@ -106,6 +107,27 @@ class VerifySkeletonTests(unittest.TestCase):
             0,
             f"verify-skeleton failed:\nstdout={result.stdout}\nstderr={result.stderr}",
         )
+
+    def test_tracked_python_cache_is_reported(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"tracked-pyc-{uuid.uuid4().hex}"
+        try:
+            cache = tmp / "scripts" / "__pycache__"
+            cache.mkdir(parents=True)
+            (cache / "tool.cpython-314.pyc").write_bytes(b"cache")
+            subprocess.run(["git", "init"], cwd=str(tmp), capture_output=True, check=True)
+            add = subprocess.run(
+                ["git", "add", "scripts/__pycache__/tool.cpython-314.pyc"],
+                cwd=str(tmp),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertEqual(add.returncode, 0, add.stdout + add.stderr)
+            result = _run([str(SCRIPTS / "verify-skeleton.py"), "--root", str(tmp), "--skip-wiki-lint"])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("tracked_python_cache", result.stdout)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class FeatureStatusTests(unittest.TestCase):
@@ -414,6 +436,18 @@ class QualityGateTests(unittest.TestCase):
         self.assertIn("lsp-diagnostics", names)
         self.assertIn("python-syntax", names)
         self.assertNotIn("python-unittest", names)
+        self.assertIn("summary", payload)
+        self.assertIn("domain_summary", payload)
+        self.assertEqual(set(payload["domain_summary"]), {"skeleton", "project", "environment", "security"})
+        checks = {item["name"]: item for item in payload["checks"]}
+        self.assertEqual(checks["verify-skeleton"]["domain"], "skeleton")
+        self.assertEqual(checks["security-scan"]["domain"], "security")
+        self.assertEqual(checks["lsp-diagnostics"]["domain"], "environment")
+        self.assertEqual(checks["python-syntax"]["domain"], "environment")
+
+    def test_quality_gate_type_alias_avoids_python39_runtime_union(self) -> None:
+        source = self.SCRIPT.read_text(encoding="utf-8")
+        self.assertNotIn("GateCheck | list[GateCheck]", source)
 
     def test_quality_gate_stable_skips_incubating_manifest_failure(self) -> None:
         tmp = REPO_ROOT / "runtime" / f"quality-tier-{uuid.uuid4().hex}"
@@ -1734,7 +1768,7 @@ class NewInternalToolTests(unittest.TestCase):
         agent_run_id: str = "run-test-01",
         brief_id: str = "test",
         status: str = "completed",
-        retry_of: str | None = None,
+        retry_of: Optional[str] = None,
     ) -> dict[str, object]:
         record: dict[str, object] = {
             "schema_version": "ai-architecture.agent-run.v1",
@@ -2682,6 +2716,69 @@ class NewInternalToolTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertEqual(payload["legacy_done_skipped"], 1)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_validate_plans_can_skip_structured_historical_done_closeout_gap(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"plan-legacy-structured-{uuid.uuid4().hex}"
+        try:
+            (tmp / "plans" / "done").mkdir(parents=True)
+            (tmp / "plans" / "done" / "0007-old-structured.md").write_text(
+                "# 0007-old-structured\n\n"
+                "## Summary\nold done plan\n\n"
+                "## Assumptions\n- Existing archive.\n\n"
+                "## Out of Scope\n- New work.\n\n"
+                "## Implementation Steps\n- Done earlier.\n\n"
+                "## Definition of Done\n- Validation ran.\n\n"
+                "## Rollback Plan\n- Revert.\n\n"
+                "## Stop Conditions\n- None.\n\n"
+                "## Validation\n- `python3 scripts/verify-skeleton.py`\n",
+                encoding="utf-8",
+            )
+            result = _run(
+                [
+                    str(SCRIPTS / "validate-plans.py"),
+                    "--root",
+                    str(tmp),
+                    "--allow-legacy-done",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["legacy_done_skipped"], 1)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_validate_plans_never_skips_active_closeout_gap(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"plan-active-closeout-{uuid.uuid4().hex}"
+        try:
+            (tmp / "plans" / "active").mkdir(parents=True)
+            (tmp / "plans" / "active" / "0008-new.md").write_text(
+                "# 0008-new\n\n"
+                "## Summary\nnew active plan\n\n"
+                "## Assumptions\n- None.\n\n"
+                "## Out of Scope\n- None.\n\n"
+                "## Implementation Steps\n- Do it.\n\n"
+                "## Definition of Done\n- Done.\n\n"
+                "## Rollback Plan\n- Revert.\n\n"
+                "## Stop Conditions\n- Stop.\n\n"
+                "## Validation\n- `python3 scripts/verify-skeleton.py`\n",
+                encoding="utf-8",
+            )
+            result = _run(
+                [
+                    str(SCRIPTS / "validate-plans.py"),
+                    "--root",
+                    str(tmp),
+                    "--allow-legacy-done",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("missing closeout validation command", "\n".join(json.loads(result.stdout)["findings"]))
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

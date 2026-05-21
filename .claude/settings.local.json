@@ -51,7 +51,8 @@
       "Bash(python3 *)",
       "WebFetch(domain:www.archives.gov)",
       "WebFetch(domain:oer.pressbooks.pub)",
-      "WebFetch(domain:idratherbewriting.com)"
+      "WebFetch(domain:idratherbewriting.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -268,6 +269,13 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def command_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
 def check_claude_md_size(root: Path, findings: list[Finding]) -> None:
     path = root / "CLAUDE.md"
     if not path.exists():
@@ -370,6 +378,38 @@ def check_ephemeral_artifacts(root: Path, findings: list[Finding]) -> None:
                     f"{len(matches) - 10} more {pattern} artifact(s) not shown",
                 )
             )
+
+
+def check_tracked_python_cache(root: Path, findings: list[Finding]) -> None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--", "*.pyc", "*.pyo", "*.pyd", ":(glob)**/__pycache__/**"],
+            capture_output=True,
+            text=False,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return
+    if result.returncode != 0:
+        return
+    tracked = sorted(item.decode("utf-8", errors="replace") for item in result.stdout.split(b"\0") if item)
+    for rel in tracked[:10]:
+        findings.append(
+            Finding(
+                "error",
+                "tracked_python_cache",
+                f"{rel} is tracked Python bytecode/cache; remove from git and keep __pycache__/ plus *.py[cod] ignored",
+            )
+        )
+    if len(tracked) > 10:
+        findings.append(
+            Finding(
+                "error",
+                "tracked_python_cache",
+                f"{len(tracked) - 10} more tracked Python cache artifact(s) not shown",
+            )
+        )
 
 
 def check_removed_paths(root: Path, findings: list[Finding]) -> None:
@@ -717,6 +757,7 @@ def check_portability_scan(root: Path, findings: list[Finding]) -> None:
             capture_output=True,
             text=True,
             encoding="utf-8",
+            env=command_env(),
             timeout=30,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -802,6 +843,7 @@ def check_permission_policy(root: Path, findings: list[Finding]) -> None:
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
+                env=command_env(),
                 timeout=30,
             )
         except subprocess.SubprocessError as exc:
@@ -843,6 +885,7 @@ def check_external_validators(root: Path, findings: list[Finding]) -> None:
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
+                env=command_env(),
                 timeout=30,
             )
         except subprocess.SubprocessError as exc:
@@ -981,6 +1024,7 @@ def check_wiki_lint(root: Path, findings: list[Finding]) -> None:
             cwd=root,
             capture_output=True,
             text=True,
+            env=command_env(),
             timeout=30,
         )
     except subprocess.SubprocessError as exc:
@@ -1036,6 +1080,7 @@ def check_reference_candidates(root: Path, findings: list[Finding]) -> None:
             cwd=root,
             capture_output=True,
             text=True,
+            env=command_env(),
             timeout=30,
         )
     except subprocess.SubprocessError as exc:
@@ -1075,6 +1120,7 @@ def check_reference_proposals(root: Path, findings: list[Finding]) -> None:
             cwd=root,
             capture_output=True,
             text=True,
+            env=command_env(),
             timeout=30,
         )
     except subprocess.SubprocessError as exc:
@@ -1162,6 +1208,7 @@ def main() -> int:
     check_required_paths(root, findings)
     check_project_profile_nonempty(root, findings)
     check_ephemeral_artifacts(root, findings)
+    check_tracked_python_cache(root, findings)
     check_removed_paths(root, findings)
     check_agent_frontmatter(root, findings)
     check_activity_log_parses(root, findings)

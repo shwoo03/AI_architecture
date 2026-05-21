@@ -108,6 +108,25 @@ python scripts/validate-reference-candidates.py
 
 검색 자동화가 생기면 먼저 이 디렉터리에 dry-run 후보 카드를 생성해야 합니다. 자동화가 운영 문서나 규칙을 직접 바꾸는 것은 별도 승인과 검증이 필요합니다.
 
+## Card Integrity Rounds
+
+카드 정합성 라운드는 후보 카드가 다음 세션에서 재현 가능한 carrier인지 점검하는 작업입니다. clone 위치는 사용자 머신마다 달라질 수 있으므로, 라운드에서 점검한 카드는 최소한 확인한 revision, 실제 확인한 source anchor, review 시점의 clone 존재 여부를 남깁니다. clone 위치 자체는 분석 편의 정보이고 영구 trace의 단일 근거가 아닙니다.
+
+### 2026-05-21 — ECC/opencode/paperclip carrier round
+
+- `checked_this_round`:
+  - `2026-04-29-everything-claude-code.md`: 실제 확인 clone, revision, `scripts/ci/` 보안/검증 source anchors를 갱신했습니다. 범위는 ECC 전체가 아니라 Unicode safety, supply-chain IOC, personal-path, workflow-security, validator 묶음 매핑으로 한정했습니다.
+  - `2026-05-13-paperclip.md`: product-runtime governance 도입을 현재 라운드에서 보류하도록 `deferred`로 정리했습니다.
+  - `2026-05-13-opencode.md`: 이미 흡수된 role/write-policy 경계와 남은 read-only smoke/LSP diagnostic 후속을 분리했습니다.
+- `unchecked_this_round`:
+  - `2026-04-27-langgraph.md`
+  - `2026-04-29-hermes-agent.md`
+  - `2026-04-29-llm-wiki.md`
+  - `2026-05-13-oh-my-claudecode.md`
+  - `2026-05-13-oh-my-codex.md`
+  - `2026-05-17-andrej-karpathy-skills.md`
+- `out_of_scope`: invisible-character gate implementation, copy-ledger import gate, closeout summary, upgrade post-apply verify call, and full ECC hooks/skills/commands/MCP/memory/install refresh.
+
 ## 구현 연결 정보
 
 - 후보 카드 템플릿: `research/reference-candidates/_template.md`
