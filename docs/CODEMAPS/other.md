@@ -1,7 +1,7 @@
 # Codemap: other
 
-- `files`: 139
-- `line_count`: 16597
+- `files`: 149
+- `line_count`: 17033
 - `directories`: 62
 
 ## Navigation Entry Points
@@ -189,7 +189,14 @@
 - `knowledge/project-registry.md`
 - `plans/INDEX.md`
 - `plans/active/_template.md`
+- `plans/done/0001-codex-cli-goal-prompt-length-contract.md`
+- `plans/done/0001-component-install-diff-surface-bloat-audit.md`
+- `plans/done/0001-delegation-permission-preflight-hardening.md`
+- `plans/done/0001-feature-boundary-cleanup.md`
 - `plans/done/0001-phase-1d-1-changed-paths-validation.md`
+- `plans/done/0001-source-anchor-strict-mode.md`
+- `plans/done/0001-subagent-debate-workflow-replaces-claude-auto-di.md`
+- `plans/done/0001-versioned-skeleton-release-upgrade-support.md`
 - `plans/done/0002-phase-1d-2-retry-idempotency.md`
 - `plans/done/0003-phase-1d-3-aggregation-summary.md`
 - `plans/done/0004-phase-1e-incubating-delegate-entrypoint.md`
@@ -220,6 +227,9 @@
 - `plans/done/0029-adoption-semantics-install-state.md`
 - `plans/done/0030-common-skeleton-hygiene-readiness-improvements.md`
 - `plans/done/0031-reference-card-integrity-carrier-round.md`
+- `plans/done/0032-codex-claude-dialogue-consensus.md`
+- `plans/done/0033-plan-id-evidence-trace.md`
+- `plans/done/0034-claude-strategy-critic-boundary.md`
 - `schemas/catalog.schema.json`
 - `schemas/completion-evidence.schema.json`
 - `schemas/install-state.schema.json`

@@ -21,6 +21,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib_feature_status import feature_by_doc_path, load_feature_manifest, tiers_for_profile
+from lib_release_manifest import build_release_manifest, component_id_for_path, release_summary
 import lib_ownership
 
 
@@ -502,6 +503,14 @@ def summarize(actions: list[Action]) -> dict[str, int]:
     return dict(sorted(summary.items()))
 
 
+def channel_for_profile(profile: str) -> str:
+    if profile == "stable":
+        return "stable"
+    if profile == "incubating":
+        return "preview"
+    return "edge"
+
+
 def action_payload(action: Action) -> dict[str, object]:
     return asdict(action)
 
@@ -511,16 +520,32 @@ def feature_payload_for_action(action: Action, features: list[dict[str, object]]
     if feature is None:
         feature = {"id": "unmapped", "tier": "stable", "overlay_default": True}
     tier = str(feature.get("tier", "stable"))
+    stable_role = str(feature.get("stable_role", ""))
+    delivery = str(feature.get("delivery", "overlay"))
     overlay_default = bool(feature.get("overlay_default", True))
-    approval_required = action.safety != "safe" or tier != "stable" or (profile == "all" and tier == "experimental")
+    approval_required = (
+        action.safety != "safe"
+        or tier != "stable"
+        or delivery in {"decision_only", "frozen_optional"}
+        or (profile == "all" and tier == "experimental")
+    )
     tier_warning = ""
-    if tier == "incubating":
+    if delivery == "decision_only":
+        tier_warning = "decision-only feature: not copied by overlay apply"
+    elif delivery == "frozen_optional":
+        tier_warning = "frozen optional feature: visible for review, not part of stable overlay"
+    elif stable_role == "advisory":
+        tier_warning = "stable advisory helper: nonblocking support surface"
+    elif tier == "incubating":
         tier_warning = "incubating feature: schema and workflow may change"
     elif tier == "experimental":
         tier_warning = "experimental adapter/future feature: explicit approval required"
     return {
         "feature_id": str(feature.get("id", "unmapped")),
+        "component_id": component_id_for_path(action.path),
         "tier": tier,
+        "stable_role": stable_role,
+        "delivery": delivery,
         "overlay_default": overlay_default,
         "approval_required": approval_required,
         "tier_warning": tier_warning,
@@ -534,8 +559,6 @@ def action_payload_with_feature(action: Action, features: list[dict[str, object]
 
 
 def include_action_for_profile(action: Action, features: list[dict[str, object]], profile: str) -> bool:
-    if action.safety == "profile":
-        return False
     if path_profile_excluded(action.path, profile):
         return False
     feature_meta = feature_payload_for_action(action, features, profile)
@@ -555,10 +578,12 @@ def apply_profile_to_actions(actions: list[Action], features: list[dict[str, obj
             filtered.append(action)
             continue
         feature_meta = feature_payload_for_action(action, features, profile)
+        delivery = str(feature_meta.get("delivery", ""))
         tier = str(feature_meta["tier"])
         overlay_default = bool(feature_meta["overlay_default"])
         excluded = (
             tier not in allowed_tiers
+            or delivery == "decision_only"
             or (profile == "stable" and not overlay_default)
             or path_profile_excluded(action.path, profile)
         )
@@ -582,7 +607,84 @@ def apply_profile_to_actions(actions: list[Action], features: list[dict[str, obj
     return filtered
 
 
-def build_brief(actions: list[Action], features: list[dict[str, object]], profile: str) -> dict[str, object]:
+def release_component_policies(release: dict[str, object]) -> dict[str, object]:
+    policies: dict[str, object] = {}
+    for component in release.get("components") or []:
+        if not isinstance(component, dict):
+            continue
+        component_id = str(component.get("id") or "")
+        if not component_id:
+            continue
+        policies[component_id] = component.get("generated_artifact_policy") or {}
+    return policies
+
+
+def build_component_diff(
+    actions: list[Action],
+    features: list[dict[str, object]],
+    profile: str,
+    release: dict[str, object],
+) -> list[dict[str, object]]:
+    policies = release_component_policies(release)
+    buckets = ("safe_additions", "manual_reviews", "risky_reviews", "protected_skips", "unchanged")
+    grouped: dict[str, dict[str, object]] = {}
+    for action in actions:
+        if action.path == ".":
+            continue
+        meta = feature_payload_for_action(action, features, profile)
+        component_id = str(meta["component_id"])
+        entry = grouped.setdefault(
+            component_id,
+            {
+                "id": component_id,
+                "safe_additions": 0,
+                "manual_reviews": 0,
+                "risky_reviews": 0,
+                "protected_skips": 0,
+                "unchanged": 0,
+                "approval_required": False,
+                "sample_paths": [],
+                "generated_artifact_policy": policies.get(component_id, {}),
+            },
+        )
+        if action.action == "add" and action.safety == "safe":
+            bucket = "safe_additions"
+        elif action.action == "review" or action.safety == "manual":
+            bucket = "manual_reviews"
+        elif action.safety == "risky" or action.action == "update_available":
+            bucket = "risky_reviews"
+        elif action.action == "skip" or action.safety == "protected":
+            bucket = "protected_skips"
+        else:
+            bucket = "unchanged"
+        entry[bucket] = int(entry[bucket]) + 1
+        entry["approval_required"] = bool(entry["approval_required"]) or bool(meta["approval_required"])
+        sample_paths = entry["sample_paths"]
+        if isinstance(sample_paths, list) and len(sample_paths) < 8:
+            sample_paths.append(action.path)
+    order = {
+        "core": 0,
+        "validation": 1,
+        "runtime": 2,
+        "reference": 3,
+        "wiki": 4,
+        "skills": 5,
+        "agents": 6,
+        "docs": 7,
+        "bootstrap": 8,
+    }
+    return sorted(
+        grouped.values(),
+        key=lambda item: (order.get(str(item["id"]), 999), str(item["id"])),
+    )
+
+
+def build_brief(
+    actions: list[Action],
+    features: list[dict[str, object]],
+    profile: str,
+    release: dict[str, object],
+) -> dict[str, object]:
     included = [action for action in actions if include_action_for_profile(action, features, profile)]
     safe_additions = [action for action in included if action.action == "add" and action.safety == "safe"]
     manual_reviews = [action for action in included if action.action == "review" or action.safety in {"manual", "review"}]
@@ -600,8 +702,16 @@ def build_brief(actions: list[Action], features: list[dict[str, object]], profil
         {action.path for action in review_items if action.path != "."},
         key=lambda path: (priority.get(path, 50), path),
     )
+    release_id = str(release.get("release_id") or "")
+    source_commit = release.get("source_commit")
+    channel = str(release.get("channel") or channel_for_profile(profile))
     return {
         "profile": profile,
+        "release_id": release_id,
+        "source_commit": source_commit,
+        "channel": channel,
+        "release": release_summary(release),
+        "component_diff": build_component_diff(included, features, profile, release),
         "included_tiers": sorted(tiers_for_profile(profile)),
         "tier_warning": "stable overlay only" if profile == "stable" else "incubating/experimental items are advisory and may require manual approval",
         "safe_additions": [action_payload_with_feature(action, features, profile) for action in safe_additions],
@@ -646,7 +756,7 @@ def render_text(actions: list[Action], *, dry_run: bool) -> str:
     return "\n".join(lines)
 
 
-def append_upgrade_log(target: Path, actions: list[Action]) -> None:
+def append_upgrade_log(target: Path, actions: list[Action], release: dict[str, object]) -> None:
     applied = [a for a in actions if a.applied]
     if not applied:
         return
@@ -670,10 +780,64 @@ def append_upgrade_log(target: Path, actions: list[Action]) -> None:
         "data": {
             "applied_paths": [a.path for a in applied],
             "mode": "safe-only",
+            "release_id": release.get("release_id"),
+            "channel": release.get("channel"),
+            "source_commit": release.get("source_commit"),
         },
     }
     with log.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+
+def latest_release_id(target: Path) -> str:
+    path = target / "runtime" / "install-state.jsonl"
+    if not path.exists():
+        return ""
+    latest = ""
+    for line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict) and record.get("release_id"):
+            latest = str(record["release_id"])
+    return latest
+
+
+def append_upgrade_install_state(target: Path, actions: list[Action], profile: str, release: dict[str, object]) -> None:
+    applied = [a for a in actions if a.applied]
+    if not applied:
+        return
+    manual_review = [
+        a.path
+        for a in actions
+        if a.action in {"review", "update_available"} or a.safety in {"manual", "risky"}
+    ]
+    record = {
+        "ts": utc_now(),
+        "event": "skeleton_release_applied",
+        "project": target.name,
+        "skeleton_version": release.get("release_id"),
+        "source_commit": release.get("source_commit"),
+        "requested_profile": profile,
+        "selected_components": [profile],
+        "generated_paths": [],
+        "preserved_paths": sorted(set(manual_review)),
+        "validation_status": "unverified",
+        "release_id": release.get("release_id"),
+        "channel": release.get("channel"),
+        "previous_release_id": latest_release_id(target) or None,
+        "skeleton_revision": release.get("source_commit"),
+        "applied_paths": [a.path for a in applied],
+        "manual_review_paths": sorted(set(manual_review)),
+        "applied_migrations": [str(item) for item in release.get("migrations") or []],
+    }
+    path = target / "runtime" / "install-state.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
 def main() -> int:
@@ -750,6 +914,7 @@ def main() -> int:
     source = Path(args.source).resolve() if args.source else repo_root()
     if not source.is_dir():
         raise SystemExit(f"--source is not a directory: {source}")
+    release = build_release_manifest(source, channel=channel_for_profile(args.profile))
     try:
         feature_manifest = load_feature_manifest(source)
         features = feature_manifest.get("features") or []
@@ -793,13 +958,15 @@ def main() -> int:
                 include_risky=args.include_risky,
             )
             ensure_python_cache_gitignore(target)
-            append_upgrade_log(target, actions)
+            append_upgrade_log(target, actions, release)
+            append_upgrade_install_state(target, actions, args.profile, release)
 
     output_format = "json" if args.json else (args.format or "text")
     if output_format == "json":
         payload = {
             "source": str(source),
             "dry_run": not args.apply,
+            "release": release_summary(release),
             "summary": summarize(all_actions),
             "gitignore_policy": {
                 str(target): {
@@ -811,7 +978,7 @@ def main() -> int:
             "actions": [action_payload(action) for action in all_actions],
         }
         if args.brief:
-            payload["brief"] = build_brief(all_actions, features, args.profile)
+            payload["brief"] = build_brief(all_actions, features, args.profile, release)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(render_text(all_actions, dry_run=not args.apply))

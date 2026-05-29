@@ -100,6 +100,20 @@ REFRESH_REQUIRED_PHRASES = [
 ]
 SKIP_FILES = {"README.md", "_template.md"}
 FIELD_RE = re.compile(r"^-[ \t]+`([^`]+)`:[ \t]*([^\r\n]*?)\r?$", re.MULTILINE)
+WEAK_SOURCE_ANCHORS = {
+    "",
+    "-",
+    "TBD",
+    "todo",
+    "TODO",
+    "not checked",
+    "not applicable",
+    "n/a",
+    "local-reference",
+    "external-reference",
+    "directory",
+    "candidate-card",
+}
 
 
 @dataclass
@@ -134,6 +148,13 @@ def clean_value(value: str) -> str:
     if len(stripped) >= 2 and stripped.startswith("`") and stripped.endswith("`"):
         return stripped[1:-1].strip()
     return stripped
+
+
+def weak_source_anchor(value: str) -> bool:
+    stripped = clean_value(value)
+    if stripped in WEAK_SOURCE_ANCHORS:
+        return True
+    return not any(char.isdigit() for char in stripped)
 
 
 def proposal_files(root: Path) -> list[Path]:
@@ -251,7 +272,62 @@ def validate_content(path: Path, text: str, proposal_type: str, findings: list[F
             findings.append(Finding(path, "source-backed evidence section has no bullet items"))
 
 
-def validate(root: Path) -> tuple[list[Finding], int]:
+def validate_candidate_source_anchor(root: Path, path: Path, candidate: str, findings: list[Finding]) -> None:
+    if not candidate or is_blank(candidate):
+        return
+    candidate_path = root / candidate
+    try:
+        rel = candidate_path.relative_to(root)
+    except ValueError:
+        return
+    if rel.parts[:2] != ("research", "reference-candidates") or not candidate_path.is_file():
+        return
+    text = candidate_path.read_text(encoding="utf-8")
+    fields = parse_fields(text)
+    revision = fields.get("checked_revision", "")
+    freshness = fields.get("freshness_signal", "")
+    if weak_source_anchor(revision):
+        findings.append(Finding(path, f"strict source anchor requires concrete checked_revision in `{candidate}`"))
+    if is_blank(freshness) or "requires" in freshness.lower():
+        findings.append(Finding(path, f"strict source anchor requires concrete freshness_signal in `{candidate}`"))
+    marker = "- `sources`:"
+    index = text.find(marker)
+    if index == -1:
+        return
+    tail = text[index + len(marker) :]
+    next_field = tail.find("\n- `")
+    block = tail if next_field == -1 else tail[:next_field]
+    source_lines = [line.strip()[2:].strip() for line in block.splitlines() if line.strip().startswith("- ")]
+    for offset, line in enumerate(source_lines, start=1):
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            findings.append(Finding(path, f"strict source anchor requires `{candidate}` sources item {offset} to use JSON object syntax"))
+            continue
+        if not isinstance(item, dict):
+            findings.append(Finding(path, f"strict source anchor requires `{candidate}` sources item {offset} to be an object"))
+            continue
+        if weak_source_anchor(str(item.get("hash_or_line_ref", ""))):
+            findings.append(Finding(path, f"strict source anchor requires concrete hash_or_line_ref in `{candidate}` sources item {offset}"))
+
+
+def validate_proposal_source_anchor(path: Path, text: str, proposal_type: str, findings: list[Finding]) -> None:
+    if proposal_type == "reference_refresh":
+        return
+    marker = "Source-backed evidence:"
+    index = text.find(marker)
+    if index == -1:
+        return
+    tail = text[index + len(marker) :]
+    next_heading = tail.find("\n## ")
+    block = tail if next_heading == -1 else tail[:next_heading]
+    bullets = [line.strip()[2:].strip() for line in block.splitlines() if line.strip().startswith("- ")]
+    for offset, bullet in enumerate(bullets, start=1):
+        if not any(token in bullet for token in ("hash_or_line_ref", "checked_revision", "line", "lines", "commit", "@")):
+            findings.append(Finding(path, f"strict source anchor requires source-backed evidence bullet {offset} to cite a concrete anchor"))
+
+
+def validate(root: Path, *, strict_source_anchor: bool = False) -> tuple[list[Finding], int]:
     findings: list[Finding] = []
     files = proposal_files(root)
     for path in files:
@@ -265,6 +341,9 @@ def validate(root: Path) -> tuple[list[Finding], int]:
         validate_headings(path, text, headings, findings)
         validate_fields(root, path, fields, proposal_type, findings)
         validate_content(path, text, proposal_type, findings)
+        if strict_source_anchor:
+            validate_candidate_source_anchor(root, path, clean_value(fields.get("candidate_card", "")), findings)
+            validate_proposal_source_anchor(path, text, proposal_type, findings)
     return findings, len(files)
 
 
@@ -318,9 +397,10 @@ def main() -> int:
     parser.add_argument("--format", choices=("text", "json"), default="text")
     parser.add_argument("--lifecycle", action="store_true", help="Warn about accepted/applied proposals missing application or validation evidence.")
     parser.add_argument("--strict-lifecycle", action="store_true", help="Fail when lifecycle warnings are present.")
+    parser.add_argument("--strict-source-anchor", action="store_true", help="Require concrete source anchors in linked candidate cards and source evidence.")
     args = parser.parse_args()
     root = Path(args.root).resolve() if args.root else repo_root()
-    findings, count = validate(root)
+    findings, count = validate(root, strict_source_anchor=args.strict_source_anchor)
     if args.lifecycle:
         findings.extend(lifecycle_warnings(root))
     if args.format == "json":

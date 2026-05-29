@@ -326,11 +326,13 @@ def build_report(root: Path) -> tuple[dict[str, Any], list[str]]:
 
     statuses, duplicate_findings = skill_statuses_with_findings(root)
     findings.extend(duplicate_findings)
+    locations = skill_locations(root)
     policy = parse_policy(root)
     by_skill: dict[str, dict[str, Any]] = {
         name: {
             "skill": name,
             "status": status,
+            "path": locations[name].relative_to(root).as_posix() if name in locations else "",
             "uses": 0,
             "successes": 0,
             "failures": 0,
@@ -348,6 +350,7 @@ def build_report(root: Path) -> tuple[dict[str, Any], list[str]]:
         item = by_skill.setdefault(skill, {
             "skill": skill,
             "status": "unknown",
+            "path": "",
             "uses": 0,
             "successes": 0,
             "failures": 0,
@@ -508,6 +511,12 @@ def cmd_propose(root: Path, args: argparse.Namespace) -> int:
             f"- successes: {item['successes']}\n"
             f"- success_rate: {rate}\n"
             f"- latest_eval_score: {item['latest_eval_score']}\n\n"
+            "## Source anchors\n\n"
+            f"- skill_path: `{item['path']}`\n"
+            "- usage_ledger: `runtime/skill-usage.jsonl`\n"
+            "- lifecycle_ledger: `runtime/skill-lifecycle.jsonl`\n"
+            "- policy_source: `config/policy.yaml` field `skill_lifecycle`\n"
+            "- proposal_queue: `runtime/proposals/skill-lifecycle/`\n\n"
             "## 제안\n\n"
             f"- 사용자 승인 후 `{recommendation}` 처리합니다.\n"
             "- 이 파일은 제안서일 뿐 자동 적용이 아닙니다.\n"

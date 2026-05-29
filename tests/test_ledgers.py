@@ -53,6 +53,59 @@ class InstallStateTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_skeleton_release_applied_accepts_additive_release_fields(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"install-state-release-{uuid.uuid4().hex}"
+        try:
+            (tmp / "runtime").mkdir(parents=True)
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "--format",
+                    "json",
+                    "add",
+                    "--event",
+                    "skeleton_release_applied",
+                    "--source-commit",
+                    "abcdef1234567890",
+                    "--requested-profile",
+                    "stable",
+                    "--selected-component",
+                    "stable",
+                    "--validation-status",
+                    "verified",
+                    "--release-id",
+                    "skeleton-stable-abcdef123456",
+                    "--channel",
+                    "stable",
+                    "--previous-release-id",
+                    "skeleton-stable-old",
+                    "--release-manifest-path",
+                    "runtime/validation/release.json",
+                    "--release-manifest-sha256",
+                    "0" * 64,
+                    "--skeleton-revision",
+                    "abcdef1234567890",
+                    "--applied-path",
+                    "scripts/agent-flow.py",
+                    "--manual-review-path",
+                    "AGENTS.md",
+                    "--applied-migration",
+                    "mig-001",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["event"], "skeleton_release_applied")
+            self.assertEqual(payload["release_id"], "skeleton-stable-abcdef123456")
+            self.assertEqual(payload["channel"], "stable")
+            self.assertEqual(payload["applied_paths"], ["scripts/agent-flow.py"])
+            check = _run([str(self.SCRIPT), "--root", str(tmp), "check", "--strict"])
+            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 class SkillLifecycleTests(unittest.TestCase):
     SCRIPT = SCRIPTS / "skill-lifecycle.py"
@@ -84,6 +137,24 @@ class SkillLifecycleTests(unittest.TestCase):
             payload = json.loads(result.stdout)
             demo = next(item for item in payload["skills"] if item["skill"] == "demo")
             self.assertEqual(demo["recommendation"], "promote")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_propose_writes_source_anchor_section_for_promotion(self) -> None:
+        tmp = self._root_with_skill("candidate")
+        try:
+            for run_id in ("r1", "r2"):
+                result = _run([str(self.SCRIPT), "--root", str(tmp), "record-use", "--skill", "demo", "--run-id", run_id, "--outcome", "success"])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", "propose"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            written = json.loads(result.stdout)["written"]
+            self.assertEqual(len(written), 1)
+            proposal = (tmp / written[0]).read_text(encoding="utf-8")
+            self.assertIn("## Source anchors", proposal)
+            self.assertIn("skill_path: `skills/_candidates/demo`", proposal)
+            self.assertIn("usage_ledger: `runtime/skill-usage.jsonl`", proposal)
+            self.assertIn("policy_source: `config/policy.yaml` field `skill_lifecycle`", proposal)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

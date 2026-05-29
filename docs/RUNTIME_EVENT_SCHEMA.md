@@ -24,7 +24,7 @@
 | --- | --- | --- |
 | `runtime/activity-log.jsonl` | `action`, `phase`, `goal_lineage`, `tool_call`, `data` | `event`, `agent`, `workflow`, `artifacts` |
 | `runtime/agent-runs.jsonl` | `event`, `agent`, `workflow`, `status`, `goal_lineage`, `artifacts` | `action`, `phase`, `tool_call` |
-| `runtime/completion-evidence.jsonl` | `goal`, `changed_paths`, `validations`, `outcome` | `action`, `phase`, `tool_call` |
+| `runtime/completion-evidence.jsonl` | `goal`, `changed_paths`, `validations`, `outcome`, optional `plan_id` | `action`, `phase`, `tool_call` |
 | `runtime/install-state.jsonl` | `event`, `skeleton_version`, `generated_paths`, `preserved_paths`, `validation_status` | `action`, `phase`, `tool_call` |
 | `runtime/skill-usage.jsonl` | `skill`, `event`, `outcome`, `run_id`, `evidence_ref` | `action`, `phase`, `tool_call` |
 | `runtime/skill-lifecycle.jsonl` | `skill`, `event`, `status`, `score`, `goldens` | `action`, `phase`, `tool_call` |
@@ -170,13 +170,25 @@ The delegate `completion_command` is workflow-aware. For read-only workflows (`m
 
 `runtime/proposals/specialists/*.json` stores on-demand `SpecialistProposal` artifacts. Required fields are `schema_version`, `proposal_id`, `role`, `mission`, `write_policy`, `default_scope`, `recommended_checks`, `status`, `source_registry`, `created_by`, `created_at`, `reason`, `review_notes`, `trigger_matches`, and `anti_trigger_matches`. Supported statuses are `draft`, `approved`, and `rejected`.
 
-`runtime/delegation-plans/*.json` stores `DelegationPlan` preview artifacts. Required fields are `schema_version`, `plan_id`, `created_at`, `goal`, `candidate_roles`, `selected_roles`, `role_source`, `score_reasons`, `read_scope`, `write_policy`, `requires_confirmation`, and `status`. A preview may select zero specialists. Execution is allowed only when `status` is `approved` and the operator supplies explicit confirmation.
+`runtime/delegation-plans/*.json` stores `DelegationPlan` preview artifacts. Required fields are `schema_version`, `plan_id`, `created_at`, `goal`, `candidate_roles`, `selected_roles`, `role_source`, `score_reasons`, `read_scope`, `write_policy`, `requires_confirmation`, and `status`. A preview may select zero specialists. Execution is allowed only when `status` is `approved`, the operator supplies explicit confirmation, and the static preflight passes. The preflight rejects unknown or duplicate selected roles, missing per-role scope or policy, repo-escaping scope, scope or policy broadening beyond the specialist registry or parent constraints, and unsupported dependency/DAG/auto-spawn/recursive-delegation fields before any AgentBrief or spawn packet artifact is written.
 
-`scripts/agent-flow.py specialist execute` does not spawn agents. It validates an approved `DelegationPlan`, requires `--confirm` when confirmation is marked, and reuses `scripts/incubating/agent-flow-delegate.py` to create AgentBrief handoffs.
+`scripts/agent-flow.py specialist execute` does not spawn agents. It validates an approved `DelegationPlan`, requires `--confirm` when confirmation is marked, applies parent `write_policy`/scope inheritance, and reuses `scripts/incubating/agent-flow-delegate.py` to create AgentBrief handoffs.
 
 `runtime/specialist-usage.jsonl` stores append-only evidence for specialist recommendation, selection, rejection, approval, and execution-preparation decisions. It is not an execution ledger; `runtime/agent-runs.jsonl` remains the AgentRun execution record. Required fields are `event_id`, `ts`, `schema_version`, `event_type`, `goal`, `actor`, `command`, `outcome`, `proposal_id`, `plan_id`, `candidate_roles`, `selected_roles`, `rejected_roles`, `role_source`, `score_reasons`, `user_decision`, `reason`, `requires_confirmation`, `confirmed`, `artifact_paths`, `handoff_paths`, and `validation_refs`. `schema_version` is `ai-architecture.specialist-usage.v1`. Records are advisory evidence only: they do not change specialist scoring, do not auto-select specialists, do not produce validator verdicts, and do not create spawn packets.
 
-`runtime/spawn-packets/*.json` stores harness-agnostic spawn-ready packets created by `scripts/agent-flow.py specialist packet`. A packet requires an approved `DelegationPlan` and explicit `--confirm`, reuses the existing delegate handoff path, and writes `schema_version: ai-architecture.spawn-ready-packet.v1`. Required top-level fields include `packet_id`, `plan_id`, `plan_path`, `goal`, `selected_roles`, `auto_spawn`, `auto_chain`, `recursive_delegation_allowed`, `requires_confirmation`, `execution_boundary`, `harness`, `units`, `operator_instructions`, and `forbidden_actions`. Packets do not spawn agents. Each `units[]` item is an individually confirmed work packet with role, role_source, brief_id, brief_path, objective, read/write scope, write_policy, validation_commands, completion_command, handoff_prompt, and expected AgentRun result schema.
+`runtime/spawn-packets/*.json` stores harness-agnostic spawn-ready packets created by `scripts/agent-flow.py specialist packet`. A packet requires an approved `DelegationPlan`, explicit `--confirm`, and the same static preflight as `specialist execute`; it reuses the existing delegate handoff path and writes `schema_version: ai-architecture.spawn-ready-packet.v1`. Required top-level fields include `packet_id`, `plan_id`, `plan_path`, `goal`, `selected_roles`, `auto_spawn`, `auto_chain`, `recursive_delegation_allowed`, `requires_confirmation`, `execution_boundary`, `harness`, `units`, `operator_instructions`, and `forbidden_actions`. Packets do not spawn agents. Each `units[]` item is an individually confirmed work packet with role, role_source, brief_id, brief_path, objective, read/write scope, write_policy, validation_commands, completion_command, handoff_prompt, and expected AgentRun result schema.
+
+## Subagent debate ledgers
+
+`runtime/dialogues/*.jsonl` stores task-scoped subagent debate records used before implementation. These ledgers are not always-on Claude sessions and repository scripts do not spawn agents. They record the planning exchange for a specific task, preserve Codex as orchestrator, and freeze an implementation scope only after unresolved block critiques are closed.
+
+The debate pattern follows current multi-agent best practices: Codex keeps the final orchestration role, subagents are scoped to independent critique, research, or verification viewpoints, rounds are bounded, and implementation does not start until blocker critiques have either been resolved or explicitly accepted as risk. `docs/_meta/SUBAGENT_DEBATE_BEST_PRACTICES.md` records the searched references and local stop conditions.
+
+Each record uses `schema_version: ai-architecture.subagent-debate.v1`. A dialogue starts with one `kind: start` record containing `task`, `status`, `max_rounds`, and policy flags. The start policy must set `claude_auto_debate_disabled: true`, `codex_is_orchestrator: true`, and `nested_subagents_allowed: false`. Planning turns use `kind: claim`, `critique`, `concession`, or `unresolved`; critiques must target a prior `turn_id` with `targets_claim_id`, and `severity: block` critiques must include evidence. A block critique stays open until a later `concession` targets that critique with `resolution: resolved` or `accepted_as_risk`.
+
+`kind: converged` records freeze the implementation boundary. They require `ready_by` containing `codex` plus at least one `subagent-*` participant, and an `implementation_scope` object with `allowed_paths`, `allowed_actions`, `forbidden_actions`, and `validation` lists. Claude is not a required participant and there is no Claude fallback identity. If Claude is used manually outside this ledger, its output must be summarized by Codex or a subagent role rather than recorded as an automatic Claude debate turn.
+
+`scripts/dialogue-lint.py` validates these ledgers and rejects targetless critiques, block critiques without evidence, automatic Claude debate policy, nested subagent records, missing subagent readiness, and convergence with open block critiques. `scripts/agent-flow.py dialogue start|add-turn|status|converge` is the public wrapper for creating and checking these records.
 
 ## Adapter extension 규칙
 
@@ -192,7 +204,7 @@ Provider credential은 `references.yaml`, `scripts/catalog.yaml`, `mcp/servers.y
 
 SDK trace와 LangGraph trace는 부가 증거입니다. closeout, resume-readiness, source recovery의 source of truth는 로컬 JSONL ledger입니다.
 
-설치 상태 로그는 skeleton 복사와 canonical 변환 결과를 기록합니다.
+설치 상태 로그는 skeleton 복사, canonical 변환, release 기반 업그레이드 결과를 기록합니다.
 
 ```json
 {
@@ -210,6 +222,29 @@ SDK trace와 LangGraph trace는 부가 증거입니다. closeout, resume-readine
 ```
 
 `validation_status`는 `unverified`, `verified`, `failed` 중 하나입니다. `convert.py`는 generated artifact 생성 후 parity 검증 결과를 install-state에 기록합니다.
+
+기존 프로젝트를 최신 skeleton release로 올릴 때는 같은 required field를 유지하고 optional release field를 추가합니다. `skeleton_release_applied` 이벤트는 safe-only apply가 실제 파일을 추가한 직후 `validation_status: "unverified"`로 기록되고, target 검증이 끝난 뒤 별도 verified 이벤트를 남길 수 있습니다.
+
+```json
+{
+  "ts": "2026-05-29T00:00:00Z",
+  "event": "skeleton_release_applied",
+  "project": "target-project",
+  "skeleton_version": "skeleton-stable-abcdef123456",
+  "source_commit": "abcdef1234567890",
+  "requested_profile": "stable",
+  "selected_components": ["stable"],
+  "generated_paths": [],
+  "preserved_paths": ["AGENTS.md"],
+  "validation_status": "unverified",
+  "release_id": "skeleton-stable-abcdef123456",
+  "channel": "stable",
+  "previous_release_id": "skeleton-stable-111111111111",
+  "applied_paths": ["scripts/agent-flow.py"],
+  "manual_review_paths": ["AGENTS.md"],
+  "applied_migrations": []
+}
+```
 
 skill 사용/생명주기 로그는 `SKILL.md` frontmatter를 직접 수정하지 않고 사용량과 평가를 append-only로 남깁니다.
 
@@ -373,6 +408,10 @@ session recall 캐시는 insert 시점에 secret-like 값을 마스킹합니다.
 - 활동 로그 검색: `scripts/search-activity-log.py`
 - 운영 루프: `docs/OPERATING_LOOP.md`
 
+Skill lifecycle promotion/demotion proposals under `runtime/proposals/skill-lifecycle/` include a `Source anchors` section tying each recommendation to the skill path, usage ledger, lifecycle ledger, proposal queue, and `config/policy.yaml` skill lifecycle thresholds. The proposals remain review-only and do not auto-promote or auto-demote skills.
+
 ## Completion Evidence
 
 `runtime/completion-evidence.jsonl` is the agent-owned closeout ledger. It is not a replacement for the activity log; it stores structured evidence for completed tasks so the next agent can inspect goal, changed paths, validations, outcome, residual risk, and next action without replaying the full chat.
+
+Completion evidence may include optional `plan_id` when a task closes an explicit plan. The value is an ID such as `0033-plan-id-evidence-trace`, not a path. When supplied, it must resolve to `plans/active/<plan_id>.md` or `plans/done/<plan_id>.md`; `plans/failed/` is not accepted for completion evidence. The ledger does not store `plan_path`, infer plan IDs from goal text, or provide a query engine.

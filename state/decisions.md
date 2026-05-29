@@ -83,3 +83,60 @@
 - ECC refresh is scoped to `scripts/ci/` security/validation surface only; hooks, skills, commands, MCP, memory, install, and harness-adapter surfaces remain unchecked in this round.
 - Paperclip governance/runtime adoption is deferred until concrete agent-team budget, approval, or recovery blocker evidence appears.
 - OpenCode follow-up for read-only CLI smoke and LSP/diagnostic integration stays separate from the ECC Unicode/security provenance proposal.
+
+## 2026-05-24 23:19 — Reference registry follows actual sibling clone set
+- User requested all references be brought up to date, so the refresh target is the actual Git clone set under `../AI_architecture_references`, not only the 7 entries that happened to be in `references.yaml`.
+- `llm_wiki` already had a candidate card and a sibling clone, so it is recorded in `references.yaml` with the same concept-only boundary instead of remaining an unregistered local reference.
+- This refresh only fast-forwarded external clones and updated registry metadata. It does not adopt or copy external source into the skeleton.
+
+## 2026-05-27 17:38 — Explicit plan_id trace for completion evidence
+- Completion evidence may optionally record `plan_id` when a closeout is tied to an explicit plan.
+- `plan_id` is an id such as `0033-plan-id-evidence-trace`, not a path, and is never inferred from goal text.
+- Supplied ids must resolve to `plans/active/<id>.md` or `plans/done/<id>.md`; `plans/failed/<id>.md` is not accepted for completion evidence.
+- The field remains optional to preserve existing ad hoc closeout behavior and avoid turning the skeleton into a query engine or product runtime.
+
+## 2026-05-27 18:44 — Real Claude is strategy/critique only
+- Real Claude may participate in Codex-Claude dialogue ledgers only as a strategy and critique voice.
+- Real Claude must not use subagents, spawn agents, or record delegation/subagent fields; this preserves Claude session budget and avoids hidden secondary execution.
+- `from: claude` requires `provider=claude_cli`. If Claude is unavailable, the substitute must be recorded as `from: claude-fallback-critic` with `provider=fallback_subagent`.
+- Fallback subagents are allowed only as labeled substitute critics; they do not grant real Claude permission to delegate.
+
+## 2026-05-27 19:14 — Delegation preflight strengthens the skeleton boundary
+- Static DelegationPlan preflight and parent permission inheritance are accepted as skeleton-strengthening safeguards.
+- `specialist execute` and `specialist packet` must fail before writing handoff artifacts if the approved plan has unknown or duplicate roles, missing per-role scope/policy, repo-escaping scope, scope/policy broadening, or unsupported DAG/auto-spawn/recursive-delegation fields.
+- Source-anchor strict mode remains deferred to reference adoption/proposal/copy/promotion workflows only. Generated/plugin SSOT remains separate validators plus possible reporting, not a merged validator feature.
+
+## 2026-05-27 19:28 — Source-anchor strict mode is opt-in, not global closeout
+- Source-anchor strict checks are accepted only for reference adoption, reference proposals, copied-source ledger checks, and skill lifecycle promotion/demotion proposals.
+- `--strict-source-anchor` must remain opt-in. It should not be wired into default `verify-skeleton`, stable `quality-gate`, or normal closeout until existing candidate cards have concrete source anchors.
+- Strict failures on legacy `local-reference`, `external-reference`, `not checked`, or missing candidate/proposal links are backlog signals, not evidence that the skeleton is unhealthy.
+
+## 2026-05-29 12:05 — Subagent debate replaces Claude automatic dialogue
+- The 2026-05-27 Claude strategy/critic dialogue policy is superseded for future planning debates.
+- Critical planning debate now defaults to Codex as orchestrator plus scoped `subagent-*` critics/researchers/verifiers.
+- Claude is not an automatic participant, Claude session expiry is not a fallback trigger, and `runtime/dialogues/*.jsonl` no longer accepts `from: claude` or `provider: claude_cli`.
+- Repository scripts only record debate ledgers; actual subagent spawning remains a surrounding harness responsibility.
+- Convergence requires Codex plus at least one subagent readiness and no unresolved block critiques.
+
+## 2026-05-29 12:18 — Goal prompt means Codex CLI /goal prompt
+- When the user asks for a `goal 프롬프트`, the agent must interpret it as a Codex CLI `/goal` prompt request.
+- The returned `/goal` prompt must be 4000 characters or fewer.
+- If the useful content would exceed 4000 characters, the agent should document details separately and return a short `/goal` prompt that points to that document.
+- `scripts/goal-prompt-check.py` is the local helper for validating the character limit.
+
+## 2026-05-29 13:05 — Skeleton upgrades are release-manifest based
+- Existing projects should not be byte-for-byte overwritten to match the current skeleton.
+- Repeatable upgrades use release id, source commit, and channel from a generated release manifest.
+- `stable` is the default target-project channel; preview/edge can surface incubating or experimental items but remain opt-in review surfaces.
+- Safe-only apply records `skeleton_release_applied` with applied paths and manual review paths in install-state; manual/risky paths remain intentional preserve candidates until approved path by path.
+
+## 2026-05-29 15:34 — Component manifests remain coarse and audits stay read-only
+- Component-level install/diff data is accepted as an upgrade review aid, not as a package manager or auto-selector.
+- Generated artifact policy belongs in the release/component manifest so target upgrades can see canonical source and regeneration commands before editing generated surfaces.
+- Skills/agents bloat detection is a read-only audit. It may report duplicate, stale generated, deprecated, missing-source, and orphan candidate signals, but cleanup still requires a separate explicit plan.
+
+## 2026-05-29 17:13 — Boundary cleanup keeps visibility without automatic expansion
+- Stable features are split into `stable_role=core` and `stable_role=advisory`; advisory tools remain safe to ship but should be treated as nonblocking diagnostics.
+- `delivery=overlay` is the normal transplant path, `delivery=frozen_optional` keeps v2/incubating runtime visible without stable overlay adoption, and `delivery=decision_only` keeps adapter decisions visible without making them apply targets.
+- Install profile `components` must stay aligned with release/upgrade components. Project types such as `cli`, `webapp`, `research`, and `private-mirror` are `flavors`, not components.
+- Canonical sources are `agents/`, `skills/*`, `rules/`, `mcp/servers.yaml`, and `AGENTS.md`; `.codex/`, `.claude/`, `.mcp.json`, and `CLAUDE.md` are generated surfaces.

@@ -24,6 +24,15 @@
     "selected_components": {"type": "array", "items": {"type": "string"}},
     "generated_paths": {"type": "array", "items": {"type": "string"}},
     "preserved_paths": {"type": "array", "items": {"type": "string"}},
-    "validation_status": {"type": "string", "enum": ["unverified", "verified", "failed"]}
+    "validation_status": {"type": "string", "enum": ["unverified", "verified", "failed"]},
+    "release_id": {"type": ["string", "null"]},
+    "channel": {"type": ["string", "null"], "enum": ["stable", "preview", "edge", null]},
+    "previous_release_id": {"type": ["string", "null"]},
+    "release_manifest_path": {"type": ["string", "null"]},
+    "release_manifest_sha256": {"type": ["string", "null"]},
+    "skeleton_revision": {"type": ["string", "null"]},
+    "applied_paths": {"type": "array", "items": {"type": "string"}},
+    "manual_review_paths": {"type": "array", "items": {"type": "string"}},
+    "applied_migrations": {"type": "array", "items": {"type": "string"}}
   }
 }

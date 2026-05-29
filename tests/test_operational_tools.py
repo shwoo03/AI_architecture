@@ -118,7 +118,9 @@ class OperationalToolTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["profile"], "cli")
-        self.assertIn("cli", payload["components"])
+        self.assertIn("core", payload["components"])
+        self.assertNotIn("cli", payload["components"])
+        self.assertIn("cli", payload["flavors"])
 
     def test_install_profiles_private_mirror_full_is_optional(self) -> None:
         check = _run([str(SCRIPTS / "install-profiles.py"), "--root", str(REPO_ROOT), "--format", "json", "check"])

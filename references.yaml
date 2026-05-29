@@ -1,59 +1,68 @@
 # 추적 대상 외부 repo. scripts/refresh-references.sh가 갱신.
 
-last_refreshed: null
+last_refreshed: "2026-05-29T05:46:15Z"
 
 repos:
   - name: "everything-claude-code"
     url: "https://github.com/affaan-m/everything-claude-code.git"
     local_path: "../AI_architecture_references/everything-claude-code"
-    last_known_commit: "841beea45cb25ba51f29fa45b7e272938d19b80a"
-    last_known_commit_date: "2026-04-30T12:25:14-04:00"
-    last_checked: null
+    last_known_commit: "64cd1ba248e77e377e76f70fc4e6434bfdddd511"
+    last_known_commit_date: "2026-05-28T07:45:46-04:00"
+    last_checked: "2026-05-29T05:46:15Z"
     why_tracked: "harness 최적화 패턴 참고"
     import_targets: ["skills/_meta/", "rules/common/", "mcp/"]
 
   - name: "hermes-agent"
     url: "https://github.com/NousResearch/hermes-agent.git"
     local_path: "../AI_architecture_references/hermes-agent"
-    last_known_commit: "20132435c07cd1cee9f896ba9cd504698c09589c"
-    last_known_commit_date: "2026-05-01T05:30:05-07:00"
-    last_checked: null
+    last_known_commit: "a0fc3df878e5d99125d3bbcbaeda6a4966e192c1"
+    last_known_commit_date: "2026-05-29T15:43:55+10:00"
+    last_checked: "2026-05-29T05:46:15Z"
     why_tracked: "agent runtime, plans, skill 구조 참고"
     import_targets: ["agents/", "plans/", "skills/_meta/"]
+
+  - name: "llm_wiki"
+    url: "https://github.com/nashsu/llm_wiki.git"
+    local_path: "../AI_architecture_references/llm_wiki"
+    last_known_commit: "b86d81b0002afcee981169658c7602b8ec5f8905"
+    last_known_commit_date: "2026-05-29T08:42:49+08:00"
+    last_checked: "2026-05-29T05:46:15Z"
+    why_tracked: "source traceability, knowledge graph, knowledge-gap 리서치 루프 참고"
+    import_targets: ["docs/", "rules/common/", "runtime/"]
 
   - name: "opencode"
     url: "https://github.com/anomalyco/opencode.git"
     local_path: "../AI_architecture_references/opencode"
-    last_known_commit: "16ddf5f559d8c52b23c6db7a046c3fda6a1d71f6"
-    last_known_commit_date: "2026-05-01T11:57:03Z"
-    last_checked: null
+    last_known_commit: "c7e1fc5e4260fc3e1aea24e26d67ed4074e3575d"
+    last_known_commit_date: "2026-05-29T00:19:54-05:00"
+    last_checked: "2026-05-29T05:46:15Z"
     why_tracked: "multi-provider coding agent CLI와 config 패턴 참고"
     import_targets: ["config/", "rules/common/", "docs/"]
 
   - name: "oh-my-codex"
     url: "https://github.com/Yeachan-Heo/oh-my-codex.git"
     local_path: "../AI_architecture_references/oh-my-codex"
-    last_known_commit: "148effde4e7c6a35f5bdde3ecd5db3488b3156b5"
-    last_known_commit_date: "not checked"
-    last_checked: null
+    last_known_commit: "9329ea6eb23e162b1efa86a2906aa4cfecbca95f"
+    last_known_commit_date: "2026-05-28T18:56:53+09:00"
+    last_checked: "2026-05-29T05:46:15Z"
     why_tracked: "Codex CLI workflow layer, skills, agents, prompts, runtime state, and team orchestration patterns 참고"
     import_targets: ["skills/", "agents/", "docs/", "rules/common/", "config/"]
 
   - name: "oh-my-claudecode"
     url: "https://github.com/Yeachan-Heo/oh-my-claudecode.git"
     local_path: "../AI_architecture_references/oh-my-claudecode"
-    last_known_commit: "679b418f32409e6d0edecf5038fd2de460cfce04"
-    last_known_commit_date: "not checked"
-    last_checked: null
+    last_known_commit: "ed7800dd73b9ef1811b6f777b2017baabda9962a"
+    last_known_commit_date: "2026-05-28T18:56:10+09:00"
+    last_checked: "2026-05-29T05:46:15Z"
     why_tracked: "Claude Code multi-agent orchestration, plugin/marketplace flow, workflows, and specialist agent patterns 참고"
     import_targets: ["skills/", "agents/", "docs/", "rules/common/", "config/"]
 
   - name: "paperclip"
     url: "https://github.com/paperclipai/paperclip.git"
     local_path: "../AI_architecture_references/paperclip"
-    last_known_commit: "42a299fb9d66fa0c136eae73bf166cad2c2c3e3e"
-    last_known_commit_date: "2026-05-01T08:32:04-05:00"
-    last_checked: null
+    last_known_commit: "9eac727cf13f6445c76e61190b6f831833759979"
+    last_known_commit_date: "2026-05-28T07:33:51-10:00"
+    last_checked: "2026-05-29T05:46:15Z"
     why_tracked: "AI agent 제품 구조, evals, skills 패턴 참고"
     import_targets: ["skills/", "docs/", "rules/common/"]
 
@@ -62,6 +71,6 @@ repos:
     local_path: "../AI_architecture_references/andrej-karpathy-skills"
     last_known_commit: "2c606141936f1eeef17fa3043a72095b4765b9c2"
     last_known_commit_date: "2026-04-20T18:05:04+08:00"
-    last_checked: null
+    last_checked: "2026-05-29T05:46:15Z"
     why_tracked: "Karpathy 4원칙(Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution)을 압축한 외부 행동지침. concept-only 참조."
     import_targets: ["rules/common/", "skills/", "docs/"]

@@ -1,8 +1,8 @@
 # Codemap: docs
 
-- `files`: 57
-- `line_count`: 4784
-- `directories`: 8
+- `files`: 59
+- `line_count`: 4982
+- `directories`: 9
 
 ## Navigation Entry Points
 
@@ -16,6 +16,7 @@
 - `docs/commands`
 - `docs/decisions`
 - `docs/design`
+- `docs/goal-prompts`
 - `docs/reference-wiki`
 - `docs/reference-wiki/wiki`
 - `docs/wiki-ops`
@@ -59,6 +60,7 @@
 - `docs/_meta/NOTION_SOURCE_ASSESSMENT.md`
 - `docs/_meta/SPECIALIST_AGENT_USAGE_BEST_PRACTICES.md`
 - `docs/_meta/SPECIALIST_OVERLAY_AUDIT.md`
+- `docs/_meta/SUBAGENT_DEBATE_BEST_PRACTICES.md`
 - `docs/commands/audit-overlay.md`
 - `docs/commands/closeout.md`
 - `docs/commands/decide.md`
@@ -72,6 +74,7 @@
 - `docs/decisions/README.md`
 - `docs/design/V2_SPECIALIST_TEAM_OS.md`
 - `docs/feature-status.yaml`
+- `docs/goal-prompts/README.md`
 - `docs/plugin-manifest-notes.md`
 - `docs/reference-wiki/README.md`
 - `docs/reference-wiki/wiki/index.md`

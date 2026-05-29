@@ -1,27 +1,34 @@
 version: 1
 default_profile: full-canonical
+component_vocabulary: [core, validation, runtime, reference, wiki, skills, agents, docs, bootstrap]
 
 profiles:
   minimal:
     description: "Smallest usable project shell with core rules and verification."
     components: [core, validation, runtime]
+    flavors: []
 
   webapp:
     description: "Web application starting point with frontend/backend rule placeholders."
-    components: [core, validation, runtime, reference, wiki, webapp]
+    components: [core, validation, runtime, reference, wiki]
+    flavors: [webapp]
 
   cli:
     description: "CLI/library starting point with packaging and distribution guidance."
-    components: [core, validation, runtime, reference, wiki, cli]
+    components: [core, validation, runtime, reference, wiki]
+    flavors: [cli]
 
   research-heavy:
     description: "Reference-first projects that will compare and absorb external systems."
-    components: [core, validation, runtime, reference, wiki, research]
+    components: [core, validation, runtime, reference, wiki]
+    flavors: [research]
 
   full-canonical:
     description: "Full reusable AI architecture skeleton. This preserves current behavior."
     components: [core, validation, runtime, reference, wiki, skills, agents, docs, bootstrap]
+    flavors: []
 
   private-mirror-full:
     description: "Private repo mirror profile that permits tracking local/generated surfaces such as .codex, .claude, .mcp.json, and adapter files; security scan is required before push."
     components: [core, validation, runtime, reference, wiki, skills, agents, docs, bootstrap]
+    flavors: [private-mirror]

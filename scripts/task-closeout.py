@@ -366,6 +366,7 @@ def record_evidence(
     next_action: str,
     skills: list[str],
     disposition: str,
+    plan_id: str,
 ) -> tuple[bool, str]:
     script = root / "scripts" / "completion-evidence.py"
     run_id = utc_run_id()
@@ -391,6 +392,8 @@ def record_evidence(
     command.extend(["--outcome", "genuine_success" if checks_ok else "partial_progress"])
     command.extend(["--disposition", disposition])
     command.extend(["--residual-risk", residual_risk])
+    if plan_id:
+        command.extend(["--plan-id", plan_id])
     if next_action:
         command.extend(["--next-action", next_action])
     result = subprocess.run(
@@ -470,6 +473,7 @@ def main() -> int:
     parser.add_argument("--next-action", default="")
     parser.add_argument("--disposition", choices=sorted(DISPOSITIONS), default="auto")
     parser.add_argument("--skill", action="append", default=[], help="Skill used by this task, repeatable. Only recorded with --record.")
+    parser.add_argument("--plan-id", default="", help="Optional plans/active or plans/done plan id for completion evidence.")
     parser.add_argument("--prevalidated-check", action="append", default=[], help="Validation JSON from an upstream gate; skips local profile checks when present.")
     parser.set_defaults(record=False)
     args = parser.parse_args()
@@ -530,7 +534,7 @@ def main() -> int:
                     )
                 )
         if maintenance_ok(maintenance_actions):
-            recorded, evidence = record_evidence(root, args.goal, changed_paths, checks, args.residual_risk, args.next_action.strip(), skills, disposition)
+            recorded, evidence = record_evidence(root, args.goal, changed_paths, checks, args.residual_risk, args.next_action.strip(), skills, disposition, args.plan_id.strip())
     result = CloseoutResult(
         root=str(root),
         goal=args.goal,

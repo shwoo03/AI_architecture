@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 TIERS = {"stable", "incubating", "experimental", "deprecated"}
+STABLE_ROLES = {"core", "advisory"}
+DELIVERY_MODES = {"overlay", "decision_only", "frozen_optional"}
 PROFILE_TIERS = {
     "stable": {"stable"},
     "incubating": {"stable", "incubating"},
@@ -136,6 +138,15 @@ def validate_feature_manifest(root: Path, profile: str = "all") -> dict[str, Any
         tier = feature.get("tier")
         if tier not in TIERS:
             findings.append({"severity": "ERROR", "check": "tier", "feature_id": feature_id, "detail": f"invalid tier: {tier}"})
+        stable_role = feature.get("stable_role")
+        if stable_role is not None:
+            if tier != "stable":
+                findings.append({"severity": "ERROR", "check": "stable_role", "feature_id": feature_id, "detail": "stable_role is only valid for stable features"})
+            elif stable_role not in STABLE_ROLES:
+                findings.append({"severity": "ERROR", "check": "stable_role", "feature_id": feature_id, "detail": f"invalid stable_role: {stable_role}"})
+        delivery = feature.get("delivery")
+        if delivery is not None and delivery not in DELIVERY_MODES:
+            findings.append({"severity": "ERROR", "check": "delivery", "feature_id": feature_id, "detail": f"invalid delivery: {delivery}"})
         if feature_id not in selected_ids:
             continue
         missing = sorted(REQUIRED_FEATURE_FIELDS - set(feature.keys()))
@@ -157,6 +168,14 @@ def validate_feature_manifest(root: Path, profile: str = "all") -> dict[str, Any
         "tier": profile,
         "feature_count": len(features),
         "features_by_tier": feature_counts(features),
+        "features_by_stable_role": {
+            role: sum(1 for feature in features if feature.get("tier") == "stable" and feature.get("stable_role") == role)
+            for role in sorted(STABLE_ROLES)
+        },
+        "features_by_delivery": {
+            mode: sum(1 for feature in features if feature.get("delivery") == mode)
+            for mode in sorted(DELIVERY_MODES)
+        },
         "included_features": [str(feature.get("id")) for feature in selected],
         "skipped_by_tier": [str(feature.get("id")) for feature in skipped],
         "findings": findings,

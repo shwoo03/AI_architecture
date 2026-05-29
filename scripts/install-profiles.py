@@ -19,6 +19,9 @@ except (AttributeError, OSError):
 
 
 COMPONENT_RE = re.compile(r"components:\s*\[([^\]]*)\]")
+FLAVOR_RE = re.compile(r"flavors:\s*\[([^\]]*)\]")
+VOCABULARY_RE = re.compile(r"^component_vocabulary:\s*\[([^\]]*)\]", re.MULTILINE)
+DEFAULT_COMPONENT_VOCABULARY = ["core", "validation", "runtime", "reference", "wiki", "skills", "agents", "docs", "bootstrap"]
 
 
 def repo_root() -> Path:
@@ -34,6 +37,8 @@ def load_profiles(root: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
     default_match = re.search(r"^default_profile:\s*([^\n#]+)", text, re.MULTILINE)
     default = default_match.group(1).strip().strip('"').strip("'") if default_match else ""
+    vocabulary_match = VOCABULARY_RE.search(text)
+    component_vocabulary = inline_list(vocabulary_match.group(1)) if vocabulary_match else list(DEFAULT_COMPONENT_VOCABULARY)
     profiles: dict[str, dict[str, Any]] = {}
     profile_block = re.search(r"^profiles:\s*$", text, re.MULTILINE)
     if profile_block:
@@ -43,17 +48,20 @@ def load_profiles(root: Path) -> dict[str, Any]:
             block = match.group(2)
             description_match = re.search(r"^\s{4}description:\s*(.+)", block, re.MULTILINE)
             components_match = COMPONENT_RE.search(block)
+            flavors_match = FLAVOR_RE.search(block)
             profiles[name] = {
                 "description": description_match.group(1).strip().strip('"').strip("'") if description_match else "",
                 "components": inline_list(components_match.group(1)) if components_match else [],
+                "flavors": inline_list(flavors_match.group(1)) if flavors_match else [],
             }
-    return {"default_profile": default, "profiles": profiles, "path": path.as_posix()}
+    return {"default_profile": default, "profiles": profiles, "component_vocabulary": component_vocabulary, "path": path.as_posix()}
 
 
 def check_profiles(payload: dict[str, Any]) -> list[str]:
     findings: list[str] = []
     profiles = payload["profiles"]
     default = payload["default_profile"]
+    vocabulary = set(payload.get("component_vocabulary") or DEFAULT_COMPONENT_VOCABULARY)
     if not profiles:
         findings.append("config/install-profiles.yaml has no profiles")
     if not default:
@@ -61,8 +69,12 @@ def check_profiles(payload: dict[str, Any]) -> list[str]:
     elif default not in profiles:
         findings.append(f"default_profile not found in profiles: {default}")
     for name, profile in profiles.items():
-        if not profile.get("components"):
+        components = list(profile.get("components") or [])
+        if not components:
             findings.append(f"profile {name} missing components")
+        unknown = sorted(component for component in components if component not in vocabulary)
+        if unknown:
+            findings.append(f"profile {name} has unknown components: {', '.join(unknown)}")
         if not profile.get("description"):
             findings.append(f"profile {name} missing description")
     return findings
@@ -76,15 +88,19 @@ def plan_profile(root: Path, profile: str) -> dict[str, Any]:
     if selected not in profiles:
         findings.append(f"unknown profile: {selected}")
         components: list[str] = []
+        flavors: list[str] = []
         description = ""
     else:
         components = list(profiles[selected]["components"])
+        flavors = list(profiles[selected].get("flavors") or [])
         description = str(profiles[selected]["description"])
     return {
         "ok": not findings,
         "profile": selected,
         "description": description,
         "components": components,
+        "flavors": flavors,
+        "component_vocabulary": payload.get("component_vocabulary") or DEFAULT_COMPONENT_VOCABULARY,
         "default_profile": payload["default_profile"],
         "findings": findings,
     }
@@ -107,7 +123,13 @@ def cmd_plan(root: Path, args: argparse.Namespace) -> int:
 def cmd_check(root: Path, args: argparse.Namespace) -> int:
     payload = load_profiles(root)
     findings = check_profiles(payload)
-    result = {"ok": not findings, "findings": findings, "profiles": sorted(payload["profiles"]), "default_profile": payload["default_profile"]}
+    result = {
+        "ok": not findings,
+        "findings": findings,
+        "profiles": sorted(payload["profiles"]),
+        "default_profile": payload["default_profile"],
+        "component_vocabulary": payload.get("component_vocabulary") or DEFAULT_COMPONENT_VOCABULARY,
+    }
     output(result, args.format)
     return 0 if not findings else 1
 

@@ -28,6 +28,87 @@ class ReferenceCandidateTests(unittest.TestCase):
         finally:
             scratch.unlink(missing_ok=True)
 
+    def test_strict_source_anchor_rejects_placeholder_source_refs(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"candidate-strict-anchor-{uuid.uuid4().hex}"
+        try:
+            directory = tmp / "research" / "reference-candidates"
+            directory.mkdir(parents=True)
+            candidate = directory / "candidate.md"
+            candidate.write_text(
+                """# Candidate
+
+- `name`: Candidate
+- `url`: https://example.com/repo
+- `source_type`: repository
+- `status`: reviewing
+- `searched_for`: test
+- `created_at`: 2026-05-27
+- `reviewed_at`: 2026-05-27
+- `reviewer`: test
+- `problem_statement`: test
+- `why_it_matters`: test
+- `expected_value`: test
+- `evidence_summary`: test
+- `local_clone_path`: ../refs/repo
+- `checked_revision`: not checked
+- `freshness_signal`: remote freshness requires review
+- `maintenance_signal`: test
+- `documentation_signal`: test
+- `validation_signal`: test
+- `sources`:
+  - {"path":"README.md","kind":"readme","evidence":"reviewed","hash_or_line_ref":"local-reference"}
+- `license`: MIT
+- `security_or_privacy_risk`: low
+- `maintenance_risk`: low
+- `complexity_risk`: low
+- `dependency_risk`: low
+- `fit_risk`: low
+- `applies_to`: tests
+- `adoption_decision`: adapt
+- `decision_reason`: test
+- `next_action`: test
+- `proposal_needed`: no
+- `behavior_change`: no
+- `validation_plan`: test
+- `rollback_or_stop_condition`: test
+- `approval_required`: no
+- `final_status`: reviewing
+- `validation_result`: pending
+- `activity_log_entry`: none
+- `notes`: none
+- `useful_patterns`:
+  - pattern
+- `what_to_copy_conceptually`:
+  - concept
+- `what_not_to_copy`:
+  - whole repo
+- `target_files_or_areas`:
+  - docs
+- `files_to_change`:
+  - docs
+
+| 기준 | 배점 | 점수 | 근거 |
+| --- | ---: | ---: | --- |
+| 문제 적합성 | 20 | 1 | t |
+| 구조 명확성 | 15 | 1 | t |
+| 검증 가능성 | 15 | 1 | t |
+| 유지보수 신호 | 15 | 1 | t |
+| 흡수 비용 | 15 | 1 | t |
+| 보안/라이선스 리스크 | 10 | 1 | t |
+| 설명 가치 | 10 | 1 | t |
+| 합계 | 100 | 7 | t |
+""",
+                encoding="utf-8",
+            )
+            relaxed = _run([str(self.SCRIPT), "--root", str(tmp)])
+            strict = _run([str(self.SCRIPT), "--root", str(tmp), "--strict-source-anchor"])
+            self.assertEqual(relaxed.returncode, 0, relaxed.stdout + relaxed.stderr)
+            self.assertNotEqual(strict.returncode, 0)
+            self.assertIn("strict source anchor requires concrete `checked_revision`", strict.stdout)
+            self.assertIn("concrete hash_or_line_ref", strict.stdout)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 class ReferenceInventoryTests(unittest.TestCase):
     SCRIPT = SCRIPTS / "reference-inventory.py"
@@ -159,6 +240,106 @@ class ReferenceProposalTests(unittest.TestCase):
             self.assertIn("missing field `candidate_card`", result.stdout)
         finally:
             scratch.unlink(missing_ok=True)
+
+    def test_strict_source_anchor_checks_linked_candidate_and_evidence_bullets(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"proposal-strict-anchor-{uuid.uuid4().hex}"
+        try:
+            candidate = tmp / "research" / "reference-candidates" / "candidate.md"
+            proposal = tmp / "runtime" / "proposals" / "reference-adoption" / "proposal.md"
+            candidate.parent.mkdir(parents=True)
+            proposal.parent.mkdir(parents=True)
+            candidate.write_text(
+                "\n".join(
+                    [
+                        "- `checked_revision`: not checked",
+                        "- `freshness_signal`: remote freshness requires review",
+                        "- `sources`:",
+                        "  - {\"path\":\"README.md\",\"kind\":\"readme\",\"evidence\":\"reviewed\",\"hash_or_line_ref\":\"local-reference\"}",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            proposal.write_text(
+                """# Proposal
+
+## 상태
+
+- `status`: proposed
+- `created_at`: 2026-05-27
+- `candidate_card`: `research/reference-candidates/candidate.md`
+- `proposal_type`: reference_adoption_dry_run
+- `approval_required`: yes
+- `decision_source`:
+
+## 한 문장 정의
+
+Proposal.
+
+## 근거
+
+Source-backed evidence:
+
+- reviewed README
+
+## 적용하지 않을 것
+
+- Whole repo.
+
+## 모듈형 흡수 판단
+
+- `absorption_mode`: concept_only
+- `recommended_mode`: translate concept.
+- `reuse_boundary`: docs only.
+- `direct_implementation_reason`: not applicable.
+
+## 제안 변경
+
+- Change docs.
+
+## 기대 효과
+
+- Better trace.
+
+## 위험
+
+- Weak evidence.
+
+## 검증 계획
+
+```powershell
+python scripts/verify-skeleton.py
+python scripts/validate-reference-candidates.py
+python scripts/validate-reference-proposals.py
+```
+
+## 롤백 또는 중단 조건
+
+- Stop.
+
+## 승인 후 실제 변경 범위
+
+- docs
+
+## 최종 결정 기록
+
+- `decision`: pending
+- `decided_at`:
+- `decided_by`:
+- `applied_in`:
+- `validation_result`:
+""",
+                encoding="utf-8",
+            )
+            relaxed = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json"])
+            strict = _run([str(self.SCRIPT), "--root", str(tmp), "--strict-source-anchor", "--format", "json"])
+            self.assertEqual(relaxed.returncode, 0, relaxed.stdout + relaxed.stderr)
+            self.assertEqual(strict.returncode, 1)
+            payload = json.loads(strict.stdout)
+            messages = "\n".join(item["message"] for item in payload["findings"])
+            self.assertIn("concrete checked_revision", messages)
+            self.assertIn("source-backed evidence bullet", messages)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_partial_copy_requires_copy_boundary(self) -> None:
         scratch = (
@@ -723,6 +904,40 @@ class ReferenceCopyLedgerTests(unittest.TestCase):
             check = _run([str(self.SCRIPT), "--root", str(tmp), "check"])
             self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
             self.assertIn("1 record", check.stdout)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_strict_source_anchor_requires_candidate_and_proposal_refs(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"copy-ledger-strict-anchor-{uuid.uuid4().hex}"
+        try:
+            tmp.mkdir(parents=True)
+            add = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "add",
+                    "--source-url",
+                    "https://github.com/example/project",
+                    "--license",
+                    "MIT",
+                    "--revision",
+                    "abc123",
+                    "--source-path",
+                    "src/helper.py",
+                    "--local-path",
+                    "scripts/copied.py",
+                    "--copy-boundary",
+                    "single helper only",
+                ]
+            )
+            self.assertEqual(add.returncode, 0, add.stdout + add.stderr)
+            relaxed = _run([str(self.SCRIPT), "--root", str(tmp), "check"])
+            strict = _run([str(self.SCRIPT), "--root", str(tmp), "check", "--strict-source-anchor"])
+            self.assertEqual(relaxed.returncode, 0, relaxed.stdout + relaxed.stderr)
+            self.assertEqual(strict.returncode, 1)
+            self.assertIn("requires non-blank `candidate_card`", strict.stdout)
+            self.assertIn("requires non-blank `proposal`", strict.stdout)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

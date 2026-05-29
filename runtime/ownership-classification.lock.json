@@ -2534,6 +2534,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "docs/_meta/SUBAGENT_DEBATE_BEST_PRACTICES.md": {
+      "action": "manual_merge",
+      "matched_pattern": "docs/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "docs/commands/audit-overlay.md": {
       "action": "manual_merge",
       "matched_pattern": "docs/**",
@@ -2624,6 +2631,13 @@
       "owner": "system_owned",
       "reason": "system_defaults.rules",
       "system_locked": true
+    },
+    "docs/goal-prompts/README.md": {
+      "action": "manual_merge",
+      "matched_pattern": "docs/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
     },
     "docs/plugin-manifest-notes.md": {
       "action": "manual_merge",
@@ -2800,7 +2814,56 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "plans/done/0001-codex-cli-goal-prompt-length-contract.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0001-component-install-diff-surface-bloat-audit.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0001-delegation-permission-preflight-hardening.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0001-feature-boundary-cleanup.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "plans/done/0001-phase-1d-1-changed-paths-validation.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0001-source-anchor-strict-mode.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0001-subagent-debate-workflow-replaces-claude-auto-di.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0001-versioned-skeleton-release-upgrade-support.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
       "owner": "project_owned",
@@ -3011,6 +3074,27 @@
       "system_locked": false
     },
     "plans/done/0031-reference-card-integrity-carrier-round.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0032-codex-claude-dialogue-consensus.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0033-plan-id-evidence-trace.md": {
+      "action": "preserve_project",
+      "matched_pattern": "plans/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "plans/done/0034-claude-strategy-critic-boundary.md": {
       "action": "preserve_project",
       "matched_pattern": "plans/**",
       "owner": "project_owned",
@@ -3318,6 +3402,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "runtime/agent-run-validator-pass-bb98e80d48034c51b0c351c600383add/runtime/agent-briefs/2026-05-29-0008-agent-run-docs-sync-auditor-01.json": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "runtime/agent-runs.jsonl": {
       "action": "protected_preserve",
       "matched_pattern": "runtime/agent-runs.jsonl",
@@ -3358,6 +3449,27 @@
       "matched_pattern": "runtime/completion-evidence.jsonl",
       "owner": "protected",
       "reason": "protected",
+      "system_locked": false
+    },
+    "runtime/dialogues/dlg-2026-05-29-01.jsonl": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "runtime/dialogues/dlg-2026-05-29-02.jsonl": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "runtime/dialogues/dlg-2026-05-29-03.jsonl": {
+      "action": "preserve_project",
+      "matched_pattern": "runtime/**",
+      "owner": "project_owned",
+      "reason": "system_defaults.rules",
       "system_locked": false
     },
     "runtime/external-repos/README.md": {
@@ -3717,6 +3829,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "scripts/dialogue-lint.py": {
+      "action": "update_system",
+      "matched_pattern": "scripts/dialogue-lint.py",
+      "owner": "system_owned",
+      "reason": "system_defaults.rules",
+      "system_locked": true
+    },
     "scripts/diff-quality-gate.py": {
       "action": "manual_merge",
       "matched_pattern": "scripts/**",
@@ -3760,6 +3879,13 @@
       "system_locked": true
     },
     "scripts/generate-codemaps.py": {
+      "action": "manual_merge",
+      "matched_pattern": "scripts/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "scripts/goal-prompt-check.py": {
       "action": "manual_merge",
       "matched_pattern": "scripts/**",
       "owner": "manual_merge",
@@ -3844,6 +3970,13 @@
       "system_locked": true
     },
     "scripts/lib_path_safety.py": {
+      "action": "manual_merge",
+      "matched_pattern": "scripts/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "scripts/lib_release_manifest.py": {
       "action": "manual_merge",
       "matched_pattern": "scripts/**",
       "owner": "manual_merge",
@@ -4011,6 +4144,13 @@
       "reason": "system_defaults.rules",
       "system_locked": false
     },
+    "scripts/release-manifest.py": {
+      "action": "manual_merge",
+      "matched_pattern": "scripts/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
     "scripts/resume-readiness.py": {
       "action": "update_system",
       "matched_pattern": "scripts/resume-readiness.py",
@@ -4110,6 +4250,13 @@
       "system_locked": true
     },
     "scripts/subdir-hints.py": {
+      "action": "manual_merge",
+      "matched_pattern": "scripts/**",
+      "owner": "manual_merge",
+      "reason": "system_defaults.rules",
+      "system_locked": false
+    },
+    "scripts/surface-bloat-audit.py": {
       "action": "manual_merge",
       "matched_pattern": "scripts/**",
       "owner": "manual_merge",
@@ -4987,5 +5134,5 @@
   },
   "root": "/Users/shwoo/mydir/AI/AI_architecture",
   "schema_version": "ai-architecture.ownership.v1",
-  "total": 712
+  "total": 733
 }

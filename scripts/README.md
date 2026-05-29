@@ -26,8 +26,10 @@
 - `python3 scripts/agent-flow.py research --auto --goal "<goal>"`: 로컬/클론된 reference를 목표 문장 기준으로 자동 선택해 먼저 분석하고 필요하면 후보 카드와 proposal을 만듭니다.
 - `python3 scripts/agent-flow.py decide --proposal <path> --decision accepted|rejected|deferred --by <name>`: proposal 결정과 review queue 상태를 같이 맞춥니다.
 - `python3 scripts/agent-flow.py recall "<query>"`: 로컬 session recall 캐시를 검색합니다. 원본은 Markdown/JSONL이고 SQLite 파일은 삭제 후 재생성 가능한 캐시입니다.
+- `python3 scripts/agent-flow.py dialogue start|add-turn|status|converge ...`: 특정 작업에 대해 Codex가 orchestrator로 남고 `subagent-critic`, `subagent-researcher`, `subagent-verifier`가 독립 의견을 내는 비판적 계획 라운드를 구조화해 기록합니다. Claude 자동 토론이나 Claude fallback 참여자는 사용하지 않으며, 열린 block critique가 없을 때만 구현 범위를 고정합니다.
 - `python3 scripts/agent-flow.py specialist propose|review|approve|preview|execute ...`: 필요할 때만 specialist proposal, overlay 반영, delegation preview, approved handoff preparation을 수행합니다.
-- `python3 scripts/agent-flow.py closeout --goal "<goal>" --changed-path <path>`: 변경 경로에 맞는 검증 profile을 고르고 closeout evidence를 기록합니다. 기본 `auto`는 개발 루프 속도를 위해 스크립트 변경을 `scripts-fast`로 라우팅하고, 전체 게이트가 필요하면 `--profile all` 또는 명시 `--profile scripts`를 사용합니다.
+- `python3 scripts/agent-flow.py closeout --goal "<goal>" --changed-path <path>`: 변경 경로에 맞는 검증 profile을 고르고 closeout evidence를 기록합니다. 기본 `auto`는 개발 루프 속도를 위해 스크립트 변경을 `scripts-fast`로 라우팅하고, 전체 게이트가 필요하면 `--profile all` 또는 명시 `--profile scripts`를 사용합니다. 완료 증거를 특정 plan에 연결할 때는 `--plan-id 0033-example-plan`을 선택적으로 넘깁니다.
+- `python3 scripts/goal-prompt-check.py --text "<prompt>"`: Codex CLI `/goal` 프롬프트가 4000자 이하인지 확인합니다. 4000자를 넘는 내용은 `docs/goal-prompts/` 같은 별도 문서로 분리하고, `/goal` 프롬프트는 그 문서 경로를 가리키는 짧은 진입점으로 작성합니다.
 
 `start`가 반환하는 `suggested_questions`와 `build_intake`는 사용자가 명령어를 치게 하려는 안내가 아닙니다. 에이전트가 자연어 대화에서 무엇을 물어볼지 참고하는 질문 후보입니다. `write_policy`는 해당 흐름이 read-only인지, 수동 구현 범위 확정과 plan 작성이 필요한지, confirmation 뒤 쓰기 가능한지 알려줍니다. `research --auto --goal`이 반환하는 `reference_candidates`는 자동 선택을 설명하기 위한 top 후보 목록이며, 기본 모드에서는 후보 카드나 proposal을 쓰지 않습니다. `next_action_type: manual_work_required`는 에이전트가 먼저 범위와 수용 기준을 정리하고 구현한 뒤 closeout으로 가야 한다는 뜻입니다. `requires_confirmation: true`는 쓰기/승인/적용 플래그가 포함된 흐름이라 사용자 확인 없이는 진행하지 않는다는 뜻입니다.
 
@@ -46,7 +48,10 @@
 
 - `scripts/agent-flow.py`: `start/research/decide/closeout` 네 흐름으로 주요 운영 스크립트를 감싸는 단일 진입점입니다. 기본은 read-only 또는 dry-run이며, reference 후보/제안 생성과 closeout 기록은 명시 플래그가 있을 때만 씁니다.
 - `scripts/agent-flow.py recall ...`: `scripts/session-recall.py search`를 감싸는 public wrapper입니다. 검색 결과는 과거 세션 회상 보조 정보이며 자동 의사결정 입력이 아닙니다.
-- `scripts/agent-flow.py specialist ...`: 0016-0018 on-demand specialist 흐름입니다. `propose`는 concrete trigger가 있어야 proposal을 쓰고, `preview`는 specialist 0명을 선택할 수 있으며, `execute`는 approved `DelegationPlan`과 `--confirm`이 있어야 기존 incubating delegate handoff만 준비합니다. `packet`은 같은 승인 경계에서 harness-agnostic spawn-ready JSON을 쓰지만 실제 subagent를 spawn하지 않습니다.
+- `scripts/agent-flow.py dialogue ...`: task-scoped subagent debate ledger wrapper입니다. `start`는 `runtime/dialogues/*.jsonl`을 만들고, `add-turn`은 claim/critique/concession을 append하며, `status`는 `scripts/dialogue-lint.py` 결과를 보여주고, `converge`는 Codex와 최소 1개 `subagent-*` 참여자가 준비됐고 열린 block critique가 없을 때만 `implementation_scope`를 기록합니다.
+- `scripts/agent-flow.py specialist ...`: 0016-0018 on-demand specialist 흐름입니다. `propose`는 concrete trigger가 있어야 proposal을 쓰고, `preview`는 specialist 0명을 선택할 수 있으며, `execute`는 approved `DelegationPlan`, `--confirm`, static preflight를 통과해야 기존 incubating delegate handoff만 준비합니다. `packet`은 같은 승인 경계에서 harness-agnostic spawn-ready JSON을 쓰지만 실제 subagent를 spawn하지 않습니다. `execute`와 `packet`은 parent `write_policy`/scope를 `agent-brief.py`로 넘기며, preflight 실패 시 brief나 spawn packet을 쓰기 전에 중단합니다.
+- `scripts/dialogue-lint.py`: subagent debate ledger validator입니다. critique target, block evidence, Claude 자동 토론 비활성화 정책, nested subagent 금지, convergence scope, unresolved block 상태를 검사합니다.
+- `scripts/goal-prompt-check.py`: Codex CLI `/goal` 프롬프트의 문자 수를 검사합니다. 빈 프롬프트나 4000자 초과 프롬프트는 실패로 보고하고, 긴 세부사항을 문서로 분리하라는 권고를 출력합니다.
 - `scripts/catalog.yaml`: public/internal script 경계를 기록합니다. public은 `agent-flow.py` 하나이고, 나머지는 agent-flow나 디버깅 흐름에서 쓰는 internal tool입니다.
 - `scripts/generate-codemaps.py`: `scripts`, `skills`, `agents`, `runtime`, `reference`, `docs`, `tests` 영역을 스캔해 `docs/CODEMAPS/`를 생성합니다. 기본은 preview이며 `--write`로 파일을 씁니다.
 - `scripts/hooks/post-tool-use-log.py`: 도구 사용이나 주요 행동 결과를 활동 로그에 추가합니다.
@@ -65,7 +70,9 @@
 - `scripts/schema-check.py`: `schemas/*.schema.json`과 runtime/config/plugin 핵심 계약을 표준 라이브러리 기반으로 검증합니다.
 - `scripts/markdown-sanitize.py`: generated Markdown의 fenced whole-document wrapper, frontmatter wrapper, BOM, final newline 문제를 preview/apply 방식으로 보수적으로 정리합니다.
 - `scripts/failure-classify.py`: validation/tool stderr·stdout을 `auth`, `quota`, `timeout`, `format`, `payload`, `policy`, `infra`, `unknown`으로 분류하고 retry 가능성과 다음 액션을 보고합니다.
-- `scripts/feature-status.py`: `docs/feature-status.yaml`의 maturity tier, overlay 기본값, 문서 경로를 검증합니다.
+- `scripts/feature-status.py`: `docs/feature-status.yaml`의 maturity tier, stable role, delivery mode, overlay 기본값, 문서 경로를 검증합니다.
+- `scripts/release-manifest.py`: 현재 skeleton tree에서 stable/preview/edge release manifest를 생성하고, component-level install/diff summary, generated artifact policy, 파일 hash, release provenance가 현재 checkout과 맞는지 검증합니다.
+- `scripts/surface-bloat-audit.py`: skills/agents 표면을 read-only로 점검합니다. 중복 이름, 누락된 `SKILL.md`, deprecated 항목의 generated surface 노출, canonical/generated mismatch, orphan 후보를 보고하지만 자동 삭제나 자동 강등은 하지 않습니다.
 - `scripts/checkpoint.py`: 긴 작업 중간 상태를 `runtime/checkpoints.jsonl`에 append-only로 남깁니다.
 - `scripts/verify-skeleton.py`: 스켈레톤 또는 부트스트랩된 프로젝트의 구조, 필수 경로, 에이전트 메타데이터, JSONL 파싱, 후보 카드, 위키 린트를 확인합니다.
 - `scripts/rotate-activity-log.py`: `runtime/activity-log.jsonl`과 `runtime/agent-runs.jsonl`이 10,000줄을 넘으면 `runtime/archive/<base>-YYYY-MM.jsonl`로 월 단위 아카이브합니다. 기본값은 dry-run이며 `--apply`로 실행합니다.
@@ -77,6 +84,8 @@
 - `scripts/validate-reference-candidates.py`: `research/reference-candidates/`의 실제 후보 카드가 필수 필드, 허용 값, 점수 합계, 리스트 항목을 갖췄는지 검사합니다.
 - `scripts/validate-reference-proposals.py`: `runtime/proposals/reference-adoption/`의 실제 dry-run 제안서가 필수 필드, 후보 카드 링크, 모듈형 흡수 판단, 검증 계획, 중단 조건을 갖췄는지 검사합니다.
 - `scripts/create-reference-proposal.py`: 후보 카드에서 reference-adoption dry-run 제안서 초안을 만듭니다. 기본은 화면 출력이며, 에이전트가 승인된 경우 `--write`로 파일을 생성합니다. 제안서에는 dependency, wrapper, partial copy, concept-only, direct implementation 중 어떤 흡수 방식을 택할지 판단하는 섹션이 포함됩니다. 후보 카드가 `adoption_decision: copy`이면 개인 로컬 사용을 전제로 partial copy 경계를 기록하게 합니다.
+- `scripts/validate-reference-candidates.py --strict-source-anchor`: 후보 카드의 `checked_revision`, `freshness_signal`, `sources[].hash_or_line_ref`가 placeholder가 아닌 재현 가능한 anchor인지 adoption/copy 판단 전에 강하게 확인합니다. 기본 검증은 기존처럼 구조 정합성만 봅니다.
+- `scripts/validate-reference-proposals.py --strict-source-anchor`: reference-adoption 제안서가 연결한 후보 카드의 source anchor와 제안서의 Source-backed evidence bullet을 강하게 확인합니다. 전역 closeout이 아니라 reference adoption/proposal 판단 직전에 쓰는 옵션입니다.
 - `scripts/reference-intake.py`: 새 구현 전 외부 오픈소스나 로컬 레퍼런스를 먼저 분석합니다. `analyze`는 clone된 repo의 README/docs/tests/license/module inventory를 보고, `card-draft`는 후보 카드 초안을 만들며, `clone`은 기본 dry-run으로 `runtime/external-repos/` 아래 안전한 clone 경로를 계획합니다. `--cache` 또는 카드 `--write`가 있을 때만 `runtime/reference-intake-cache.jsonl`을 갱신하므로 preview는 원본과 프로젝트를 수정하지 않습니다.
 - `scripts/reference-inventory.py`: `references.yaml`, 후보 카드, reference-adoption proposal을 read-only로 대조해 tracked reference가 후보 카드 없이 방치되지 않게 합니다.
 - `scripts/reference-task-queue.py`: 긴 reference 분석을 중단/재개할 수 있도록 `runtime/reference-tasks.jsonl`에 append-only 작업 상태를 남깁니다. source hash 기반 unchanged skip과 retry 장부를 포함합니다.
@@ -85,9 +94,10 @@
 - `scripts/agent-flow.py doctor`: 흩어진 운영 진단을 한 번에 보는 public UX wrapper입니다. `skeleton-doctor`, `verify-skeleton`, `ownership-lock check`, `resume-readiness --strict`, `quality-gate`를 read-only로 실행하고 `OK/WARN/FAIL` JSON/text summary를 냅니다. 기본은 빠른 확인을 위해 quality-gate에 `--skip-tests`를 붙이며, `--with-tests`로 풀 테스트를 허용합니다.
 - `scripts/resume-readiness.py`: 다음 에이전트가 handoff, activity log, completion evidence, ownership lock 상태를 보고 추측 없이 이어받을 수 있는지 검사합니다. `--strict`에서는 handoff보다 최신인 runtime 기록과 미처리 ownership lock drift를 실패로 올립니다. 의도적으로 미룰 때는 handoff에 `ownership lock drift: deferred`를 남깁니다.
 - `scripts/skill-surface-check.py`: `skills/active`를 canonical로 두고 `.codex/skills`, `.claude/skills` 생성물이 동기화됐는지 검사합니다.
-- `scripts/install-state.py`: bootstrap/convert 결과를 `runtime/install-state.jsonl`에 append-only로 기록하고 검증합니다.
-- `scripts/install-profiles.py`: `config/install-profiles.yaml`을 읽어 bootstrap profile과 component 목록을 계획/검증합니다.
-- `scripts/skill-lifecycle.py`: skill 사용, 평가, promotion/demotion 제안을 ledger 기반으로 관리합니다. `health`는 7일/30일 추세, golden coverage, 실패 이유, pending proposal을 요약합니다. 제안은 자동 적용하지 않고 `runtime/proposals/skill-lifecycle/`에 씁니다.
+- `scripts/surface-bloat-audit.py`: skill/agent 표면이 중복, orphan, deprecated/generated drift, manifest-disk mismatch 없이 유지되는지 read-only로 감사합니다.
+- `scripts/install-state.py`: bootstrap/convert/release upgrade 결과를 `runtime/install-state.jsonl`에 append-only로 기록하고 검증합니다. `skeleton_release_applied` 이벤트는 release id, channel, applied paths, manual review paths를 optional field로 남깁니다.
+- `scripts/install-profiles.py`: `config/install-profiles.yaml`을 읽어 bootstrap profile의 component와 flavor 목록을 계획/검증합니다. component는 release/upgrade 묶음이고 flavor는 CLI/webapp/research 같은 프로젝트 성격입니다.
+- `scripts/skill-lifecycle.py`: skill 사용, 평가, promotion/demotion 제안을 ledger 기반으로 관리합니다. `health`는 7일/30일 추세, golden coverage, 실패 이유, pending proposal을 요약합니다. 제안은 자동 적용하지 않고 `runtime/proposals/skill-lifecycle/`에 쓰며, proposal 본문에는 skill path, usage/lifecycle ledger, policy source를 묶은 `Source anchors` 섹션을 남깁니다.
 - `scripts/skill-stocktake.py`: skill surface와 usage/eval/golden 상태를 보고 `keep/improve/update/merge/retire` 권고를 생성합니다. 자동 변경은 하지 않습니다.
 - `scripts/eval-all.py`: `skills/active`, `skills/_candidates`, `skills/_meta`의 golden case를 한 번에 실행합니다. golden 없는 skill은 `WARN regression_uncovered`로 보고합니다.
 - `scripts/cost-log.py`: `state/cost-log.jsonl` 비용 이벤트를 추가, 검증, 요약합니다.
@@ -132,7 +142,7 @@ python3 scripts/search-activity-log.py --contains "rotation lock" --last 5
 - 런타임 소유 설정은 수정하지 않습니다.
 ## 2026-04-29 skeleton upgrade automation
 
-- `scripts/upgrade-from-skeleton.py` plans or applies safe skeleton updates to existing projects.
+- `scripts/upgrade-from-skeleton.py` plans or applies safe skeleton updates to existing projects. Brief output includes the current release id, channel, source commit, and release summary.
 - Default mode is dry-run and prints what would be added, skipped, or reviewed.
 - `--apply --safe-only` copies only missing safe files, such as templates and README files.
 - Existing files with different content are reported as risky and are not overwritten in safe-only mode.
@@ -172,7 +182,7 @@ python3 scripts/search-activity-log.py --contains "rotation lock" --last 5
 
 ## 2026-04-30 copied-source ledger
 
-- `scripts/reference-copy-ledger.py` records actual copied-source provenance in `runtime/reference-copy-ledger.jsonl`.
+- `scripts/reference-copy-ledger.py` records actual copied-source provenance in `runtime/reference-copy-ledger.jsonl`. `check --strict-source-anchor` additionally requires copied-source records to point back to a concrete candidate card and reference-adoption proposal.
 - This is an agent responsibility, not a user chore. When an agent copies open-source code into local files, the same agent must run `add`, then run `check` and `security-scan.py --strict` before closing the task.
 - Use `list` only for inspection and handoff review.
 - Each record stores source URL, license, revision, source path, local path, copy boundary, and whether redistribution needs a fresh review.
@@ -182,6 +192,7 @@ python3 scripts/search-activity-log.py --contains "rotation lock" --last 5
 python3 scripts/reference-copy-ledger.py add --source-url https://github.com/example/project --license MIT --revision abc123 --source-path src/helper.py --local-path scripts/helper.py --copy-boundary "single helper only"
 python3 scripts/reference-copy-ledger.py list
 python3 scripts/reference-copy-ledger.py check
+python3 scripts/reference-copy-ledger.py check --strict-source-anchor
 ```
 
 - `scripts/security-scan.py` reports a MEDIUM governance finding when a `copy` or `partial_copy` artifact has no matching ledger record.
@@ -191,7 +202,7 @@ python3 scripts/reference-copy-ledger.py check
 - `scripts/agent-autonomy-check.py --strict` prevents the skeleton from drifting back to "user runs the command" language.
 - `scripts/task-closeout.py` is the preferred final gate for agent work. It chooses checks from changed paths or an explicit profile and can record evidence.
 - `auto` closeout uses `scripts-fast` for script/test path edits: skeleton verification, changed-file compile checks, and focused unittest modules. Explicit `scripts` and `all` remain the heavier final gates.
-- `runtime/completion-evidence.jsonl` is written by agents, not users. It records the goal, changed paths, validations, outcome, residual risk, and next action.
+- `runtime/completion-evidence.jsonl` is written by agents, not users. It records the goal, changed paths, validations, outcome, residual risk, next action, and optional `plan_id` when closeout evidence is tied to `plans/active` or `plans/done`.
 - `runtime/checkpoints.jsonl` stores named mid-task checkpoints. It is not a replacement for closeout evidence.
 - `scripts/security-scan.py` supports `rules/security-scan-allowlist.json` for justified known findings. Suppressed findings are counted separately in JSON output.
 - `scripts/resume-readiness.py --strict` checks that handoff, activity log, and completion evidence are aligned before another agent resumes.
@@ -208,6 +219,7 @@ python3 scripts/reference-copy-ledger.py check
 
 - `runtime/install-state.jsonl` records bootstrap and convert events.
 - `runtime/skill-usage.jsonl` and `runtime/skill-lifecycle.jsonl` are the source for skill success rates and promotion/demotion proposals.
+- Skill lifecycle proposals include a `Source anchors` section so promotion/demotion recommendations remain tied to concrete local ledgers and policy thresholds.
 - `scripts/eval-all.py` is connected to `quality-gate.py`; missing goldens are warnings at first, not failures.
 - `state/cost-log.jsonl` is validated by `scripts/cost-log.py`.
 - `runtime/session-snapshot.json` gives the next agent a machine-readable resume surface.

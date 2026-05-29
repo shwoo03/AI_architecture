@@ -51,6 +51,7 @@ system_defaults:
     - scripts/source-recovery.py
     - scripts/upgrade-from-skeleton.py
     - scripts/task-closeout.py
+    - scripts/dialogue-lint.py
     - scripts/validate-plans.py
     - scripts/validate-reference-proposals.py
     - scripts/feature-status.py
@@ -163,6 +164,8 @@ system_defaults:
     - pattern: scripts/upgrade-from-skeleton.py
       owner: system_owned
     - pattern: scripts/task-closeout.py
+      owner: system_owned
+    - pattern: scripts/dialogue-lint.py
       owner: system_owned
     - pattern: scripts/lib_ownership.py
       owner: system_owned

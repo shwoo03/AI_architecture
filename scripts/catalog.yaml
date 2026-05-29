@@ -91,6 +91,10 @@ internal:
       used_by: approved partial-copy absorption
     - path: scripts/refresh-references.py
       used_by: reference refresh workflow
+    - path: scripts/dialogue-lint.py
+      used_by: agent-flow subagent debate planning ledger validation
+    - path: scripts/goal-prompt-check.py
+      used_by: validating Codex CLI /goal prompt length before handing prompts to the user
 
   decision:
     - path: scripts/review-queue.py
@@ -135,6 +139,10 @@ internal:
       used_by: schema-backed contract validation
     - path: scripts/feature-status.py
       used_by: maturity tier manifest validation and tier-aware quality gates
+    - path: scripts/release-manifest.py
+      used_by: versioned skeleton release manifests for upgrade briefs and adoption intake
+    - path: scripts/surface-bloat-audit.py
+      used_by: read-only skills/agents surface bloat audit before cleanup or broad skeleton upgrades
     - path: scripts/markdown-sanitize.py
       used_by: generated Markdown/frontmatter drift detection
     - path: scripts/failure-classify.py
@@ -208,6 +216,8 @@ internal:
       used_by: canonical artifact generation
     - path: scripts/upgrade-from-skeleton.py
       used_by: skeleton upgrades and agent-flow adopt dry-run intake
+    - path: scripts/lib_release_manifest.py
+      used_by: release-manifest.py, upgrade-from-skeleton.py, and agent-flow adopt release provenance
     - path: scripts/ownership-lock.py
       used_by: ownership-aware upgrade self-classification lock generation
     - path: scripts/ownership-initialize.py

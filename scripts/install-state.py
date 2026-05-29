@@ -47,6 +47,15 @@ class InstallStateRecord:
     generated_paths: list[str] = field(default_factory=list)
     preserved_paths: list[str] = field(default_factory=list)
     validation_status: str = "unverified"
+    release_id: str | None = None
+    channel: str | None = None
+    previous_release_id: str | None = None
+    release_manifest_path: str | None = None
+    release_manifest_sha256: str | None = None
+    skeleton_revision: str | None = None
+    applied_paths: list[str] = field(default_factory=list)
+    manual_review_paths: list[str] = field(default_factory=list)
+    applied_migrations: list[str] = field(default_factory=list)
 
 
 def repo_root() -> Path:
@@ -150,6 +159,24 @@ def validate_record(record: dict[str, Any], index: int) -> list[str]:
     for field_name in ("skeleton_version", "source_commit"):
         if field_name in record and record.get(field_name) is not None and not isinstance(record.get(field_name), str):
             findings.append(f"{label} field `{field_name}` must be string or null")
+    for field_name in (
+        "release_id",
+        "channel",
+        "previous_release_id",
+        "release_manifest_path",
+        "release_manifest_sha256",
+        "skeleton_revision",
+    ):
+        if field_name in record and record.get(field_name) is not None and not isinstance(record.get(field_name), str):
+            findings.append(f"{label} field `{field_name}` must be string or null")
+    if record.get("channel") not in (None, "stable", "preview", "edge"):
+        findings.append(f"{label} field `channel` must be one of: stable, preview, edge")
+    for field_name in ("applied_paths", "manual_review_paths", "applied_migrations"):
+        value = record.get(field_name)
+        if field_name in record and not isinstance(value, list):
+            findings.append(f"{label} field `{field_name}` must be a list")
+        elif isinstance(value, list) and not all(isinstance(item, str) for item in value):
+            findings.append(f"{label} field `{field_name}` must contain strings")
     return findings
 
 
@@ -172,6 +199,15 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         generated_paths=args.generated_path or [],
         preserved_paths=args.preserved_path or [],
         validation_status=args.validation_status,
+        release_id=args.release_id or None,
+        channel=args.channel or None,
+        previous_release_id=args.previous_release_id or None,
+        release_manifest_path=args.release_manifest_path or None,
+        release_manifest_sha256=args.release_manifest_sha256 or None,
+        skeleton_revision=args.skeleton_revision or None,
+        applied_paths=args.applied_path or [],
+        manual_review_paths=args.manual_review_path or [],
+        applied_migrations=args.applied_migration or [],
     )
     findings = validate_record(asdict(record), 1)
     if findings:
@@ -262,6 +298,15 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--generated-path", action="append", default=[])
     add.add_argument("--preserved-path", action="append", default=[])
     add.add_argument("--validation-status", default="unverified")
+    add.add_argument("--release-id", default="")
+    add.add_argument("--channel", choices=("", "stable", "preview", "edge"), default="")
+    add.add_argument("--previous-release-id", default="")
+    add.add_argument("--release-manifest-path", default="")
+    add.add_argument("--release-manifest-sha256", default="")
+    add.add_argument("--skeleton-revision", default="")
+    add.add_argument("--applied-path", action="append", default=[])
+    add.add_argument("--manual-review-path", action="append", default=[])
+    add.add_argument("--applied-migration", action="append", default=[])
     add.add_argument("--ts", default="")
     add.set_defaults(func=cmd_add)
 

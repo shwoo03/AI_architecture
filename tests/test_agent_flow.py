@@ -1037,12 +1037,64 @@ class AgentFlowTests(unittest.TestCase):
             self.assertEqual(payload["status"], "prepared")
             self.assertEqual(payload["handoffs"][0]["role"], "docs-sync-auditor")
             self.assertTrue((tmp / payload["handoffs"][0]["brief_path"]).is_file())
+            brief = json.loads((tmp / payload["handoffs"][0]["brief_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(brief["parent_plan"], preview_payload["plan_path"])
+            self.assertEqual(brief["policy_inheritance"]["parent_role"], "agent-flow.specialist")
+            self.assertEqual(brief["policy_inheritance"]["inherited_write_policy"], "manual_work_required")
             records = self._specialist_usage_records(tmp)
             self.assertEqual(records[0]["event_type"], "preview_created")
             self.assertEqual(records[-1]["event_type"], "delegation_execute_prepared")
             self.assertEqual(records[-1]["outcome"], "prepared")
             self.assertTrue(records[-1]["confirmed"])
             self.assertEqual(records[-1]["handoff_paths"], [item["brief_path"] for item in payload["handoffs"]])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_specialist_execute_preflight_rejects_unsupported_plan_before_brief_write(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            preview = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "preview",
+                    "--goal",
+                    "context isolation docs migration review",
+                    "--approve",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+            preview_payload = json.loads(preview.stdout)
+            plan_path = tmp / preview_payload["plan_path"]
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["auto_chain"] = True
+            plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "execute",
+                    "--plan",
+                    preview_payload["plan_path"],
+                    "--confirm",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("delegation preflight failed", result.stderr)
+            self.assertIn("unsupported delegation plan field", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-briefs").exists())
+            records = self._specialist_usage_records(tmp)
+            self.assertEqual(records[-1]["event_type"], "delegation_execute_blocked")
+            self.assertEqual(records[-1]["outcome"], "blocked")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -1101,6 +1153,53 @@ class AgentFlowTests(unittest.TestCase):
             self.assertEqual(unit["expected_result_schema"]["ledger"], "runtime/agent-runs.jsonl")
             self.assertTrue(unit["requires_individual_confirmation"])
             self.assertFalse(unit["recursive_delegation_allowed"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_specialist_packet_preflight_rejects_policy_broadening_before_artifacts(self) -> None:
+        tmp = self._prepare_specialist_root()
+        try:
+            preview = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "preview",
+                    "--goal",
+                    "context isolation docs migration review",
+                    "--approve",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+            preview_payload = json.loads(preview.stdout)
+            plan_path = tmp / preview_payload["plan_path"]
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            role = plan["selected_roles"][0]
+            plan["write_policy"][role] = "manual_work_required"
+            plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "specialist",
+                    "packet",
+                    "--plan",
+                    preview_payload["plan_path"],
+                    "--confirm",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("delegation preflight failed", result.stderr)
+            self.assertIn("broadens specialist policy", result.stderr)
+            self.assertFalse((tmp / "runtime" / "agent-briefs").exists())
+            self.assertFalse((tmp / "runtime" / "spawn-packets").exists())
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -1431,6 +1530,44 @@ class AgentFlowTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_closeout_passes_plan_id_to_task_closeout(self) -> None:
+        tmp = self._tmp_root("closeout-plan-id")
+        try:
+            scripts = tmp / "scripts"
+            scripts.mkdir()
+            (scripts / "task-closeout.py").write_text(
+                "import json, sys\n"
+                "from pathlib import Path\n"
+                "Path('task-argv.json').write_text(json.dumps(sys.argv), encoding='utf-8')\n"
+                "print('{\"recorded\": true}')\n"
+                "raise SystemExit(0)\n",
+                encoding="utf-8",
+            )
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "closeout",
+                    "--goal",
+                    "plan id closeout",
+                    "--changed-path",
+                    "docs/example.md",
+                    "--profile",
+                    "docs",
+                    "--plan-id",
+                    "0033-plan-id-evidence-trace",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            task_argv = json.loads((tmp / "task-argv.json").read_text(encoding="utf-8"))
+            self.assertIn("--plan-id", task_argv)
+            self.assertIn("0033-plan-id-evidence-trace", task_argv)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_closeout_auto_script_change_uses_fast_profile(self) -> None:
         tmp = self._tmp_root("closeout-scripts-fast")
         try:
@@ -1697,7 +1834,7 @@ class AgentFlowTests(unittest.TestCase):
             self._init_clean_git_target(target)
             (target / "runtime").mkdir()
             (target / "runtime" / "install-state.jsonl").write_text(
-                '{"event":"convert_completed","source_commit":"abcdef1234567890","validation_status":"verified"}\n'
+                '{"event":"skeleton_release_applied","source_commit":"abcdef1234567890","validation_status":"verified","release_id":"skeleton-stable-abcdef123456","channel":"stable","manual_review_paths":["AGENTS.md"],"applied_migrations":["mig-001"]}\n'
                 '{"event":"old_entry_without_new_keys"}\n',
                 encoding="utf-8",
             )
@@ -1710,6 +1847,9 @@ class AgentFlowTests(unittest.TestCase):
             self.assertEqual(payload["install_state"]["records"], 2)
             self.assertEqual(payload["install_state"]["latest_event"], "old_entry_without_new_keys")
             self.assertEqual(payload["skeleton_source_commit_previous"], "abcdef123456")
+            self.assertEqual(payload["install_state"]["latest_release_id"], "skeleton-stable-abcdef123456")
+            self.assertEqual(payload["install_state"]["latest_channel"], "stable")
+            self.assertEqual(payload["skeleton_release_in_target"], "skeleton-stable-abcdef123456")
             self.assertEqual(payload["skeleton_source_commit_current"], payload["skeleton_revision_current"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -1869,6 +2009,306 @@ class AgentFlowTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             names = [item["name"] for item in json.loads(result.stdout)["commands"]]
             self.assertIn("diff-quality-gate", names)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_dialogue_lifecycle_converges_after_resolved_subagent_block(self) -> None:
+        tmp = self._tmp_root("dialogue")
+        try:
+            self._copy_scripts(tmp, ["dialogue-lint.py"])
+            start = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "start",
+                    "--task",
+                    "Task A planning",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+            dialogue_path = json.loads(start.stdout)["dialogue_path"]
+
+            claim = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "add-turn",
+                    "--dialogue",
+                    dialogue_path,
+                    "--from",
+                    "codex",
+                    "--provider",
+                    "codex",
+                    "--kind",
+                    "claim",
+                    "--content",
+                    "Implement ledger and validator only.",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(claim.returncode, 0, claim.stdout + claim.stderr)
+            claim_id = json.loads(claim.stdout)["record"]["turn_id"]
+
+            critique = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "add-turn",
+                    "--dialogue",
+                    dialogue_path,
+                    "--from",
+                    "subagent-critic",
+                    "--provider",
+                    "subagent",
+                    "--kind",
+                    "critique",
+                    "--targets-claim-id",
+                    claim_id,
+                    "--severity",
+                    "block",
+                    "--evidence",
+                    "plans/active/0001-subagent-debate-workflow-replaces-claude-auto-di.md",
+                    "--content",
+                    "Fallback must be labeled and implementation scope must be frozen.",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(critique.returncode, 0, critique.stdout + critique.stderr)
+            critique_id = json.loads(critique.stdout)["record"]["turn_id"]
+
+            blocked = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "converge",
+                    "--dialogue",
+                    dialogue_path,
+                    "--ready-by",
+                    "codex",
+                    "--ready-by",
+                    "subagent-critic",
+                    "--scope-summary",
+                    "first slice only",
+                    "--allow-path",
+                    "scripts/dialogue-lint.py",
+                    "--allow-action",
+                    "add validator",
+                    "--forbid-action",
+                    "auto-run Claude",
+                    "--validation",
+                    "python3 scripts/dialogue-lint.py <dialogue>",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(blocked.returncode, 2)
+            self.assertIn("unresolved block", blocked.stderr)
+
+            concession = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "add-turn",
+                    "--dialogue",
+                    dialogue_path,
+                    "--from",
+                    "codex",
+                    "--provider",
+                    "codex",
+                    "--kind",
+                    "concession",
+                    "--targets-claim-id",
+                    critique_id,
+                    "--resolution",
+                    "resolved",
+                    "--content",
+                    "Scope narrowed and fallback labeling is mandatory.",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(concession.returncode, 0, concession.stdout + concession.stderr)
+
+            converge = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "converge",
+                    "--dialogue",
+                    dialogue_path,
+                    "--ready-by",
+                    "codex",
+                    "--ready-by",
+                    "subagent-critic",
+                    "--scope-summary",
+                    "first slice only",
+                    "--allow-path",
+                    "scripts/dialogue-lint.py",
+                    "--allow-path",
+                    "scripts/agent-flow.py",
+                    "--allow-action",
+                    "add subagent debate commands",
+                    "--forbid-action",
+                    "auto-run Claude",
+                    "--validation",
+                    "python3 scripts/dialogue-lint.py <dialogue>",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(converge.returncode, 0, converge.stdout + converge.stderr)
+            payload = json.loads(converge.stdout)
+            self.assertTrue(payload["lint"]["converged"])
+            self.assertEqual(payload["lint"]["open_blocks"], [])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_dialogue_rejects_claude_as_participant(self) -> None:
+        tmp = self._tmp_root("dialogue-claude-removed")
+        try:
+            self._copy_scripts(tmp, ["dialogue-lint.py"])
+            start = _run([str(self.SCRIPT), "--root", str(tmp), "dialogue", "start", "--task", "Task A", "--format", "json"])
+            self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+            dialogue_path = json.loads(start.stdout)["dialogue_path"]
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "add-turn",
+                    "--dialogue",
+                    dialogue_path,
+                    "--from",
+                    "claude",
+                    "--provider",
+                    "manual",
+                    "--kind",
+                    "claim",
+                    "--content",
+                    "Claude should not be a dialogue participant.",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("invalid choice", result.stderr)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_dialogue_subagent_turn_records_debate_policy(self) -> None:
+        tmp = self._tmp_root("dialogue-subagent-policy")
+        try:
+            self._copy_scripts(tmp, ["dialogue-lint.py"])
+            start = _run([str(self.SCRIPT), "--root", str(tmp), "dialogue", "start", "--task", "Task A", "--format", "json"])
+            self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+            start_payload = json.loads(start.stdout)
+            self.assertTrue(start_payload["record"]["policy"]["claude_auto_debate_disabled"])
+            self.assertFalse(start_payload["record"]["policy"]["nested_subagents_allowed"])
+            dialogue_path = start_payload["dialogue_path"]
+
+            claim = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "add-turn",
+                    "--dialogue",
+                    dialogue_path,
+                    "--from",
+                    "codex",
+                    "--provider",
+                    "codex",
+                    "--kind",
+                    "claim",
+                    "--content",
+                    "Propose a narrow implementation plan.",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(claim.returncode, 0, claim.stdout + claim.stderr)
+            claim_id = json.loads(claim.stdout)["record"]["turn_id"]
+
+            critique = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "add-turn",
+                    "--dialogue",
+                    dialogue_path,
+                    "--from",
+                    "subagent-verifier",
+                    "--provider",
+                    "subagent",
+                    "--kind",
+                    "critique",
+                    "--targets-claim-id",
+                    claim_id,
+                    "--severity",
+                    "risk",
+                    "--content",
+                    "The plan needs one stronger validation check.",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(critique.returncode, 0, critique.stdout + critique.stderr)
+            record = json.loads(critique.stdout)["record"]
+            self.assertEqual(record["from"], "subagent-verifier")
+            self.assertEqual(record["provider"], "subagent")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_dialogue_rejects_subagent_manual_provider(self) -> None:
+        tmp = self._tmp_root("dialogue-subagent-manual-provider")
+        try:
+            self._copy_scripts(tmp, ["dialogue-lint.py"])
+            start = _run([str(self.SCRIPT), "--root", str(tmp), "dialogue", "start", "--task", "Task A", "--format", "json"])
+            self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+            dialogue_path = json.loads(start.stdout)["dialogue_path"]
+            result = _run(
+                [
+                    str(self.SCRIPT),
+                    "--root",
+                    str(tmp),
+                    "dialogue",
+                    "add-turn",
+                    "--dialogue",
+                    dialogue_path,
+                    "--from",
+                    "subagent-critic",
+                    "--provider",
+                    "manual",
+                    "--kind",
+                    "claim",
+                    "--content",
+                    "Manual should not impersonate a subagent result.",
+                    "--format",
+                    "json",
+                ]
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("subagent participants require provider=subagent", result.stderr)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

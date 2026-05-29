@@ -104,8 +104,8 @@ On-demand specialist 흐름은 `scripts/agent-flow.py specialist ...` 하위 명
 - `specialist propose`는 concrete trigger가 있는 경우에만 `runtime/proposals/specialists/*.json`에 `SpecialistProposal`을 만듭니다.
 - `specialist approve --apply-overlay`는 승인된 proposal을 `config/agent-team-overrides.yaml` 입력으로 반영합니다.
 - `specialist preview`는 goal 기준 `DelegationPlan`을 `runtime/delegation-plans/*.json`에 만들며, specialist가 필요 없으면 `selected_roles: []`를 허용합니다.
-- `specialist execute`는 approved `DelegationPlan`과 명시적 `--confirm`이 있을 때만 기존 incubating delegate handoff를 준비합니다. 이 명령은 subagent를 자동 spawn하지 않고 `agent-flow-delegate.py`가 반환하는 AgentBrief/handoff evidence를 노출합니다.
-- `specialist packet`은 approved `DelegationPlan`과 명시적 `--confirm`으로 harness-agnostic `runtime/spawn-packets/*.json`을 만듭니다. Packet은 외부 runtime이 읽는 준비물일 뿐이며 자동 spawn, 자동 chain, recursive delegation을 허용하지 않습니다.
+- `specialist execute`는 approved `DelegationPlan`, 명시적 `--confirm`, static preflight 통과가 있을 때만 기존 incubating delegate handoff를 준비합니다. 이 명령은 subagent를 자동 spawn하지 않고 `agent-flow-delegate.py`가 반환하는 AgentBrief/handoff evidence를 노출합니다.
+- `specialist packet`은 approved `DelegationPlan`, 명시적 `--confirm`, 같은 static preflight 통과로 harness-agnostic `runtime/spawn-packets/*.json`을 만듭니다. Packet은 외부 runtime이 읽는 준비물일 뿐이며 자동 spawn, 자동 chain, recursive delegation을 허용하지 않습니다.
 
 `agent-flow run --goal`은 future candidate입니다. 자동 실행 범위가 커지기 전까지는 `start`가 추천하고 에이전트가 단계별로 실행하는 구조를 유지합니다.
 

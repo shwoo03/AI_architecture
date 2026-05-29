@@ -29,6 +29,7 @@ REQUIRED_FIELDS = (
     "copy_boundary",
     "redistribution_review_required",
 )
+WEAK_SOURCE_ANCHORS = {"", "-", "TBD", "todo", "TODO", "not checked", "not applicable", "n/a", "local-reference", "external-reference", "directory"}
 
 
 @dataclass
@@ -61,6 +62,13 @@ def ledger_path(root: Path) -> Path:
 
 def is_blank(value: Any) -> bool:
     return not str(value).strip()
+
+
+def weak_source_anchor(value: Any) -> bool:
+    stripped = str(value).strip()
+    if stripped in WEAK_SOURCE_ANCHORS:
+        return True
+    return not any(char.isdigit() for char in stripped)
 
 
 def resolve_under_root(root: Path, value: str) -> Path:
@@ -127,10 +135,33 @@ def validate_record(root: Path, record: dict[str, Any], index: int) -> list[str]
     return findings
 
 
-def validate_ledger(root: Path) -> tuple[list[str], int]:
+def validate_strict_source_anchor(root: Path, record: dict[str, Any], index: int) -> list[str]:
+    label = f"record {index}"
+    findings: list[str] = []
+    if weak_source_anchor(record.get("revision", "")):
+        findings.append(f"{label} strict source anchor requires concrete `revision`")
+    if weak_source_anchor(record.get("source_path", "")):
+        findings.append(f"{label} strict source anchor requires concrete `source_path`")
+    for field in ("candidate_card", "proposal"):
+        value = str(record.get(field, "")).strip()
+        if not value:
+            findings.append(f"{label} strict source anchor requires non-blank `{field}`")
+            continue
+        try:
+            normalized = normalize_repo_path(root, value)
+        except ValueError:
+            continue
+        if not (root / normalized).is_file():
+            findings.append(f"{label} strict source anchor `{field}` target does not exist: {normalized}")
+    return findings
+
+
+def validate_ledger(root: Path, *, strict_source_anchor: bool = False) -> tuple[list[str], int]:
     records, findings = read_records(root)
     for index, record in enumerate(records, start=1):
         findings.extend(validate_record(root, record, index))
+        if strict_source_anchor:
+            findings.extend(validate_strict_source_anchor(root, record, index))
     return findings, len(records)
 
 
@@ -203,7 +234,7 @@ def cmd_list(root: Path, args: argparse.Namespace) -> int:
 
 
 def cmd_check(root: Path, args: argparse.Namespace) -> int:
-    findings, count = validate_ledger(root)
+    findings, count = validate_ledger(root, strict_source_anchor=args.strict_source_anchor)
     if findings:
         print("copied-source ledger findings:")
         for finding in findings:
@@ -248,6 +279,7 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser.set_defaults(func=cmd_list)
 
     check_parser = sub.add_parser("check", help="Validate the copied-source ledger.")
+    check_parser.add_argument("--strict-source-anchor", action="store_true", help="Require candidate/proposal anchors for copied-source records.")
     check_parser.set_defaults(func=cmd_check)
     return parser
 

@@ -32,13 +32,12 @@
 - `rules/common/**` (README 포함), `rules/languages/**` (README 포함)
 - `scripts/**/*.py` (bootstrap, wiki-lint, verify-skeleton, hooks),
   `scripts/README.md`, `scripts/bootstrap/README.md`, `scripts/hooks/README.md`
-- `codex/agents/README.md`, `codex/agents/codebase-explorer.md`,
-  `codex/agents/implementation-worker.md`, `codex/agents/independent-validator.md`,
-  `codex/agents/strategy-planner.md`
-  (개별 에이전트 파일도 canonical 소스이지만, 프로젝트가 frontmatter를 수정했다면
-  "수동 머지"로 재분류. 기본은 안전 복사.)
-- `codex/rules/**`, `codex/skills/_template/**`, `codex/skills/README.md`,
-  `codex/skills/universal/**`, `codex/workflows/_template.md`
+- `agents/README.md`, `agents/*.md`
+  (개별 에이전트 파일은 canonical 소스입니다. `.codex/agents/`와
+  `.claude/agents/`는 `scripts/convert.py`가 만드는 generated surface이므로
+  직접 편집하거나 복사 기준으로 삼지 않습니다.)
+- `rules/**`, `skills/active/**`, `skills/candidates/**`, `skills/deprecated/**`
+  (generated skill export는 `.codex/skills/`, `.claude/skills/`로 재생성합니다.)
 - `examples/**` (참고용 예시, 프로젝트 고유 상태 아님)
 - `CLAUDE.md`, `AGENTS.md`, `README.md`, `.editorconfig`
 - `docs/README.md`, `docs/PROJECT_PROFILE.template.md`,
@@ -55,10 +54,11 @@
 - `knowledge/index.md`: 스켈레톤의 인덱스 규칙이 바뀌면 규칙 섹션만 병합. K 항목은 프로젝트 것이므로 유지.
 - `.claude/settings.local.json`: 프로젝트가 승인한 권한 유지. 스키마가 바뀌면 병합.
 - `.claude/settings.json` (있는 경우): 프로젝트 공용 훅/권한은 유지. 스켈레톤이 훅 필드를 추가했다면 병합.
-- `codex/agents/*.md`(개별 에이전트): 역할 frontmatter 필드가 늘어나면 추가만.
+- `agents/*.md`(개별 에이전트): 역할 frontmatter 필드가 늘어나면 추가만.
   프로젝트가 해당 파일을 수정하지 않았다면 "안전 복사" 영역에서 덮어써도 됨.
-- `.claude/skills/*`, `codex/skills/*` (프로젝트 스킬): 스켈레톤에 같은 이름 skill이
-  새로 생기면 덮지 말고 비교 후 선택. `_template/`과 `universal/`은 제외(안전 복사).
+- `skills/active/*`, `skills/candidates/*`, `skills/deprecated/*` (프로젝트 스킬):
+  스켈레톤에 같은 이름 skill이 새로 생기면 덮지 말고 비교 후 선택.
+  `.codex/skills/*`와 `.claude/skills/*`는 generated surface라서 직접 머지하지 않습니다.
 
 ### 의도적으로 제거된 경로 (재생성 금지)
 
@@ -147,11 +147,32 @@
 {"ts":"<ISO8601 UTC>","phase":"maintenance","action":"skeleton_upgraded","project":"<name>","goal_lineage":["maintenance","<project>","follow skeleton improvements"],"data":{"from_commit":"<old>","to_commit":"<new>","regions_touched":["safe_copy","manual_merge"]}}
 ```
 
-## 버전 마커와 스키마 호환성
+## 릴리스 manifest와 스키마 호환성
 
-현재 스켈레톤은 명시적 `skeleton_version` 또는 `schema_version` 필드를 파일에 쓰지 **않습니다**. 의도적입니다 — 매 편집마다 버전을 올리면 유지보수 비용이 높고, 스켈레톤은 완전히 새로 복사하는 방식(또는 이 문서의 절차)으로 드리프트를 잡습니다. 대신 아래 규약을 따릅니다.
+반복 업그레이드의 기준점은 "현재 최신"이 아니라 **구체적인 release manifest**입니다. `scripts/release-manifest.py generate --channel stable --format json`은 현재 skeleton tree에서 `schema_version`, `release_id`, `source_commit`, `channel`, `feature_profile`, component summary, 파일 hash 목록, 제거된 경로, 검증 명령을 가진 manifest를 만듭니다.
+
+`components`는 파일 diff를 `core`, `validation`, `runtime`, `reference`, `wiki`, `skills`, `agents`, `docs`, `bootstrap` 같은 install/upgrade 묶음으로 요약합니다. 각 component는 포함 파일 수, byte 수, 연결된 feature id, 필요한 check, ownership action 분포, generated artifact policy를 갖습니다. generated artifact policy는 `.codex/`, `.claude/`, `.mcp.json`, `CLAUDE.md`처럼 canonical source에서 재생성되는 대상의 source, target, 재생성 명령, parity check, 직접 편집 금지를 component 하위 필드로 노출합니다.
+
+`scripts/upgrade-from-skeleton.py --brief --profile stable --format json`은 파일 목록과 함께 `component_diff`를 출력합니다. 이 값은 component별 `safe_additions`, `manual_reviews`, `risky_reviews`, `protected_skips`, `approval_required`, `sample_paths`, `generated_artifact_policy`를 보여주므로, 구버전 뼈대가 들어간 프로젝트를 업그레이드할 때 "어떤 기능 묶음이 안전 적용이고 어떤 묶음이 수동 검토인지"를 먼저 판단할 수 있습니다.
+
+업그레이드 전후에 skill/agent 표면이 비대해졌는지 볼 때는 `scripts/surface-bloat-audit.py --format json`을 사용합니다. 이 도구는 duplicate, orphan, deprecated-but-generated, generated parity mismatch 같은 기계적으로 확인 가능한 신호만 보고하며, skill/agent 삭제·승격·강등은 자동으로 수행하지 않습니다.
+
+`scripts/skill-surface-check.py`와 `scripts/surface-bloat-audit.py`는 역할이 다릅니다. `skill-surface-check.py`는 canonical source와 generated surface의 일관성을 확인하는 lint/verify용 검사이고, `surface-bloat-audit.py`는 정리 후보를 찾는 read-only advisory 도구입니다. 전자는 parity 문제를 막는 게 목적이고, 후자는 삭제나 demotion 결정을 자동 실행하지 않습니다.
+
+채널은 세 단계입니다.
+
+- `stable`: 기존 프로젝트에 기본으로 제안되는 채널입니다. `docs/feature-status.yaml`에서 `tier=stable`, `delivery=overlay`, `overlay_default=true`인 항목만 포함합니다. stable 안에서도 `stable_role=core`는 운영 뼈대이고 `stable_role=advisory`는 비차단 보조 도구입니다.
+- `preview`: incubating 항목까지 보여주되 dry-run 검토가 기본입니다. v2 specialist runtime 계열은 `delivery=frozen_optional`로 표시해 검토 대상임을 드러내고 stable overlay에는 넣지 않습니다.
+- `edge`: experimental 항목까지 manifest에 표시할 수 있지만 `delivery=decision_only` 항목은 overlay/apply 대상이 아닙니다.
+
+`scripts/upgrade-from-skeleton.py --brief --profile stable --format json`은 현재 release id, source commit, channel, file count를 함께 출력합니다. `--apply --safe-only`가 실제로 파일을 추가하면 `runtime/install-state.jsonl`에 `skeleton_release_applied` 이벤트를 append합니다. 이 이벤트는 기존 필드를 유지하면서 `release_id`, `channel`, `previous_release_id`, `applied_paths`, `manual_review_paths`, `applied_migrations`를 optional field로 남깁니다.
+
+기존 프로젝트가 아직 release id를 모르는 오래된 install-state를 갖고 있어도 업그레이드는 멈추지 않습니다. 읽는 쪽은 먼저 `release_id`를 찾고, 없으면 기존 `source_commit`/`skeleton_revision` fallback으로 이전 기준점을 추론합니다.
+
+기본 호환성 규약은 아래와 같습니다.
 
 - **기준점은 git 커밋 해시**: 스켈레톤은 자체 git 저장소이므로 "어느 커밋에서 부트스트랩했는지"를 프로젝트가 `runtime/activity-log.jsonl`의 bootstrap 이벤트에 기록하거나 `docs/PROJECT_PROFILE.md`의 `created_at` 근처에 메모합니다.
+- **릴리스 기준점은 release id**: 새 업그레이드 이벤트는 `release_id`와 `source_commit`을 함께 기록합니다. release id가 있으면 사람이 "어느 skeleton release로 따라왔는지"를 바로 알 수 있고, source commit은 hash 검증과 재현에 씁니다.
 - **활동 로그 스키마 변경 시**: `docs/RUNTIME_EVENT_SCHEMA.md`가 canonical 정의입니다. 필드가 추가되기만 하고 기존 필드 의미는 유지된다는 것이 현재 규약입니다. 기존 로그 라인은 읽을 때 누락 필드를 `null`로 취급합니다. 기존 필드의 의미가 바뀌면 새 `action` 이름을 도입하고 옛 필드는 유지합니다. 읽는 쪽은 `ts`/`action`/`phase` 기반으로 필터해서 혼용을 처리합니다.
 - **스킬/에이전트 frontmatter 스키마**: 필드는 추가만, 제거 금지. `verify-skeleton.py`의 `AGENT_REQUIRED_FIELDS`가 현재 필수 집합입니다. 이 집합이 늘면 기존 프로젝트의 에이전트 파일에 수동 병합이 필요하므로, 확장 시 이 문서와 `AGENT_REGISTRY.md`에 동시 기재합니다.
 
@@ -185,7 +206,8 @@
 - Core config and contracts: `config/roles.yaml`, `config/policy.yaml`, `config/agent-team.yaml`, `config/install-profiles.yaml`, `runtime/AGENTS.md`.
 - Rules and schemas: `rules/common/`, `rules/languages/`, `schemas/`.
 - Stable docs: `docs/OPERATING_LOOP.md`, `docs/SESSION_CONTINUITY.md`, `docs/RUNTIME_EVENT_SCHEMA.md`, `docs/SKELETON_UPGRADE.md`, `docs/WORKFLOW_CATALOG.md`, `docs/FEATURE_DECISION_GUIDE.md`, `docs/AGENT_REGISTRY.md`, `docs/DOCUMENTATION_STYLE_GUIDE.md`.
-- Canonical role/skill sources: `agents/`, `codex/agents/`, `codex/rules/`, `skills/`.
+- Canonical role/skill/rule sources: `agents/`, `skills/active/`, `skills/candidates/`, `skills/deprecated/`, `rules/`, `mcp/servers.yaml`, `AGENTS.md`.
+- Generated surfaces: `.codex/`, `.claude/`, `.mcp.json`, `CLAUDE.md`. 이 경로들은 `scripts/convert.py`와 parity check로 재생성·검증하며 직접 편집하거나 overlay 기준으로 삼지 않습니다.
 
 The safe bundle is still missing-file only. Existing target files with different content remain `update_available:risky` or `review:manual` and require explicit approval.
 

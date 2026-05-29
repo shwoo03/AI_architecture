@@ -1,8 +1,8 @@
 # Codemap: runtime
 
-- `files`: 29
-- `line_count`: 7294
-- `directories`: 9
+- `files`: 30
+- `line_count`: 7609
+- `directories`: 10
 
 ## Navigation Entry Points
 
@@ -12,6 +12,7 @@
 
 - `runtime`
 - `runtime/agent-briefs`
+- `runtime/agent-run-validator-pass-bb98e80d48034c51b0c351c600383add/runtime/agent-briefs`
 - `runtime/proposals`
 - `runtime/proposals/reference-adoption`
 - `runtime/proposals/skill-lifecycle`
@@ -28,6 +29,7 @@
 - `runtime/agent-briefs/2026-05-13-phase-1b-agent-run-docs-sync-auditor-01.json`
 - `runtime/agent-briefs/2026-05-14-adhoc-docs-sync-auditor-01.json`
 - `runtime/agent-briefs/2026-05-14-adhoc-docs-sync-auditor-02.json`
+- `runtime/agent-run-validator-pass-bb98e80d48034c51b0c351c600383add/runtime/agent-briefs/2026-05-29-0008-agent-run-docs-sync-auditor-01.json`
 - `runtime/ai-architecture-overlay-audit-prompt.md`
 - `runtime/ownership-classification.lock.json`
 - `runtime/proposals/README.md`

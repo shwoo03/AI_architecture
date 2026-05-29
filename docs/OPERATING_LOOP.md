@@ -32,11 +32,17 @@ AI 프로젝트에서 가장 흔한 실패는 검증 없이 구현이 커지는 
 
 프로필과 명세를 바탕으로 가장 작은 실행 단위를 정합니다. 필요한 워크플로와 에이전트 역할을 고르고, 권한과 쓰기 범위를 확인합니다. 기본 에이전트 네 개는 canonical `agents/`에 정의되어 있습니다: `strategy-planner`(계획·트레이드오프), `codebase-explorer`(읽기 전용 조사), `implementation-worker`(배정 범위 구현), `independent-validator`(독립 검증). Codex/Claude 산출물은 `scripts/convert.py`로 생성합니다.
 
+사용자가 `goal 프롬프트`를 요청하면 계획 산출물은 Codex CLI `/goal`에 넣을 짧은 프롬프트입니다. 이 프롬프트는 4000자 이하이어야 하며, 넘칠 경우 상세 계획을 문서로 분리하고 `/goal`은 해당 문서를 가리키는 진입점으로 작성합니다.
+
+비판적 토론이 필요한 계획은 Claude 자동 토론이 아니라 subagent debate로 진행합니다. 이 방식은 사용자가 명시적으로 요청했거나, 범위가 크거나, 되돌리기 어렵거나, 근거 충돌이 있는 작업에 사용합니다. 일반적인 작은 수정은 평소처럼 Codex가 짧은 계획과 검증으로 진행합니다. Codex는 user-facing orchestrator로 남고, 서브 에이전트는 독립적인 비판·조사·검증 관점만 제공합니다. 토론 기록이 필요한 경우 `runtime/dialogues/*.jsonl`에 claim, critique, concession, convergence를 남기며, convergence는 Codex와 최소 1개 `subagent-*` readiness 및 열린 block critique 없음이 조건입니다.
+
 다음 단계 조건: 가장 싼 검증 방법이 먼저 문서화되어야 합니다.
 
 ### 4. 실행
 
 가장 작은 유용한 결과물을 만듭니다. 작업 범위를 넘기지 않고, 필요한 경우 에이전트 역할을 나누며, 반복 실행은 목표 계보와 실행 로그를 남깁니다.
+
+기존 프로젝트의 구버전 뼈대를 최신화할 때는 release manifest 기준으로 진행합니다. `agent-flow adopt`로 read-only intake를 먼저 보고, `upgrade-from-skeleton --brief --profile stable`로 release id/source commit/channel과 변경 후보를 확인한 뒤, 승인된 `--apply --safe-only`만 자동 적용합니다. manual/risky 항목은 path별 승인 전까지 preserve 후보로 둡니다.
 
 다음 단계 조건: 테스트할 수 있는 결과물이 있어야 하고, 주요 변경이 활동 로그에 기록되어야 합니다.
 

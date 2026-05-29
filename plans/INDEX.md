@@ -36,3 +36,13 @@
 | 0027 | enki-manual-risky-system-review | done | 2026-05-17 | 0 | 0026 baseline and safe apply |
 | 0028 | closeout-wrapper-timing | done | 2026-05-17 | 0 | ENKI migration follow-up performance evidence |
 | 0029 | adoption-semantics-install-state | done | 2026-05-17 | 0 | 0024 adoption intake + ENKI migration follow-up semantics |
+| 0032 | codex-claude-dialogue-consensus | done | 2026-05-27 | 0 | user-approved critical planning workflow |
+| 0033 | plan-id-evidence-trace | done | 2026-05-27 | 0 | explicit plan_id trace from closeout to completion evidence |
+| 0034 | claude-strategy-critic-boundary | done | 2026-05-27 | 0 | 0032 dialogue consensus; real Claude strategy/critic only |
+| 0001 | delegation-permission-preflight-hardening | done | 2026-05-27 | 0 | follow-up to 0018/0022 delegation boundary; local plan id preserved for completion evidence |
+| 0001 | source-anchor-strict-mode | done | 2026-05-27 | 0 | adoption/proposal/copy/promotion source-anchor strict option |
+| 0001 | subagent-debate-workflow-replaces-claude-auto-di | done | 2026-05-29 | 0 | replaces Claude automatic dialogue with Codex-orchestrated subagent debate |
+| 0001 | codex-cli-goal-prompt-length-contract | done | 2026-05-29 | 0 | goal prompt means Codex CLI /goal prompt capped at 4000 chars |
+| 0001 | versioned-skeleton-release-upgrade-support | done | 2026-05-29 | 0 | release manifest and install-state provenance for repeatable skeleton upgrades |
+| 0001 | component-install-diff-surface-bloat-audit | done | 2026-05-29 | 0 | component-scoped release/upgrade review plus read-only skills/agents bloat audit |
+| 0001 | feature-boundary-cleanup | done | 2026-05-29 | 0 | canonical/generated boundary cleanup, feature delivery metadata, and install profile vocabulary alignment |

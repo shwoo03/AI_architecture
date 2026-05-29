@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from lib_catalog import load_catalog_modes_with_status as load_shared_catalog_modes_with_status
+from lib_release_manifest import build_release_manifest, release_summary
 from redact import redact_json
 
 
@@ -41,8 +42,19 @@ DELEGATION_PLAN_SCHEMA = "ai-architecture.delegation-plan.v1"
 SPECIALIST_USAGE_SCHEMA = "ai-architecture.specialist-usage.v1"
 CLOSEOUT_TIMING_SCHEMA = "ai-architecture.closeout-timing.v1"
 SPAWN_PACKET_SCHEMA = "ai-architecture.spawn-ready-packet.v1"
+DIALOGUE_SCHEMA = "ai-architecture.subagent-debate.v1"
 SPECIALIST_STATUSES = {"draft", "approved", "rejected"}
 WRITE_POLICIES = {"read_only", "manual_work_required", "write_with_confirmation"}
+WRITE_POLICY_RANK = {
+    "read_only": 0,
+    "manual_work_required": 1,
+    "write_with_confirmation": 2,
+}
+DIALOGUE_PARTICIPANTS = {"codex", "subagent-critic", "subagent-researcher", "subagent-verifier", "human"}
+DIALOGUE_PROVIDERS = {"codex", "subagent", "manual"}
+DIALOGUE_KINDS = {"claim", "critique", "concession", "unresolved"}
+DIALOGUE_SEVERITIES = {"info", "risk", "block"}
+DIALOGUE_RESOLUTIONS = {"resolved", "accepted_as_risk"}
 ON_DEMAND_TRIGGERS: dict[str, tuple[str, ...]] = {
     "context_isolation": ("context isolation", "context bloat", "many files", "logs", "research", "조사", "분석", "컨텍스트", "로그"),
     "parallel_work": ("parallel", "independent", "fan out", "병렬", "독립"),
@@ -357,6 +369,10 @@ def spawn_packet_dir(root: Path) -> Path:
     return root / "runtime" / "spawn-packets"
 
 
+def dialogue_dir(root: Path) -> Path:
+    return root / "runtime" / "dialogues"
+
+
 def specialist_usage_path(root: Path) -> Path:
     return root / "runtime" / "specialist-usage.jsonl"
 
@@ -395,6 +411,23 @@ def spawn_packet_id(root: Path) -> str:
     date_part = utc_now()[:10]
     prefix = f"spawn-{date_part}"
     return f"{prefix}-{next_json_sequence(directory, prefix):02d}"
+
+
+def next_jsonl_sequence(directory: Path, prefix: str) -> int:
+    highest = 0
+    if directory.exists():
+        for path in directory.glob(f"{prefix}-*.jsonl"):
+            suffix = path.stem.removeprefix(prefix + "-")
+            if suffix.isdigit():
+                highest = max(highest, int(suffix))
+    return highest + 1
+
+
+def dialogue_id(root: Path) -> str:
+    directory = dialogue_dir(root)
+    date_part = utc_now()[:10]
+    prefix = f"dlg-{date_part}"
+    return f"{prefix}-{next_jsonl_sequence(directory, prefix):02d}"
 
 
 def next_specialist_usage_sequence(root: Path) -> int:
@@ -439,6 +472,8 @@ def append_jsonl_file(path: Path, payload: dict[str, Any]) -> None:
 
 
 def command_name(args: argparse.Namespace) -> str:
+    if getattr(args, "dialogue_command", ""):
+        return f"dialogue.{args.dialogue_command}"
     if getattr(args, "specialist_command", ""):
         return f"specialist.{args.specialist_command}"
     return str(getattr(args, "command", "") or "")
@@ -612,6 +647,118 @@ def load_specialist_proposals(root: Path) -> list[dict[str, Any]]:
 
 def specialist_from_registry(root: Path) -> dict[str, dict[str, object]]:
     return load_specialist_registry(root)
+
+
+UNSUPPORTED_DELEGATION_PLAN_KEYS = {
+    "auto_chain",
+    "auto_spawn",
+    "chain",
+    "dag",
+    "delegated_to",
+    "dependencies",
+    "dependency_graph",
+    "edges",
+    "recursive_delegation",
+    "recursive_delegation_allowed",
+    "spawned_agents",
+    "subagents",
+}
+
+
+def scope_is_same_or_under(child: str, parent: str) -> bool:
+    child_path = Path(child)
+    parent_path = Path(parent)
+    return child == parent or parent == "." or child_path == parent_path or parent_path in child_path.parents
+
+
+def normalized_specialist_scope(root: Path, role: str, entry: dict[str, object]) -> list[str]:
+    raw_scope = entry.get("default_scope")
+    if raw_scope is not None and not isinstance(raw_scope, list):
+        raise ValueError(f"specialist {role} default_scope must be a list")
+    values = [str(item) for item in raw_scope] if isinstance(raw_scope, list) else ["."]
+    return normalize_scope_values(root, values or ["."])
+
+
+def validate_delegation_plan_preflight(
+    root: Path,
+    plan: dict[str, Any],
+    *,
+    parent_write_policy: str,
+    parent_scope: list[str] | None = None,
+) -> None:
+    findings: list[str] = []
+    unsupported = sorted(key for key in UNSUPPORTED_DELEGATION_PLAN_KEYS if key in plan)
+    if unsupported:
+        findings.append("unsupported delegation plan field(s): " + ", ".join(unsupported))
+    selected_roles = plan.get("selected_roles")
+    if not isinstance(selected_roles, list) or not selected_roles:
+        findings.append("selected_roles must be a non-empty list")
+        selected_roles = []
+    role_names = [str(role) for role in selected_roles]
+    duplicates = sorted({role for role in role_names if role_names.count(role) > 1})
+    if duplicates:
+        findings.append("selected_roles contains duplicate role(s): " + ", ".join(duplicates))
+
+    candidate_roles = plan.get("candidate_roles")
+    candidate_set = {str(role) for role in candidate_roles} if isinstance(candidate_roles, list) else set()
+    read_scope = plan.get("read_scope")
+    write_policy = plan.get("write_policy")
+    if not isinstance(read_scope, dict):
+        findings.append("read_scope must be a role-to-scope object")
+        read_scope = {}
+    if not isinstance(write_policy, dict):
+        findings.append("write_policy must be a role-to-policy object")
+        write_policy = {}
+    if parent_write_policy not in WRITE_POLICIES:
+        findings.append(f"invalid parent write_policy: {parent_write_policy}")
+    normalized_parent_scope: list[str] = []
+    if parent_scope:
+        try:
+            normalized_parent_scope = normalize_scope_values(root, parent_scope)
+        except ValueError:
+            findings.append("parent scope escapes repository root")
+
+    registry = specialist_from_registry(root)
+    for role in role_names:
+        if role not in registry:
+            findings.append(f"unknown selected role: {role}")
+            continue
+        if candidate_set and role not in candidate_set:
+            findings.append(f"selected role not listed in candidate_roles: {role}")
+        role_scope_raw = read_scope.get(role)
+        if not isinstance(role_scope_raw, list) or not role_scope_raw:
+            findings.append(f"read_scope for {role} must be a non-empty list")
+            role_scope: list[str] = []
+        else:
+            try:
+                role_scope = normalize_scope_values(root, [str(item) for item in role_scope_raw])
+            except ValueError:
+                findings.append(f"read_scope for {role} escapes repository root")
+                role_scope = []
+        try:
+            allowed_scope = normalized_specialist_scope(root, role, registry[role])
+        except ValueError as exc:
+            findings.append(str(exc))
+            allowed_scope = []
+        for item in role_scope:
+            if allowed_scope and not any(scope_is_same_or_under(item, allowed) for allowed in allowed_scope):
+                findings.append(f"read_scope for {role} broadens specialist default_scope: {item}")
+            if normalized_parent_scope and not any(scope_is_same_or_under(item, parent) for parent in normalized_parent_scope):
+                findings.append(f"read_scope for {role} broadens parent scope: {item}")
+        policy = str(write_policy.get(role) or "")
+        if policy not in WRITE_POLICIES:
+            findings.append(f"invalid write_policy for {role}: {policy or '(missing)'}")
+            continue
+        configured_policy = str(registry[role].get("write_policy") or "read_only")
+        if configured_policy not in WRITE_POLICIES:
+            findings.append(f"invalid configured write_policy for {role}: {configured_policy}")
+            continue
+        if WRITE_POLICY_RANK[policy] > WRITE_POLICY_RANK[configured_policy]:
+            findings.append(f"write_policy for {role} broadens specialist policy {configured_policy} -> {policy}")
+        if parent_write_policy in WRITE_POLICIES and WRITE_POLICY_RANK[policy] > WRITE_POLICY_RANK[parent_write_policy]:
+            findings.append(f"write_policy for {role} broadens parent policy {parent_write_policy} -> {policy}")
+    if findings:
+        raise ValueError("delegation preflight failed: " + "; ".join(findings))
 
 
 def count_markdown_files(path: Path) -> int:
@@ -2023,6 +2170,8 @@ def cmd_closeout(root: Path, args: argparse.Namespace) -> int:
             closeout_command.extend(["--changed-path", path])
         for skill in args.skill:
             closeout_command.extend(["--skill", skill])
+        if args.plan_id:
+            closeout_command.extend(["--plan-id", args.plan_id])
         for result in commands:
             closeout_command.extend(["--prevalidated-check", prevalidated_check_payload(result)])
         closeout_result = run_command(root, "task-closeout", closeout_command, args.timeout)
@@ -2441,6 +2590,8 @@ def find_revision_in_value(value: Any) -> str | None:
             "skeleton_commit",
             "source_revision",
             "source_commit",
+            "release_id",
+            "release_manifest_sha256",
             "to_commit",
             "from_commit",
             "revision",
@@ -2480,25 +2631,43 @@ def target_install_state(target: Path) -> dict[str, Any]:
     records = jsonl_records(target / "runtime" / "install-state.jsonl")
     latest = records[-1] if records else {}
     source_commit = ""
+    release_id = ""
+    channel = ""
     for record in reversed(records):
         if not isinstance(record, dict):
             continue
-        source_commit = str(record.get("source_commit") or record.get("skeleton_commit") or record.get("skeleton_revision") or "")
-        if source_commit:
-            source_commit = source_commit[:12]
+        if not release_id and record.get("release_id"):
+            release_id = str(record.get("release_id") or "")
+        if not channel and record.get("channel"):
+            channel = str(record.get("channel") or "")
+        candidate_commit = str(record.get("source_commit") or record.get("skeleton_commit") or record.get("skeleton_revision") or "")
+        if candidate_commit and not source_commit:
+            source_commit = candidate_commit[:12]
+        if source_commit and release_id and channel:
             break
     if not source_commit:
         source_commit = target_skeleton_revision(target) or ""
     preserved = []
     if isinstance(latest, dict) and isinstance(latest.get("preserved_paths"), list):
         preserved = [str(item) for item in latest["preserved_paths"]]
+    manual_review_paths = []
+    if isinstance(latest, dict) and isinstance(latest.get("manual_review_paths"), list):
+        manual_review_paths = [str(item) for item in latest["manual_review_paths"]]
+    applied_migrations = []
+    if isinstance(latest, dict) and isinstance(latest.get("applied_migrations"), list):
+        applied_migrations = [str(item) for item in latest["applied_migrations"]]
     return {
         "path": "runtime/install-state.jsonl",
         "records": len(records),
         "latest_event": str(latest.get("event") or "") if isinstance(latest, dict) else "",
         "latest_source_commit": source_commit,
+        "latest_release_id": release_id,
+        "latest_channel": channel,
+        "previous_release_id": str(latest.get("previous_release_id") or "") if isinstance(latest, dict) else "",
         "validation_status": str(latest.get("validation_status") or "") if isinstance(latest, dict) else "",
         "preserved_paths": preserved,
+        "manual_review_paths": manual_review_paths,
+        "applied_migrations": applied_migrations,
     }
 
 
@@ -2673,6 +2842,20 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
     mode = "status" if args.status else "dry_run"
     stop_threshold = int(args.stop_threshold)
     current_revision = short_git_revision(root, min(args.timeout, 20))
+    try:
+        current_release = release_summary(build_release_manifest(root, channel="stable"))
+    except (OSError, ValueError) as exc:
+        current_release = {
+            "schema_version": "ai-architecture.release.v1",
+            "release_id": "",
+            "source_commit": current_revision,
+            "source_dirty": None,
+            "channel": "stable",
+            "feature_profile": "stable",
+            "file_count": 0,
+            "migration_count": 0,
+            "error": str(exc),
+        }
     payload: dict[str, Any] = {
         "ok": target_exists,
         "target": str(target),
@@ -2681,6 +2864,9 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
         "target_git_clean": False,
         "skeleton_revision_in_target": None,
         "skeleton_revision_current": current_revision,
+        "skeleton_release_in_target": "",
+        "skeleton_release_current": current_release.get("release_id") or "",
+        "release": current_release,
         "skeleton_source_commit_previous": "",
         "skeleton_source_commit_current": current_revision or "",
         "install_state": {
@@ -2688,8 +2874,13 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
             "records": 0,
             "latest_event": "",
             "latest_source_commit": "",
+            "latest_release_id": "",
+            "latest_channel": "",
+            "previous_release_id": "",
             "validation_status": "",
             "preserved_paths": [],
+            "manual_review_paths": [],
+            "applied_migrations": [],
         },
         "project_profile_state": "missing",
         "license_signal": "unknown",
@@ -2730,6 +2921,7 @@ def build_adopt_payload(root: Path, args: argparse.Namespace) -> tuple[dict[str,
     install_state = target_install_state(target)
     payload["install_state"] = install_state
     payload["skeleton_revision_in_target"] = install_state["latest_source_commit"] or target_skeleton_revision(target)
+    payload["skeleton_release_in_target"] = install_state.get("latest_release_id", "")
     payload["skeleton_source_commit_previous"] = payload["skeleton_revision_in_target"] or ""
     payload["project_profile_state"] = project_profile_state(target)
     payload["license_signal"] = license_signal(target)
@@ -3127,7 +3319,15 @@ def cmd_specialist_plan_approve(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
-def load_approved_delegation_plan(root: Path, args: argparse.Namespace, *, confirm: bool, record_blocked: bool = True) -> tuple[Path, dict[str, Any]]:
+def load_approved_delegation_plan(
+    root: Path,
+    args: argparse.Namespace,
+    *,
+    confirm: bool,
+    parent_write_policy: str,
+    parent_scope: list[str] | None = None,
+    record_blocked: bool = True,
+) -> tuple[Path, dict[str, Any]]:
     path = plan_path_from_arg(root, args.plan)
     plan = load_json_file(path)
     if plan.get("schema_version") != DELEGATION_PLAN_SCHEMA:
@@ -3184,10 +3384,43 @@ def load_approved_delegation_plan(root: Path, args: argparse.Namespace, *, confi
                 ),
             )
         raise ValueError("delegation plan has no selected roles")
+    try:
+        validate_delegation_plan_preflight(
+            root,
+            plan,
+            parent_write_policy=parent_write_policy,
+            parent_scope=parent_scope or [],
+        )
+    except ValueError as exc:
+        if record_blocked:
+            append_specialist_usage(
+                root,
+                specialist_usage_event(
+                    root,
+                    event_type="delegation_execute_blocked",
+                    args=args,
+                    outcome="blocked",
+                    plan=plan,
+                    plan_path=path,
+                    reason=str(exc),
+                    user_decision="blocked",
+                    confirmed=bool(args.confirm),
+                ),
+            )
+        raise
     return path, plan
 
 
-def prepare_delegate_handoffs(root: Path, plan: dict[str, Any], *, workflow: str, timeout: int) -> tuple[list[dict[str, Any]], list[CommandResult]]:
+def prepare_delegate_handoffs(
+    root: Path,
+    plan_path: Path,
+    plan: dict[str, Any],
+    *,
+    workflow: str,
+    timeout: int,
+    parent_write_policy: str,
+    parent_scope: list[str] | None = None,
+) -> tuple[list[dict[str, Any]], list[CommandResult]]:
     handoffs: list[dict[str, Any]] = []
     commands: list[CommandResult] = []
     read_scope = plan.get("read_scope") if isinstance(plan.get("read_scope"), dict) else {}
@@ -3208,9 +3441,21 @@ def prepare_delegate_handoffs(root: Path, plan: dict[str, Any], *, workflow: str
             workflow,
             "--format",
             "json",
+            "--parent-plan",
+            rel_to_root(root, plan_path),
+            "--parent-goal",
+            str(plan["goal"]),
+            "--user-goal",
+            str(plan["goal"]),
+            "--parent-role",
+            "agent-flow.specialist",
+            "--parent-write-policy",
+            parent_write_policy,
         ]
         for scope in read_scope.get(role, []) if isinstance(read_scope.get(role), list) else []:
             command.extend(["--scope", str(scope)])
+        for scope in parent_scope or []:
+            command.extend(["--parent-scope", str(scope)])
         policy = str(write_policy.get(role) or "")
         if policy:
             command.extend(["--write-policy", policy])
@@ -3222,8 +3467,23 @@ def prepare_delegate_handoffs(root: Path, plan: dict[str, Any], *, workflow: str
 
 
 def cmd_specialist_execute(root: Path, args: argparse.Namespace) -> int:
-    path, plan = load_approved_delegation_plan(root, args, confirm=bool(args.confirm), record_blocked=True)
-    handoffs, commands = prepare_delegate_handoffs(root, plan, workflow=args.workflow, timeout=args.timeout)
+    path, plan = load_approved_delegation_plan(
+        root,
+        args,
+        confirm=bool(args.confirm),
+        parent_write_policy=args.parent_write_policy,
+        parent_scope=args.parent_scope,
+        record_blocked=True,
+    )
+    handoffs, commands = prepare_delegate_handoffs(
+        root,
+        path,
+        plan,
+        workflow=args.workflow,
+        timeout=args.timeout,
+        parent_write_policy=args.parent_write_policy,
+        parent_scope=args.parent_scope,
+    )
     ok = all(result.ok for result in commands)
     payload = {
         "root": str(root),
@@ -3334,8 +3594,23 @@ def build_spawn_packet(root: Path, plan_path: Path, plan: dict[str, Any], handof
 
 
 def cmd_specialist_packet(root: Path, args: argparse.Namespace) -> int:
-    path, plan = load_approved_delegation_plan(root, args, confirm=bool(args.confirm), record_blocked=False)
-    handoffs, commands = prepare_delegate_handoffs(root, plan, workflow=args.workflow, timeout=args.timeout)
+    path, plan = load_approved_delegation_plan(
+        root,
+        args,
+        confirm=bool(args.confirm),
+        parent_write_policy=args.parent_write_policy,
+        parent_scope=args.parent_scope,
+        record_blocked=False,
+    )
+    handoffs, commands = prepare_delegate_handoffs(
+        root,
+        path,
+        plan,
+        workflow=args.workflow,
+        timeout=args.timeout,
+        parent_write_policy=args.parent_write_policy,
+        parent_scope=args.parent_scope,
+    )
     ok = all(result.ok for result in commands)
     if not ok:
         payload = {
@@ -3368,6 +3643,236 @@ def cmd_specialist_packet(root: Path, args: argparse.Namespace) -> int:
         print("status: ready")
         print("auto_spawn: false")
     return 0
+
+
+def dialogue_path_from_arg(root: Path, value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute() or "/" in value or value.endswith(".jsonl"):
+        resolved = resolve_under_root(root, value)
+    else:
+        resolved = dialogue_dir(root) / f"{value}.jsonl"
+    if resolved.suffix != ".jsonl":
+        raise ValueError("dialogue path must be a .jsonl file")
+    return resolved
+
+
+def next_dialogue_turn_id(path: Path) -> str:
+    highest = 0
+    if path.exists():
+        for raw in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            if not raw.strip():
+                continue
+            try:
+                record = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            turn_id = str(record.get("turn_id") or "")
+            match = re.search(r"-(\d{3,})$", turn_id)
+            if match:
+                highest = max(highest, int(match.group(1)))
+    return f"{path.stem}-{highest + 1:03d}"
+
+
+def dialogue_existing_turn_ids(path: Path) -> set[str]:
+    ids: set[str] = set()
+    if not path.exists():
+        return ids
+    for raw in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+        if not raw.strip():
+            continue
+        try:
+            record = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        turn_id = str(record.get("turn_id") or "")
+        if turn_id:
+            ids.add(turn_id)
+    return ids
+
+
+def dialogue_lint(root: Path, path: Path, *, timeout: int) -> dict[str, Any]:
+    result = run_command(
+        root,
+        "dialogue-lint",
+        [sys.executable, str(root / "scripts" / "dialogue-lint.py"), "--root", str(root), "--format", "json", rel_to_root(root, path)],
+        timeout,
+    )
+    payload = read_json_stdout(result, {})
+    if isinstance(payload, dict):
+        payload["command"] = result_payload(result)
+        return payload
+    return {"ok": False, "findings": [{"severity": "ERROR", "check": "dialogue_lint_output", "detail": "invalid dialogue-lint output"}], "command": result_payload(result)}
+
+
+def cmd_dialogue_start(root: Path, args: argparse.Namespace) -> int:
+    if args.by not in DIALOGUE_PARTICIPANTS:
+        raise ValueError(f"invalid dialogue participant: {args.by}")
+    if args.provider not in DIALOGUE_PROVIDERS:
+        raise ValueError(f"invalid dialogue provider: {args.provider}")
+    identifier = dialogue_id(root)
+    path = dialogue_dir(root) / f"{identifier}.jsonl"
+    record = {
+        "schema_version": DIALOGUE_SCHEMA,
+        "turn_id": f"{identifier}-001",
+        "ts": utc_now(),
+        "kind": "start",
+        "from": args.by,
+        "provider": args.provider,
+        "task": args.task,
+        "status": "open",
+        "max_rounds": args.max_rounds,
+        "policy": {
+            "debate_mode": "subagent_debate",
+            "codex_is_orchestrator": True,
+            "claude_auto_debate_disabled": True,
+            "subagents_are_external_harness": True,
+            "nested_subagents_allowed": False,
+            "bounded_rounds": True,
+            "requires_independent_subagent_critique": True,
+            "implementation_requires_convergence": True,
+        },
+    }
+    append_jsonl_file(path, record)
+    payload = {
+        "root": str(root),
+        "dialogue_id": identifier,
+        "dialogue_path": rel_to_root(root, path),
+        "record": record,
+        "next_actions": [
+            f"python3 scripts/agent-flow.py dialogue add-turn --dialogue {rel_to_root(root, path)} --from codex --provider codex --kind claim --content '<planning claim>' --format json",
+            f"python3 scripts/agent-flow.py dialogue add-turn --dialogue {rel_to_root(root, path)} --from subagent-critic --provider subagent --kind critique --targets-claim-id <turn-id> --severity risk --content '<independent critique>' --format json",
+            f"python3 scripts/agent-flow.py dialogue status --dialogue {rel_to_root(root, path)} --format json",
+        ],
+    }
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"dialogue_path: {payload['dialogue_path']}")
+        print("status: open")
+    return 0
+
+
+def cmd_dialogue_add_turn(root: Path, args: argparse.Namespace) -> int:
+    path = dialogue_path_from_arg(root, args.dialogue)
+    if not path.exists():
+        raise ValueError(f"dialogue not found: {rel_to_root(root, path)}")
+    if args.participant not in DIALOGUE_PARTICIPANTS:
+        raise ValueError(f"invalid dialogue participant: {args.participant}")
+    if args.provider not in DIALOGUE_PROVIDERS:
+        raise ValueError(f"invalid dialogue provider: {args.provider}")
+    if args.participant.startswith("subagent-") and args.provider != "subagent":
+        raise ValueError("subagent participants require provider=subagent")
+    if args.participant == "codex" and args.provider != "codex":
+        raise ValueError("codex turns require provider=codex")
+    if args.kind not in DIALOGUE_KINDS:
+        raise ValueError(f"invalid dialogue kind: {args.kind}")
+    if args.kind == "critique" and not args.targets_claim_id:
+        raise ValueError("critique requires --targets-claim-id")
+    if args.kind == "critique" and args.severity == "block" and not args.evidence:
+        raise ValueError("block critique requires --evidence")
+    if args.kind == "concession" and not args.targets_claim_id:
+        raise ValueError("concession requires --targets-claim-id")
+    if args.kind == "concession" and args.resolution not in DIALOGUE_RESOLUTIONS:
+        raise ValueError("concession requires --resolution resolved|accepted_as_risk")
+    existing_ids = dialogue_existing_turn_ids(path)
+    if args.targets_claim_id and args.targets_claim_id not in existing_ids:
+        raise ValueError(f"unknown targets_claim_id: {args.targets_claim_id}")
+    record: dict[str, Any] = {
+        "schema_version": DIALOGUE_SCHEMA,
+        "turn_id": next_dialogue_turn_id(path),
+        "ts": utc_now(),
+        "kind": args.kind,
+        "from": args.participant,
+        "provider": args.provider,
+        "round": args.round,
+        "content": args.content,
+    }
+    if args.targets_claim_id:
+        record["targets_claim_id"] = args.targets_claim_id
+    if args.kind == "critique":
+        record["severity"] = args.severity
+        record["evidence"] = args.evidence
+    if args.kind == "concession":
+        record["resolution"] = args.resolution
+    if args.fallback_reason:
+        record["note"] = args.fallback_reason
+    append_jsonl_file(path, record)
+    lint = dialogue_lint(root, path, timeout=args.timeout)
+    payload = {"root": str(root), "dialogue_path": rel_to_root(root, path), "record": record, "lint": lint}
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"turn_id: {record['turn_id']}")
+        print(f"lint_ok: {bool(lint.get('ok'))}")
+    return 0 if lint.get("ok") else 1
+
+
+def cmd_dialogue_status(root: Path, args: argparse.Namespace) -> int:
+    path = dialogue_path_from_arg(root, args.dialogue)
+    lint = dialogue_lint(root, path, timeout=args.timeout)
+    payload = {"root": str(root), "dialogue_path": rel_to_root(root, path), **lint}
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    elif lint.get("ok"):
+        print(f"status: {'converged' if lint.get('converged') else 'open'}")
+        print(f"open_blocks: {len(lint.get('open_blocks') or [])}")
+    else:
+        print("status: invalid")
+        for item in lint.get("findings", []):
+            print(f"{item.get('severity')} {item.get('check')}: {item.get('detail')}")
+    return 0 if lint.get("ok") else 1
+
+
+def cmd_dialogue_converge(root: Path, args: argparse.Namespace) -> int:
+    path = dialogue_path_from_arg(root, args.dialogue)
+    lint = dialogue_lint(root, path, timeout=args.timeout)
+    if not lint.get("ok"):
+        raise ValueError("dialogue must be valid before convergence")
+    open_blocks = lint.get("open_blocks")
+    if open_blocks:
+        raise ValueError("cannot converge with unresolved block critiques: " + ", ".join(str(item) for item in open_blocks))
+    ready_by = args.ready_by or ["codex", "subagent-critic"]
+    ready_set = set(ready_by)
+    invalid_ready = sorted(item for item in ready_set if item not in DIALOGUE_PARTICIPANTS)
+    if invalid_ready:
+        raise ValueError("--ready-by contains invalid participant(s): " + ", ".join(invalid_ready))
+    if "codex" not in ready_set or not any(item.startswith("subagent-") for item in ready_set):
+        raise ValueError("--ready-by must include codex and at least one subagent participant")
+    if args.by.startswith("subagent-") and args.provider != "subagent":
+        raise ValueError("subagent convergence turns require provider=subagent")
+    if args.by == "codex" and args.provider != "codex":
+        raise ValueError("codex convergence turns require provider=codex")
+    scope = {
+        "allowed_paths": args.allow_path,
+        "allowed_actions": args.allow_action,
+        "forbidden_actions": args.forbid_action,
+        "validation": args.validation,
+        "summary": args.scope_summary,
+    }
+    record = {
+        "schema_version": DIALOGUE_SCHEMA,
+        "turn_id": next_dialogue_turn_id(path),
+        "ts": utc_now(),
+        "kind": "converged",
+        "from": args.by,
+        "provider": args.provider,
+        "ready_by": ready_by,
+        "implementation_scope": scope,
+        "debate_boundary": {
+            "codex_is_orchestrator": True,
+            "claude_auto_debate_disabled": True,
+            "nested_subagents_allowed": False,
+        },
+    }
+    append_jsonl_file(path, record)
+    final_lint = dialogue_lint(root, path, timeout=args.timeout)
+    payload = {"root": str(root), "dialogue_path": rel_to_root(root, path), "record": record, "lint": final_lint}
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"status: {'converged' if final_lint.get('ok') else 'invalid'}")
+        print(f"dialogue_path: {rel_to_root(root, path)}")
+    return 0 if final_lint.get("ok") else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -3415,6 +3920,7 @@ def build_parser() -> argparse.ArgumentParser:
     closeout.add_argument("--goal", required=True)
     closeout.add_argument("--changed-path", action="append", default=[])
     closeout.add_argument("--skill", action="append", default=[])
+    closeout.add_argument("--plan-id", default="", help="Optional plans/active or plans/done plan id for completion evidence.")
     closeout.add_argument("--profile", default="auto")
     closeout.add_argument("--format", choices=("text", "json"), default="text")
     closeout.add_argument("--timeout", type=int, default=120)
@@ -3449,6 +3955,53 @@ def build_parser() -> argparse.ArgumentParser:
     adopt.add_argument("--format", choices=("text", "json"), default="text")
     adopt.add_argument("--timeout", type=int, default=120)
     adopt.set_defaults(func=cmd_adopt)
+
+    dialogue = sub.add_parser("dialogue", help="Task-scoped subagent debate planning ledger.")
+    dialogue_sub = dialogue.add_subparsers(dest="dialogue_command", required=True)
+
+    dialogue_start = dialogue_sub.add_parser("start", help="Create a critical planning dialogue ledger for a task.")
+    dialogue_start.add_argument("--task", required=True)
+    dialogue_start.add_argument("--by", choices=sorted(DIALOGUE_PARTICIPANTS), default="codex")
+    dialogue_start.add_argument("--provider", choices=sorted(DIALOGUE_PROVIDERS), default="codex")
+    dialogue_start.add_argument("--max-rounds", type=int, default=3)
+    dialogue_start.add_argument("--format", choices=("text", "json"), default="text")
+    dialogue_start.set_defaults(func=cmd_dialogue_start)
+
+    dialogue_turn = dialogue_sub.add_parser("add-turn", help="Append a structured claim, critique, concession, or unresolved note.")
+    dialogue_turn.add_argument("--dialogue", required=True)
+    dialogue_turn.add_argument("--from", dest="participant", choices=sorted(DIALOGUE_PARTICIPANTS), required=True)
+    dialogue_turn.add_argument("--provider", choices=sorted(DIALOGUE_PROVIDERS), required=True)
+    dialogue_turn.add_argument("--kind", choices=sorted(DIALOGUE_KINDS), required=True)
+    dialogue_turn.add_argument("--content", required=True)
+    dialogue_turn.add_argument("--round", type=int, default=1)
+    dialogue_turn.add_argument("--targets-claim-id", default="")
+    dialogue_turn.add_argument("--severity", choices=sorted(DIALOGUE_SEVERITIES), default="info")
+    dialogue_turn.add_argument("--evidence", action="append", default=[])
+    dialogue_turn.add_argument("--resolution", choices=sorted(DIALOGUE_RESOLUTIONS), default="")
+    dialogue_turn.add_argument("--fallback-reason", default="")
+    dialogue_turn.add_argument("--format", choices=("text", "json"), default="text")
+    dialogue_turn.add_argument("--timeout", type=int, default=60)
+    dialogue_turn.set_defaults(func=cmd_dialogue_add_turn)
+
+    dialogue_status = dialogue_sub.add_parser("status", help="Validate a dialogue ledger and report unresolved blockers.")
+    dialogue_status.add_argument("--dialogue", required=True)
+    dialogue_status.add_argument("--format", choices=("text", "json"), default="text")
+    dialogue_status.add_argument("--timeout", type=int, default=60)
+    dialogue_status.set_defaults(func=cmd_dialogue_status)
+
+    dialogue_converge = dialogue_sub.add_parser("converge", help="Freeze implementation scope after Codex and subagent readiness.")
+    dialogue_converge.add_argument("--dialogue", required=True)
+    dialogue_converge.add_argument("--by", choices=sorted(DIALOGUE_PARTICIPANTS), default="codex")
+    dialogue_converge.add_argument("--provider", choices=sorted(DIALOGUE_PROVIDERS), default="codex")
+    dialogue_converge.add_argument("--ready-by", action="append", default=[])
+    dialogue_converge.add_argument("--scope-summary", required=True)
+    dialogue_converge.add_argument("--allow-path", action="append", default=[])
+    dialogue_converge.add_argument("--allow-action", action="append", default=[])
+    dialogue_converge.add_argument("--forbid-action", action="append", default=[])
+    dialogue_converge.add_argument("--validation", action="append", default=[])
+    dialogue_converge.add_argument("--format", choices=("text", "json"), default="text")
+    dialogue_converge.add_argument("--timeout", type=int, default=60)
+    dialogue_converge.set_defaults(func=cmd_dialogue_converge)
 
     specialist = sub.add_parser("specialist", help="On-demand specialist proposal, preview, and approved delegation prep.")
     specialist_sub = specialist.add_subparsers(dest="specialist_command", required=True)
@@ -3503,6 +4056,8 @@ def build_parser() -> argparse.ArgumentParser:
     execute.add_argument("--plan", required=True)
     execute.add_argument("--confirm", action="store_true")
     execute.add_argument("--workflow", default="dry_run")
+    execute.add_argument("--parent-write-policy", choices=sorted(WRITE_POLICIES), default="manual_work_required")
+    execute.add_argument("--parent-scope", action="append", default=[])
     execute.add_argument("--format", choices=("text", "json"), default="text")
     execute.add_argument("--timeout", type=int, default=60)
     execute.set_defaults(func=cmd_specialist_execute)
@@ -3512,6 +4067,8 @@ def build_parser() -> argparse.ArgumentParser:
     packet.add_argument("--confirm", action="store_true")
     packet.add_argument("--workflow", default="dry_run")
     packet.add_argument("--by", default="codex")
+    packet.add_argument("--parent-write-policy", choices=sorted(WRITE_POLICIES), default="manual_work_required")
+    packet.add_argument("--parent-scope", action="append", default=[])
     packet.add_argument("--format", choices=("text", "json"), default="text")
     packet.add_argument("--timeout", type=int, default=60)
     packet.set_defaults(func=cmd_specialist_packet)

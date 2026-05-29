@@ -80,6 +80,10 @@ class ScriptHelpTests(unittest.TestCase):
         "validate-plans.py",
         "reference-wiki.py",
         "source-recovery.py",
+        "dialogue-lint.py",
+        "goal-prompt-check.py",
+        "release-manifest.py",
+        "surface-bloat-audit.py",
     )
 
     def test_each_main_script_prints_help(self) -> None:
@@ -92,6 +96,182 @@ class ScriptHelpTests(unittest.TestCase):
                     f"--help failed for {rel}\nstdout={result.stdout}\nstderr={result.stderr}",
                 )
                 self.assertIn("usage:", result.stdout.lower())
+
+
+class CompletionEvidencePlanIdTests(unittest.TestCase):
+    SCRIPT = SCRIPTS / "completion-evidence.py"
+
+    def _tmp_root(self) -> Path:
+        path = REPO_ROOT / "runtime" / f"completion-plan-id-{uuid.uuid4().hex}"
+        path.mkdir(parents=True)
+        return path
+
+    def _add_command(self, root: Path, *extra: str) -> list[str]:
+        return [
+            str(self.SCRIPT),
+            "--root",
+            str(root),
+            "add",
+            "--goal",
+            "plan evidence",
+            "--changed-path",
+            "docs/example.md",
+            "--validation",
+            json.dumps({"name": "unit", "command": "true", "status": "OK"}),
+            "--outcome",
+            "genuine_success",
+            "--json",
+            *extra,
+        ]
+
+    def _records(self, root: Path) -> list[dict[str, object]]:
+        path = root / "runtime" / "completion-evidence.jsonl"
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    def test_add_without_plan_id_preserves_existing_record_shape(self) -> None:
+        root = self._tmp_root()
+        try:
+            result = _run(self._add_command(root))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertNotIn("plan_id", payload)
+            self.assertNotIn("plan_id", self._records(root)[-1])
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_add_accepts_active_plan_id(self) -> None:
+        root = self._tmp_root()
+        try:
+            plan_id = "0033-plan-id-evidence-trace"
+            (root / "plans" / "active").mkdir(parents=True)
+            (root / "plans" / "active" / f"{plan_id}.md").write_text("# plan\n", encoding="utf-8")
+            result = _run(self._add_command(root, "--plan-id", plan_id))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(json.loads(result.stdout)["plan_id"], plan_id)
+            self.assertEqual(self._records(root)[-1]["plan_id"], plan_id)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_add_accepts_done_plan_id(self) -> None:
+        root = self._tmp_root()
+        try:
+            plan_id = "0033-plan-id-evidence-trace"
+            (root / "plans" / "done").mkdir(parents=True)
+            (root / "plans" / "done" / f"{plan_id}.md").write_text("# plan\n", encoding="utf-8")
+            result = _run(self._add_command(root, "--plan-id", plan_id))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(self._records(root)[-1]["plan_id"], plan_id)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_add_rejects_missing_plan_id_without_append(self) -> None:
+        root = self._tmp_root()
+        try:
+            result = _run(self._add_command(root, "--plan-id", "0099-missing-plan"))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("plan_id", result.stderr)
+            self.assertEqual(self._records(root), [])
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_add_rejects_failed_only_plan_id_without_append(self) -> None:
+        root = self._tmp_root()
+        try:
+            plan_id = "0099-failed-plan"
+            (root / "plans" / "failed").mkdir(parents=True)
+            (root / "plans" / "failed" / f"{plan_id}.md").write_text("# failed\n", encoding="utf-8")
+            result = _run(self._add_command(root, "--plan-id", plan_id))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("plans/active", result.stderr)
+            self.assertEqual(self._records(root), [])
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+
+class GoalPromptCheckTests(unittest.TestCase):
+    SCRIPT = SCRIPTS / "goal-prompt-check.py"
+
+    def test_accepts_prompt_at_limit(self) -> None:
+        prompt = "/goal " + ("a" * 3994)
+        result = _run([str(self.SCRIPT), "--text", prompt, "--format", "json"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["chars"], 4000)
+        self.assertFalse(payload["over_limit"])
+
+    def test_rejects_over_limit_prompt_with_doc_recommendation(self) -> None:
+        prompt = "/goal " + ("a" * 3995)
+        result = _run([str(self.SCRIPT), "--text", prompt, "--format", "json"])
+        self.assertEqual(result.returncode, 1)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["over_limit"])
+        self.assertIn("separate document", payload["recommendation"])
+
+
+class SurfaceBloatAuditTests(unittest.TestCase):
+    SCRIPT = SCRIPTS / "surface-bloat-audit.py"
+
+    def _tmp_root(self) -> Path:
+        path = REPO_ROOT / "runtime" / f"surface-bloat-{uuid.uuid4().hex}"
+        path.mkdir(parents=True)
+        return path
+
+    def _skill(self, root: Path, rel: str, name: str) -> None:
+        path = root / rel
+        path.mkdir(parents=True)
+        (path / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: test skill\n---\n# {name}\n",
+            encoding="utf-8",
+        )
+
+    def test_reports_duplicate_missing_deprecated_and_generated_mismatch(self) -> None:
+        root = self._tmp_root()
+        try:
+            self._skill(root, "skills/active/demo", "shared")
+            self._skill(root, "skills/_candidates/other", "shared")
+            (root / "skills" / "active" / "missing").mkdir(parents=True)
+            self._skill(root, "skills/_deprecated/old", "old")
+            (root / "agents").mkdir()
+            (root / "agents" / "worker.md").write_text("# worker\n", encoding="utf-8")
+            (root / ".codex" / "skills" / "old").mkdir(parents=True)
+            (root / ".claude" / "skills" / "old").mkdir(parents=True)
+            (root / ".codex" / "agents").mkdir(parents=True)
+            (root / ".claude" / "agents").mkdir(parents=True)
+
+            result = _run([str(self.SCRIPT), "--root", str(root), "--format", "json"])
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["read_only"])
+            self.assertFalse(payload["mutates_files"])
+            checks = {finding["check"] for finding in payload["findings"]}
+            self.assertIn("skill_duplicate", checks)
+            self.assertIn("skill_source_missing", checks)
+            self.assertIn("deprecated_skill_generated", checks)
+            self.assertIn("codex_skill_manifest_disk_mismatch", checks)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_clean_minimal_surface_passes(self) -> None:
+        root = self._tmp_root()
+        try:
+            self._skill(root, "skills/active/demo", "demo")
+            (root / "agents").mkdir()
+            (root / "agents" / "worker.md").write_text("# worker\n", encoding="utf-8")
+            for rel in (".codex/skills/demo", ".claude/skills/demo"):
+                (root / rel).mkdir(parents=True)
+            for rel in (".codex/agents/worker.md", ".claude/agents/worker.md"):
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# worker\n", encoding="utf-8")
+            result = _run([str(self.SCRIPT), "--root", str(root), "--format", "json"])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["summary"]["ERROR"], 0)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
 
 class VerifySkeletonTests(unittest.TestCase):
     """`verify-skeleton.py --skip-wiki-lint` against the skeleton itself must
@@ -141,6 +321,11 @@ class FeatureStatusTests(unittest.TestCase):
         self.assertGreater(payload["features_by_tier"]["stable"], 0)
         self.assertGreater(payload["features_by_tier"]["incubating"], 0)
         self.assertGreater(payload["features_by_tier"]["experimental"], 0)
+        self.assertGreater(payload["features_by_stable_role"]["core"], 0)
+        self.assertGreater(payload["features_by_stable_role"]["advisory"], 0)
+        self.assertGreater(payload["features_by_delivery"]["overlay"], 0)
+        self.assertGreater(payload["features_by_delivery"]["frozen_optional"], 0)
+        self.assertGreater(payload["features_by_delivery"]["decision_only"], 0)
 
     def test_stable_tier_does_not_validate_incubating_doc_paths(self) -> None:
         tmp = REPO_ROOT / "runtime" / f"feature-status-{uuid.uuid4().hex}"
@@ -169,6 +354,38 @@ class FeatureStatusTests(unittest.TestCase):
             self.assertNotEqual(all_tiers.returncode, 0)
             all_payload = json.loads(all_tiers.stdout)
             self.assertEqual(all_payload["findings"][0]["check"], "doc_exists")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_feature_metadata_rejects_invalid_scope(self) -> None:
+        tmp = REPO_ROOT / "runtime" / f"feature-status-metadata-{uuid.uuid4().hex}"
+        try:
+            (tmp / "docs").mkdir(parents=True)
+            (tmp / "docs" / "stable.md").write_text("# stable\n", encoding="utf-8")
+            (tmp / "docs" / "feature-status.yaml").write_text(
+                "version: 1\n"
+                "tiers: [stable, incubating, experimental, deprecated]\n"
+                "features:\n"
+                "  - id: incubating.bad_role\n"
+                "    tier: incubating\n"
+                "    stable_role: advisory\n"
+                "    delivery: overlay\n"
+                "    overlay_default: false\n"
+                "    docs: [docs/stable.md]\n"
+                "  - id: stable.bad_delivery\n"
+                "    tier: stable\n"
+                "    stable_role: maybe\n"
+                "    delivery: auto_magic\n"
+                "    overlay_default: true\n"
+                "    docs: [docs/stable.md]\n",
+                encoding="utf-8",
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", "check", "--tier", "all"], cwd=REPO_ROOT)
+            self.assertNotEqual(result.returncode, 0)
+            payload = json.loads(result.stdout)
+            checks = [finding["check"] for finding in payload["findings"]]
+            self.assertIn("stable_role", checks)
+            self.assertIn("delivery", checks)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -3141,3 +3358,223 @@ class RotateActivityLogArgParseTests(unittest.TestCase):
             0,
             f"unknown flag was accepted:\nstdout={result.stdout}\nstderr={result.stderr}",
         )
+
+
+class DialogueLintTests(unittest.TestCase):
+    SCRIPT = SCRIPTS / "dialogue-lint.py"
+
+    def _tmp_dialogue(self, name: str) -> tuple[Path, Path]:
+        tmp = REPO_ROOT / "runtime" / f"dialogue-lint-{name}-{uuid.uuid4().hex}"
+        tmp.mkdir(parents=True)
+        return tmp, tmp / "dialogue.jsonl"
+
+    def _write_records(self, path: Path, records: list[dict[str, object]]) -> None:
+        path.write_text("\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n", encoding="utf-8")
+
+    def _start(self) -> dict[str, object]:
+        return {
+            "schema_version": "ai-architecture.subagent-debate.v1",
+            "turn_id": "dlg-test-001",
+            "ts": "2026-05-27T00:00:00Z",
+            "kind": "start",
+            "from": "codex",
+            "provider": "codex",
+            "task": "plan task A",
+            "policy": {
+                "claude_auto_debate_disabled": True,
+                "nested_subagents_allowed": False,
+            },
+        }
+
+    def _claim(self) -> dict[str, object]:
+        return {
+            "schema_version": "ai-architecture.subagent-debate.v1",
+            "turn_id": "dlg-test-002",
+            "ts": "2026-05-27T00:00:01Z",
+            "kind": "claim",
+            "from": "codex",
+            "provider": "codex",
+            "round": 1,
+            "content": "Implement only the dialogue ledger first.",
+        }
+
+    def test_rejects_critique_without_target(self) -> None:
+        tmp, path = self._tmp_dialogue("missing-target")
+        try:
+            self._write_records(
+                path,
+                [
+                    self._start(),
+                    self._claim(),
+                    {
+                        "schema_version": "ai-architecture.subagent-debate.v1",
+                        "turn_id": "dlg-test-003",
+                        "ts": "2026-05-27T00:00:02Z",
+                        "kind": "critique",
+                        "from": "subagent-critic",
+                        "provider": "subagent",
+                        "round": 1,
+                        "content": "This critique is not anchored.",
+                        "severity": "risk",
+                        "evidence": [],
+                    },
+                ],
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", str(path)])
+            self.assertEqual(result.returncode, 1)
+            checks = {item["check"] for item in json.loads(result.stdout)["findings"]}
+            self.assertIn("critique_target_missing", checks)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_rejects_block_without_evidence_and_convergence_with_open_block(self) -> None:
+        tmp, path = self._tmp_dialogue("open-block")
+        try:
+            self._write_records(
+                path,
+                [
+                    self._start(),
+                    self._claim(),
+                    {
+                        "schema_version": "ai-architecture.subagent-debate.v1",
+                        "turn_id": "dlg-test-003",
+                        "ts": "2026-05-27T00:00:02Z",
+                        "kind": "critique",
+                        "from": "subagent-critic",
+                        "provider": "subagent",
+                        "round": 1,
+                        "content": "This blocks implementation.",
+                        "targets_claim_id": "dlg-test-002",
+                        "severity": "block",
+                        "evidence": [],
+                    },
+                    {
+                        "schema_version": "ai-architecture.subagent-debate.v1",
+                        "turn_id": "dlg-test-004",
+                        "ts": "2026-05-27T00:00:03Z",
+                        "kind": "converged",
+                        "from": "codex",
+                        "provider": "codex",
+                        "ready_by": ["codex", "subagent-critic"],
+                        "implementation_scope": {
+                            "allowed_paths": ["scripts/dialogue-lint.py"],
+                            "allowed_actions": ["add validator"],
+                            "forbidden_actions": ["auto-run Claude"],
+                            "validation": ["python3 scripts/dialogue-lint.py runtime/dialogues/example.jsonl"],
+                        },
+                    },
+                ],
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", str(path)])
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            checks = {item["check"] for item in payload["findings"]}
+            self.assertIn("block_evidence_missing", checks)
+            self.assertIn("converged_with_open_blocks", checks)
+            self.assertEqual(payload["open_blocks"], ["dlg-test-003"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_accepts_subagent_critic_when_block_resolved(self) -> None:
+        tmp, path = self._tmp_dialogue("subagent")
+        try:
+            self._write_records(
+                path,
+                [
+                    self._start(),
+                    self._claim(),
+                    {
+                        "schema_version": "ai-architecture.subagent-debate.v1",
+                        "turn_id": "dlg-test-003",
+                        "ts": "2026-05-27T00:00:02Z",
+                        "kind": "critique",
+                        "from": "subagent-critic",
+                        "provider": "subagent",
+                        "round": 1,
+                        "content": "Subagent critic found a blocker.",
+                        "targets_claim_id": "dlg-test-002",
+                        "severity": "block",
+                        "evidence": ["tests/test_validation.py:dialogue"],
+                    },
+                    {
+                        "schema_version": "ai-architecture.subagent-debate.v1",
+                        "turn_id": "dlg-test-004",
+                        "ts": "2026-05-27T00:00:03Z",
+                        "kind": "concession",
+                        "from": "codex",
+                        "provider": "codex",
+                        "round": 1,
+                        "content": "Accepted and narrowed the implementation scope.",
+                        "targets_claim_id": "dlg-test-003",
+                        "resolution": "resolved",
+                    },
+                    {
+                        "schema_version": "ai-architecture.subagent-debate.v1",
+                        "turn_id": "dlg-test-005",
+                        "ts": "2026-05-27T00:00:04Z",
+                        "kind": "converged",
+                        "from": "codex",
+                        "provider": "codex",
+                        "ready_by": ["codex", "subagent-critic"],
+                        "implementation_scope": {
+                            "allowed_paths": ["scripts/dialogue-lint.py"],
+                            "allowed_actions": ["add validator"],
+                            "forbidden_actions": ["auto-run Claude"],
+                            "validation": ["python3 scripts/dialogue-lint.py runtime/dialogues/example.jsonl"],
+                        },
+                    },
+                ],
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", str(path)])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["converged"])
+            self.assertEqual(payload["open_blocks"], [])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_rejects_nested_subagent_usage(self) -> None:
+        tmp, path = self._tmp_dialogue("nested-subagents")
+        try:
+            self._write_records(
+                path,
+                [
+                    self._start(),
+                    self._claim(),
+                    {
+                        "schema_version": "ai-architecture.subagent-debate.v1",
+                        "turn_id": "dlg-test-003",
+                        "ts": "2026-05-27T00:00:02Z",
+                        "kind": "critique",
+                        "from": "subagent-critic",
+                        "provider": "subagent",
+                        "round": 1,
+                        "content": "I delegated this critique.",
+                        "targets_claim_id": "dlg-test-002",
+                        "severity": "risk",
+                        "evidence": ["manual smoke"],
+                        "subagents_allowed": True,
+                        "subagents": ["reviewer"],
+                    },
+                ],
+            )
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", str(path)])
+            self.assertEqual(result.returncode, 1)
+            checks = [item["check"] for item in json.loads(result.stdout)["findings"]]
+            self.assertIn("nested_subagents_forbidden", checks)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_rejects_dialogue_policy_that_enables_claude_auto_debate(self) -> None:
+        tmp, path = self._tmp_dialogue("claude-policy")
+        try:
+            start = self._start()
+            start["policy"] = {"claude_auto_debate_disabled": False, "nested_subagents_allowed": True}
+            self._write_records(path, [start, self._claim()])
+            result = _run([str(self.SCRIPT), "--root", str(tmp), "--format", "json", str(path)])
+            self.assertEqual(result.returncode, 1)
+            checks = {item["check"] for item in json.loads(result.stdout)["findings"]}
+            self.assertIn("claude_auto_debate_disabled", checks)
+            self.assertIn("nested_subagents_forbidden", checks)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)

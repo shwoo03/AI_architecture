@@ -92,7 +92,8 @@ class BootstrapIntegrationTests(unittest.TestCase):
             self.assertGreaterEqual(len(install_state), 2)
             bootstrap_record = json.loads(install_state[0])
             self.assertEqual(bootstrap_record["requested_profile"], "cli")
-            self.assertIn("cli", bootstrap_record["selected_components"])
+            self.assertIn("core", bootstrap_record["selected_components"])
+            self.assertNotIn("cli", bootstrap_record["selected_components"])
         finally:
             shutil.rmtree(fake_clone.parent, ignore_errors=True)
             shutil.rmtree(tmp, ignore_errors=True)
@@ -102,6 +103,66 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
     clobbering project-owned or locally edited files."""
 
     SCRIPT = SCRIPTS / "upgrade-from-skeleton.py"
+    RELEASE_SCRIPT = SCRIPTS / "release-manifest.py"
+
+    def test_release_manifest_generate_and_check_current_skeleton(self) -> None:
+        tmp = _make_external_tmpdir_or_skip(self, "skeleton-release-manifest")
+        try:
+            manifest = tmp / "release.json"
+            command = [
+                str(self.RELEASE_SCRIPT),
+                "--root",
+                str(REPO_ROOT),
+                "--format",
+                "json",
+                "generate",
+                "--channel",
+                "stable",
+                "--release-id",
+                "skeleton-stable-test",
+                "--created-at",
+                "2026-05-29T00:00:00Z",
+                "--output",
+                str(manifest),
+            ]
+            first = _run(command, cwd=REPO_ROOT)
+            second = _run(command, cwd=REPO_ROOT)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertEqual(json.loads(first.stdout), json.loads(second.stdout))
+            payload = json.loads(first.stdout)
+            self.assertEqual(payload["schema_version"], "ai-architecture.release.v1")
+            self.assertEqual(payload["release_id"], "skeleton-stable-test")
+            self.assertEqual(payload["channel"], "stable")
+            self.assertTrue(payload["files"])
+            self.assertTrue(payload["components"])
+            component_ids = {item["id"] for item in payload["components"]}
+            self.assertIn("core", component_ids)
+            self.assertIn("skills", component_ids)
+            generated_components = [item for item in payload["components"] if item.get("generated_artifacts")]
+            self.assertTrue(generated_components)
+            components = {item["id"]: item for item in payload["components"]}
+            self.assertEqual(components["skills"]["generated_artifact_policy"]["status"], "managed")
+            self.assertFalse(components["skills"]["generated_artifact_policy"]["target_direct_edit_allowed"])
+            policy = payload["generated_artifact_policy"]
+            self.assertTrue(policy)
+            self.assertTrue(all(item["direct_edit_allowed"] is False for item in policy))
+            self.assertIn(".codex/skills", {target for item in policy for target in item["generated_targets"]})
+            paths = [item["path"] for item in payload["files"]]
+            self.assertEqual(paths, sorted(paths))
+            self.assertIn("scripts/agent-flow.py", paths)
+            by_path = {item["path"]: item for item in payload["files"]}
+            self.assertEqual(by_path["scripts/agent-flow.py"]["component_id"], "core")
+            check = _run([str(self.RELEASE_SCRIPT), "--root", str(REPO_ROOT), "--format", "json", "check", "--manifest", str(manifest)], cwd=REPO_ROOT)
+            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+            tampered = payload
+            tampered["files"][0]["sha256"] = "0" * 64
+            manifest.write_text(json.dumps(tampered), encoding="utf-8")
+            stale = _run([str(self.RELEASE_SCRIPT), "--root", str(REPO_ROOT), "--format", "json", "check", "--manifest", str(manifest)], cwd=REPO_ROOT)
+            self.assertEqual(stale.returncode, 1)
+            self.assertIn("hash_mismatch", "\n".join(json.loads(stale.stdout)["findings"]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_dry_run_reports_missing_safe_files_and_risky_updates(self) -> None:
         tmp = _make_external_tmpdir_or_skip(self, "skeleton-upgrade-dry-run")
@@ -159,6 +220,15 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
             self.assertEqual(safe_item["tier"], "stable")
             self.assertTrue(safe_item["overlay_default"])
             self.assertFalse(safe_item["approval_required"])
+            self.assertTrue(brief["release_id"].startswith("skeleton-stable-"))
+            self.assertEqual(brief["channel"], "stable")
+            self.assertEqual(brief["release"]["release_id"], brief["release_id"])
+            self.assertEqual(payload["release"]["release_id"], brief["release_id"])
+            self.assertTrue(brief["component_diff"])
+            component_diff = {item["id"]: item for item in brief["component_diff"]}
+            self.assertIn("reference", component_diff)
+            self.assertGreater(component_diff["reference"]["safe_additions"], 0)
+            self.assertIn("generated_artifact_policy", component_diff["reference"])
             self.assertTrue(brief["approval_required"])
             self.assertIn("not approval", brief["approval_note"])
             self.assertIn("python3 scripts/quality-gate.py --format json", brief["validation_commands"])
@@ -362,6 +432,17 @@ class UpgradeFromSkeletonTests(unittest.TestCase):
             }
             self.assertIn("docs/REFERENCE_REVIEW.template.md", applied)
             self.assertNotIn("AGENTS.md", applied)
+            records = [
+                json.loads(line)
+                for line in (target / "runtime" / "install-state.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            release_record = records[-1]
+            self.assertEqual(release_record["event"], "skeleton_release_applied")
+            self.assertEqual(release_record["channel"], "stable")
+            self.assertTrue(release_record["release_id"].startswith("skeleton-stable-"))
+            self.assertIn("docs/REFERENCE_REVIEW.template.md", release_record["applied_paths"])
+            self.assertIn("AGENTS.md", release_record["manual_review_paths"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -50,6 +51,7 @@ OUTCOME_DEFAULT_DISPOSITION = {
 ALLOWED_VALIDATION_STATUSES = {"OK", "PASS", "WARN", "SKIP", "FAIL", "ERROR"}
 PASSING_VALIDATION_STATUSES = {"OK", "PASS"}
 RISK_VALIDATION_STATUSES = {"WARN", "SKIP"}
+PLAN_ID_PATTERN = re.compile(r"^\d{4}-[a-z0-9][a-z0-9-]*$")
 
 
 @dataclass
@@ -65,6 +67,7 @@ class EvidenceRecord:
     notes: str = ""
     agent: str = "codex"
     artifacts: list[str] = field(default_factory=list)
+    plan_id: str = ""
 
 
 def repo_root() -> Path:
@@ -77,6 +80,29 @@ def utc_now() -> str:
 
 def evidence_path(root: Path) -> Path:
     return root / "runtime" / "completion-evidence.jsonl"
+
+
+def normalize_plan_id(root: Path, value: str) -> str:
+    plan_id = value.strip()
+    if not plan_id:
+        return ""
+    if not PLAN_ID_PATTERN.fullmatch(plan_id):
+        raise ValueError("plan_id must match <4 digits>-<lowercase-slug>")
+    active = root / "plans" / "active" / f"{plan_id}.md"
+    done = root / "plans" / "done" / f"{plan_id}.md"
+    if active.is_file() or done.is_file():
+        return plan_id
+    failed = root / "plans" / "failed" / f"{plan_id}.md"
+    if failed.is_file():
+        raise ValueError(f"plan_id {plan_id!r} exists only in plans/failed; expected plans/active or plans/done")
+    raise ValueError(f"plan_id {plan_id!r} not found in plans/active or plans/done")
+
+
+def record_payload(record: EvidenceRecord) -> dict[str, Any]:
+    payload = asdict(record)
+    if not payload.get("plan_id"):
+        payload.pop("plan_id", None)
+    return payload
 
 
 def resolve_under_root(root: Path, value: str) -> Path:
@@ -151,6 +177,12 @@ def validate_record(root: Path, record: dict[str, Any], index: int) -> list[str]
         findings.append(f"{label} field `outcome` invalid: {outcome}")
     if disposition and disposition not in ALLOWED_DISPOSITIONS:
         findings.append(f"{label} field `disposition` invalid: {disposition}")
+    plan_id = str(record.get("plan_id", "") or "").strip()
+    if plan_id:
+        try:
+            normalize_plan_id(root, plan_id)
+        except ValueError as exc:
+            findings.append(f"{label} field `plan_id` invalid: {exc}")
     changed_paths = record.get("changed_paths")
     if not isinstance(changed_paths, list) or not changed_paths:
         findings.append(f"{label} field `changed_paths` must be a non-empty list")
@@ -221,7 +253,7 @@ def append_record(root: Path, record: EvidenceRecord) -> None:
     path = evidence_path(root)
     path.resolve(strict=False).relative_to(root.resolve())
     path.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(redact_json(asdict(record)), ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n"
+    line = json.dumps(redact_json(record_payload(record)), ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n"
     with runtime_lock(root, "completion-evidence"):
         with path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(line)
@@ -232,6 +264,7 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         changed_paths = normalize_paths(root, args.changed_path)
         artifacts = normalize_paths(root, args.artifact)
         validations = [parse_validation(item) for item in args.validation]
+        plan_id = normalize_plan_id(root, args.plan_id)
     except (ValueError, json.JSONDecodeError) as exc:
         print(f"invalid evidence input: {exc}", file=sys.stderr)
         return 2
@@ -248,15 +281,17 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         notes=redact_text(args.notes.strip()),
         agent=args.agent.strip() or "codex",
         artifacts=artifacts,
+        plan_id=plan_id,
     )
-    findings = validate_record(root, asdict(record), 1)
+    payload = record_payload(record)
+    findings = validate_record(root, payload, 1)
     if findings:
         for finding in findings:
             print(f"ERROR {finding}", file=sys.stderr)
         return 1
     append_record(root, record)
     if args.json:
-        print(json.dumps(asdict(record), ensure_ascii=False, indent=2))
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(f"recorded completion evidence: {record.goal}")
     return 0
@@ -314,6 +349,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.add_argument("--notes", default="")
     add_parser.add_argument("--agent", default="codex")
     add_parser.add_argument("--artifact", action="append", default=[])
+    add_parser.add_argument("--plan-id", default="", help="Optional plans/active or plans/done plan id, e.g. 0033-plan-id-evidence-trace.")
     add_parser.add_argument("--ts", default="")
     add_parser.add_argument("--json", action="store_true")
     add_parser.set_defaults(func=cmd_add)

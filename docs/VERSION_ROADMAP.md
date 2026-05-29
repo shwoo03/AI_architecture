@@ -15,6 +15,16 @@
 - `experimental`: SDK/LangGraph 같은 future adapter입니다. core dependency가 아니며 명시 승인 없이는 적용하지 않습니다.
 - `deprecated`: 제거 또는 대체 경로가 정해진 기능입니다.
 
+## Stable role과 delivery
+
+`stable` 기능도 역할이 다릅니다. `stable_role=core`는 운영 뼈대 자체를 구성하는 필수 표면이고, `stable_role=advisory`는 진단·복구·탐색처럼 비차단 보조 도구입니다.
+
+`delivery`는 기존 프로젝트에 어떻게 전달되는지 표시합니다.
+
+- `overlay`: release manifest와 upgrade overlay에서 일반적으로 다룰 수 있습니다.
+- `frozen_optional`: v2/incubating 계열처럼 보존은 하지만 stable overlay에는 넣지 않는 선택 기능입니다.
+- `decision_only`: adapter처럼 결정 기록과 검토 근거만 유지하고 자동 overlay 대상에서는 제외합니다.
+
 ## 현재 방향
 
 v1은 stable agent-governed project scaffold입니다. v2는 lightweight specialist team OS를 incubating tier로 실험합니다. SDK/LangGraph 통합은 v2 core가 아니라 experimental adapter로 둡니다.

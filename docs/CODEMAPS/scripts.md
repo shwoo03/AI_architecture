@@ -1,7 +1,7 @@
 # Codemap: scripts
 
-- `files`: 85
-- `line_count`: 24965
+- `files`: 90
+- `line_count`: 27341
 - `directories`: 4
 
 ## Navigation Entry Points
@@ -36,6 +36,7 @@
 - `scripts/convert.sh`
 - `scripts/cost-log.py`
 - `scripts/create-reference-proposal.py`
+- `scripts/dialogue-lint.py`
 - `scripts/diff-quality-gate.py`
 - `scripts/eval-all.py`
 - `scripts/eval.py`
@@ -43,6 +44,7 @@
 - `scripts/failure-classify.py`
 - `scripts/feature-status.py`
 - `scripts/generate-codemaps.py`
+- `scripts/goal-prompt-check.py`
 - `scripts/hooks/README.md`
 - `scripts/hooks/post-tool-use-log.py`
 - `scripts/incubating/agent-flow-delegate.py`
@@ -54,6 +56,7 @@
 - `scripts/lib_feature_status.py`
 - `scripts/lib_ownership.py`
 - `scripts/lib_path_safety.py`
+- `scripts/lib_release_manifest.py`
 - `scripts/lib_runtime_lock.py`
 - `scripts/lib_safe_write.py`
 - `scripts/list-open-questions.py`
@@ -77,6 +80,7 @@
 - `scripts/reference-wiki.py`
 - `scripts/refresh-references.py`
 - `scripts/refresh-references.sh`
+- `scripts/release-manifest.py`
 - `scripts/resume-readiness.py`
 - `scripts/review-queue.py`
 - `scripts/rotate-activity-log.py`
@@ -92,6 +96,7 @@
 - `scripts/skill-surface-check.py`
 - `scripts/source-recovery.py`
 - `scripts/subdir-hints.py`
+- `scripts/surface-bloat-audit.py`
 - `scripts/task-closeout.py`
 - `scripts/tool-guardrail.py`
 - `scripts/tool-health.py`

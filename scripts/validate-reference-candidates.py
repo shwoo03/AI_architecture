@@ -8,6 +8,7 @@ research/reference-candidates/. README.md and _template.md are skipped.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -79,6 +80,20 @@ SCORE_WEIGHTS = {
 SKIP_FILES = {"README.md", "_template.md"}
 FIELD_RE = re.compile(r"^-\s+`([^`]+)`:\s*(.*)$", re.MULTILINE)
 SCORE_RE = re.compile(r"^\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|\s*(\d*)\s*\|", re.MULTILINE)
+WEAK_SOURCE_ANCHORS = {
+    "",
+    "-",
+    "TBD",
+    "todo",
+    "TODO",
+    "not checked",
+    "not applicable",
+    "n/a",
+    "local-reference",
+    "external-reference",
+    "directory",
+    "candidate-card",
+}
 
 
 @dataclass
@@ -191,6 +206,49 @@ def validate_sources(path: Path, text: str, findings: list[Finding]) -> None:
             findings.append(Finding(path, f"sources item {offset} missing: {', '.join(missing)}"))
 
 
+def parse_source_item(line: str) -> dict[str, str]:
+    try:
+        payload = json.loads(line)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {str(key): str(value) for key, value in payload.items()}
+
+
+def weak_source_anchor(value: str) -> bool:
+    stripped = value.strip()
+    if stripped in WEAK_SOURCE_ANCHORS:
+        return True
+    return not any(char.isdigit() for char in stripped)
+
+
+def validate_strict_source_anchors(path: Path, text: str, fields: dict[str, str], findings: list[Finding]) -> None:
+    revision = fields.get("checked_revision", "")
+    if weak_source_anchor(revision):
+        findings.append(Finding(path, "strict source anchor requires concrete `checked_revision`"))
+    freshness = fields.get("freshness_signal", "")
+    if is_blank(freshness) or "requires" in freshness.lower():
+        findings.append(Finding(path, "strict source anchor requires concrete `freshness_signal` evidence"))
+
+    marker = "- `sources`:"
+    index = text.find(marker)
+    if index == -1:
+        return
+    tail = text[index + len(marker) :]
+    next_field = tail.find("\n- `")
+    block = tail if next_field == -1 else tail[:next_field]
+    source_lines = [line.strip()[2:].strip() for line in block.splitlines() if line.strip().startswith("- ")]
+    for offset, line in enumerate(source_lines, start=1):
+        item = parse_source_item(line)
+        if not item:
+            findings.append(Finding(path, f"strict source anchor requires sources item {offset} to be JSON object syntax"))
+            continue
+        anchor = item.get("hash_or_line_ref", "")
+        if weak_source_anchor(anchor):
+            findings.append(Finding(path, f"strict source anchor requires concrete hash_or_line_ref for sources item {offset}"))
+
+
 def validate_scores(path: Path, text: str, findings: list[Finding]) -> None:
     seen: dict[str, tuple[int, int]] = {}
     for match in SCORE_RE.finditer(text):
@@ -241,7 +299,7 @@ def candidate_files(root: Path) -> list[Path]:
     )
 
 
-def validate(root: Path) -> tuple[list[Finding], int]:
+def validate(root: Path, *, strict_source_anchor: bool = False) -> tuple[list[Finding], int]:
     findings: list[Finding] = []
     files = candidate_files(root)
     for path in files:
@@ -252,6 +310,8 @@ def validate(root: Path) -> tuple[list[Finding], int]:
         validate_copy_decision(path, text, fields, findings)
         validate_direct_implementation(path, fields, findings)
         validate_sources(path, text, findings)
+        if strict_source_anchor:
+            validate_strict_source_anchors(path, text, fields, findings)
         validate_scores(path, text, findings)
     return findings, len(files)
 
@@ -263,9 +323,10 @@ def main() -> int:
         default=None,
         help="Project root (defaults to this script's repository root).",
     )
+    parser.add_argument("--strict-source-anchor", action="store_true", help="Require concrete revision and source anchors for adoption/copy decisions.")
     args = parser.parse_args()
     root = Path(args.root).resolve() if args.root else repo_root()
-    findings, count = validate(root)
+    findings, count = validate(root, strict_source_anchor=args.strict_source_anchor)
     if findings:
         print("reference candidate findings:")
         for finding in findings:
