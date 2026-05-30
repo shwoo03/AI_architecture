@@ -107,3 +107,8 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - URL
   - why it was used
   - adoption level: reference-only | concept-only | direct-dependency | adapter | fork | vendored-source | rejected
+
+## Community references
+
+- Non-official community/open-source AI systems are tracked in `references/community-ai-systems.md`.
+- Keep official links and community references separate.

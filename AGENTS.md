@@ -11,6 +11,10 @@ This repository is an AI project starter kit. It is not an agent runtime.
 - Keep `AGENTS.md` as the canonical instruction source.
 - Keep harness-specific files as generated adapter surfaces.
 - Put official documentation links in `templates/links.md`.
+- Keep official links and community references separate.
+- Put community AI systems in `references/community-ai-systems.md`.
+- Do not promote a community system to default dependency without a project-specific adoption record.
+- If adding a community reference, include license/activity/security/adoption-mode notes.
 - Prefer official SDK or harness features over local reimplementation.
 - Prefer recipes, templates, profiles, and examples over new scripts.
 - Treat examples as first-class documentation.

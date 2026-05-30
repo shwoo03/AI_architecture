@@ -69,6 +69,8 @@ templates/
   harness-adapters/  Short generated adapter templates.
 recipes/             Practical setup guides and checklists.
   open-source-reuse.md
+references/
+  community-ai-systems.md  Non-official community/open-source AI systems catalog.
 profiles/            Project-shape checklists.
 examples/            Minimal example shapes.
   agents-md/
@@ -102,6 +104,18 @@ Apply the kit to real projects, then write a short sanitized report in
 Use `dogfood/backlog.md` to triage actionable kit improvements. Promote repeated
 lessons to recipes, templates, examples, or README only after they repeat across
 projects.
+
+## Community References
+
+Official docs live in `templates/links.md`.
+
+Community/open-source AI systems live in `references/community-ai-systems.md`.
+Use them for ecosystem learning and concept extraction. Do not install them by
+default. Before adopting one, use `recipes/community-reference-evaluation.md`
+and record the decision in `docs/REFERENCES.md`.
+
+Examples include ECC, Hermes Agent, Oh My Codex, and Paperclip. See the
+reference catalog for details.
 
 ## Minimum Project Surface
 
