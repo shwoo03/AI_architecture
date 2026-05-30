@@ -1,76 +1,35 @@
 # AGENTS.md
 
-This file is the canonical instruction source for AI coding agents working in
-this project.
+This file is the canonical instruction source for coding agents in this project.
 
-## Project Goal
+## Project goal
 
-State the project goal in one sentence.
+- <one sentence>
 
-```text
-Goal: <what this project is trying to accomplish>
-```
+## Success criteria
 
-## Success Criteria
+- <what must be true before this task/project is considered done>
 
-Define how completion is judged.
+## Working rules
 
-- The primary workflow works for the target user.
-- The required tests or checks pass.
-- Security and data-handling constraints are respected.
-- The handoff file explains the current state and next action.
-
-## Non-Goals
-
-List things the agent should not build unless explicitly asked.
-
-- Do not introduce new frameworks without a clear reason.
-- Do not add long-running automation before the project needs it.
-- Do not store secrets, tokens, credentials, or private user data in the repo.
-
-## Working Rules
-
-- Read the project profile before making changes.
-- Search existing files before creating new structures.
-- Prefer small, testable changes.
-- Follow the existing stack and style before introducing alternatives.
-- Use official SDK or harness features instead of reimplementing agent loops.
-- Ask before destructive changes, dependency changes, pushes, deployments, or
-  external API calls that may cost money.
+- Confirm the goal before large changes.
+- Prefer the smallest useful change.
+- Do not add secrets, credentials, or production tokens to the repository.
+- Ask before destructive, irreversible, deployment, or dependency-heavy changes.
 
 ## Validation
 
-Record the cheapest useful validation for each task.
-
-```text
-Check:
-Lint:
-Unit:
-Smoke:
-Manual:
-```
-
-If validation cannot run, record why in the handoff.
+- Primary validation command: <fill in>
+- Secondary checks: <fill in or "none">
+- If validation cannot be run, record why in the handoff.
 
 ## Handoff
 
-Update `docs/HANDOFF.md` when:
-
-- A milestone is completed.
-- Work stops with unresolved questions.
-- The next agent needs context to continue.
-- A risky decision was made.
+- Update `docs/HANDOFF.md` before stopping work.
+- Include current state, next action, blockers, and evidence.
 
 ## References
 
-When using external docs, repositories, examples, or copied patterns:
-
-- Add a short entry to `docs/REFERENCES.md`.
-- Include the source link, checked date, why it matters, and how it was used.
-- Do not copy code unless the license and copy boundary are clear.
-
-## Harness Adapters
-
-This file is canonical. Harness-specific files such as `CLAUDE.md` should be
-generated from this file or kept clearly marked as adapters.
+- Project references live in `docs/REFERENCES.md`.
+- Official docs live in `templates/links.md` in the source kit.
 

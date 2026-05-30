@@ -1,26 +1,21 @@
 # References
 
-Use this file for lightweight provenance. Keep entries short. Create a heavier
-research workflow only when the project needs it.
+Use this file only for project-specific references.
 
-## Entry Template
+## Entry template
 
-```text
-## <name>
-- url:
-- checked_at:
-- used_for:
-- adoption_mode: link | concept | dependency | wrapper | partial_copy
-- why_it_matters:
-- risk_or_license_notes:
-```
+### <name>
+
+- URL:
+- Date checked:
+- Why relevant:
+- Adoption:
+  - reference-only | concept-only | dependency | copied-source
+- Notes:
 
 ## Rules
 
-- Link to official docs when available.
-- Prefer concept or dependency over copying code.
-- If copying code, record license, revision, original path, local path, and
-  copy boundary.
-- Do not paste long copyrighted text.
-- Re-check fast-moving SDK/API docs before implementing against them.
+- Do not copy source unless the license and provenance are recorded.
+- Prefer reference-only or concept-only adoption.
+- Official kit links live in `templates/links.md`.
 

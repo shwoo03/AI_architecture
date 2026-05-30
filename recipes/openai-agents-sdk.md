@@ -1,15 +1,20 @@
-# OpenAI Agents SDK Recipe
+# OpenAI Agents SDK recipe
 
-Use this recipe when the product or service needs an agent runtime.
+Official links: see `templates/links.md`.
 
-## When To Use
+## When to use
 
-- The application needs tool-using agents.
-- The app needs handoffs between specialized agents.
-- You need tracing, streaming, and runtime observability.
-- You are building a user-facing or service-facing agent workflow.
+- The app needs an embedded agent runtime.
+- The product needs tools, handoffs, guardrails, state, tracing, or evals.
+- Agent behavior is part of application logic.
 
-## Project Structure
+## When not to use
+
+- You only need coding assistant instructions.
+- There is no runtime app or product workflow.
+- A simple API call or local script is enough.
+
+## Minimal setup
 
 ```text
 AGENTS.md
@@ -23,23 +28,22 @@ src/agents/
   evals/
 ```
 
-## Practice
+## Checklist
 
-- Keep operational project instructions in `AGENTS.md`.
-- Keep agent runtime instructions close to runtime code.
-- Treat handoffs and tools as application behavior, not skeleton behavior.
-- Add tests or evals for tool contracts and handoff outcomes.
-- Record external sources in `docs/REFERENCES.md`.
+- Define the agent input/output contract.
+- Define the tool allowlist.
+- Add guardrails/evals for production paths.
+- Keep secrets outside the repository.
+- Do not rebuild orchestration in kit scripts.
 
-## Avoid
+## Common mistakes
 
-- Reimplementing SDK handoffs or tracing in custom scripts.
-- Mixing product agent prompts with repository operating instructions.
+- Mixing repository operating instructions with runtime agent prompts.
 - Granting tools broader access than the user flow needs.
+- Reimplementing SDK handoffs, tracing, or orchestration.
 
-Official references:
+## Policy sentence
 
-- https://platform.openai.com/docs/guides/agents-sdk/
-- https://platform.openai.com/docs/api-reference/responses
-- https://platform.openai.com/docs/guides/tools
+This repo uses the official SDK for agent runtime behavior. The starter kit only
+supplies canonical project docs, adapters, recipes, and profiles.
 

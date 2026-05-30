@@ -1,38 +1,22 @@
 # Handoff
 
-## Current State
-
-Describe what is true now in one or two short paragraphs.
-
-## Last Completed
+## Current state
 
 - 
 
-## Next Action
-
-1. 
-2. 
-3. 
-
-## Open Questions
+## Next action
 
 - 
 
-## Risks
+## Blockers / unknowns
 
 - 
 
-## Changed Files
+## Evidence
 
 - 
 
-## Validation
-
-- `not run`: 
-- `passed`: 
-- `failed`: 
-
-## Reference Links
+## Notes
 
 - 
 

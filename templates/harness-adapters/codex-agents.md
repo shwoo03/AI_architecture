@@ -1,16 +1,18 @@
-# Codex Adapter Notes
+# Codex adapter notes
 
-Codex should read `AGENTS.md` as the canonical project instruction file.
+<!--
+Generated from canonical starter-kit templates. Do not hand-edit long-lived
+rules here.
+-->
 
-Recommended use:
+Codex should consume `AGENTS.md` directly.
 
-- Put project-specific rules in `AGENTS.md`.
-- Keep detailed recipes in `docs/` or `recipes/`, linked from `AGENTS.md`.
-- Avoid duplicating full instructions in multiple files.
-- Use Codex for codebase edits, reviews, refactors, tests, and local
-  verification.
+Use this adapter only when a project wants a Codex-specific note alongside the
+canonical instructions.
 
-Official reference:
-
-- https://developers.openai.com/codex/guides/agents-md
+- Canonical instructions: `AGENTS.md`
+- Project profile: `docs/PROJECT_PROFILE.md`
+- Security and permissions: `docs/SECURITY.md`
+- Handoff: `docs/HANDOFF.md`
+- Official links: `docs/LINKS.md` if scaffolded, otherwise `templates/links.md` in the source kit.
 

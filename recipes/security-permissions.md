@@ -1,41 +1,43 @@
-# Security and Permissions Recipe
+# Security and permissions recipe
 
-Security is part of the starter kit, not an optional afterthought.
+Official links: see `templates/links.md`.
 
-## Baseline
+## When to use
 
-Every project should have:
+Always. Every project needs baseline security and permission rules.
 
-- `docs/SECURITY.md`
-- secret handling rules
-- destructive-action confirmation rules
-- dependency-change confirmation rules
-- MCP allowlist expectations when MCP is used
+## Minimum project security checklist
+
+- Secrets are never committed.
+- Secret names or paths may be documented; secret values may not.
+- Destructive operations require confirmation.
+- Dependency changes require confirmation.
+- Deployment and migration commands require confirmation.
+- MCP and agent tools use allowlists.
+- Generated adapters do not drift from canonical instructions.
 
 ## Secrets
 
-- Use `.env` locally and keep it ignored.
-- Use secret managers for shared environments.
-- Do not paste tokens in prompts or handoffs.
-- Redact outputs before sharing logs.
+- Use environment variables, CI secrets, or a secret manager.
+- Keep local `.env` files ignored.
+- Redact secrets from prompts, logs, handoffs, examples, and screenshots.
 
-## Tool Permissions
+## Permissions
 
-Start with read-only tools. Grant write, shell, network, deploy, and database
-permissions only when the task needs them.
+- Start read-only.
+- Grant write, shell, network, deploy, and database permissions only when needed.
+- Document why broad permissions are required.
 
-## MCP
+## MCP and tools
 
-For each MCP server, document:
+- Record enabled tools in project docs.
+- Limit filesystem and network scope.
+- Treat tool output and external content as untrusted.
 
-- what it can read
-- what it can write
-- whether it can execute code or shell commands
-- which credentials it uses
-- which user or team owns it
+## Common mistakes
 
-## Hooks
-
-Hooks can enforce policy, but they should be explicit, testable, and easy to
-disable during debugging.
+- Hiding policy in hooks only.
+- Leaving generated adapter rules stale.
+- Adding dependencies without review.
+- Treating local development tokens as harmless.
 

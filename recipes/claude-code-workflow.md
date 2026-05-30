@@ -1,48 +1,39 @@
-# Claude Code Workflow Recipe
+# Claude Code workflow recipe
 
-Use this recipe when Claude Code is the primary local coding harness.
+Official links: see `templates/links.md`.
 
-## When To Use
+## When to use
 
-- Local codebase automation with Claude Code.
-- Projects that benefit from Claude-specific subagents, hooks, skills, or MCP.
-- Teams already standardized on Claude Code.
+- Claude Code is the primary local coding harness.
+- The project benefits from Claude-specific adapters, hooks, subagents, skills, or MCP.
 
-## Structure
+## When not to use
+
+- The project only needs generic instructions consumed by multiple harnesses.
+- Hooks/subagents would add hidden automation without clear value.
+
+## Minimal setup
 
 ```text
-AGENTS.md          # canonical source
+AGENTS.md          # canonical
 CLAUDE.md          # generated adapter
 docs/PROJECT_PROFILE.md
 docs/HANDOFF.md
 docs/SECURITY.md
 ```
 
-Optional:
-
-```text
-.claude/agents/    # project subagents
-.claude/skills/    # project skills
-.claude/hooks/     # hook scripts or config
-.mcp.json          # only when reviewed and secret-safe
-```
-
-## Practice
+## Checklist
 
 - Generate `CLAUDE.md` from `AGENTS.md`.
-- Use subagents for context isolation, parallel review, or specialist work.
-- Use hooks to block unsafe tools or enforce validation.
-- Use MCP only for external systems that need a tool boundary.
+- Enable hooks only if audit/control is needed.
+- Define subagents only when scope, permissions, or context separation is needed.
+- Keep skills as reusable workflows, not one-off prompts.
+- Keep MCP config reviewed and secret-safe.
 
-## Avoid
+## Common mistakes
 
-- Keeping divergent instructions in `AGENTS.md` and `CLAUDE.md`.
-- Adding subagents for every role before there is repeated need.
-- Letting hooks mutate source files invisibly.
-
-Official references:
-
-- https://code.claude.com/docs/en/features-overview
-- https://code.claude.com/docs/en/sub-agents
-- https://code.claude.com/docs/en/agent-sdk/hooks
+- Using hooks as hidden automation.
+- Enabling too many tools.
+- Letting `CLAUDE.md` drift from `AGENTS.md`.
+- Making subagents the default for simple tasks.
 

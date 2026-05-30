@@ -1,21 +1,18 @@
-# MCP Adapter Notes
+# MCP adapter notes
 
-MCP configuration is project-specific. Keep this file as a checklist, not a
-universal config.
+<!--
+Generated from canonical starter-kit templates. Do not hand-edit long-lived
+rules here.
+-->
 
-For each MCP server, document:
+Use this adapter only when MCP is enabled.
 
-- Server name.
-- Local or remote transport.
-- Tools exposed.
-- Read/write/execute capability.
-- Required environment variables.
-- Allowlist or denied tools.
-- Owner and review date.
+Define host, client, server, tool allowlist, auth, filesystem scope, and network
+scope before enabling any MCP server. Do not store secrets in repository config.
 
-Never commit secrets in MCP config files.
-
-Official reference:
-
-- https://modelcontextprotocol.io/docs/learn/architecture
+- Canonical instructions: `AGENTS.md`
+- Project profile: `docs/PROJECT_PROFILE.md`
+- Security and permissions: `docs/SECURITY.md`
+- Handoff: `docs/HANDOFF.md`
+- Official links: `docs/LINKS.md` if scaffolded, otherwise `templates/links.md` in the source kit.
 

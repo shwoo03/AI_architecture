@@ -1,19 +1,19 @@
-# OpenAI Agents SDK Adapter Notes
+# OpenAI Agents SDK adapter notes
 
-Use the OpenAI Agents SDK when the application itself needs an agent runtime:
+<!--
+Generated from canonical starter-kit templates. Do not hand-edit long-lived
+rules here.
+-->
 
-- Tool-using application flows.
-- Handoffs between specialized agents.
-- Streaming partial results.
-- Tracing and operational visibility.
-- Reusable agent components inside a product.
+Use this adapter only for projects embedding an OpenAI Agents SDK runtime.
 
-Do not use this kit to reimplement the SDK runtime. Keep project instructions
-and security policy in the canonical templates, and keep runtime code in the
-application.
+This kit does not implement the runtime. Keep orchestration, tools, handoffs,
+guardrails, tracing, state, and evals in the application code that uses the
+official SDK.
 
-Official references:
-
-- https://platform.openai.com/docs/guides/agents-sdk/
-- https://platform.openai.com/docs/api-reference/responses
+- Canonical instructions: `AGENTS.md`
+- Project profile: `docs/PROJECT_PROFILE.md`
+- Security and permissions: `docs/SECURITY.md`
+- Handoff: `docs/HANDOFF.md`
+- Official links: `docs/LINKS.md` if scaffolded, otherwise `templates/links.md` in the source kit.
 

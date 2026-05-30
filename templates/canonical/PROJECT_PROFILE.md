@@ -1,49 +1,37 @@
-# Project Profile
+# Project profile
 
-## Identity
+## TL;DR
 
-- `project_name`:
-- `owner`:
-- `status`: draft | active | paused | archived
-- `created_at`:
+- <what this project is and why it exists>
 
-## Goal
+## Scope
 
-- `primary_goal`:
-- `target_users`:
-- `success_criteria`:
-- `failure_definition`:
-- `non_goals`:
+- In scope:
+- Out of scope:
 
-## Context
+## Environment
 
-- `stack`:
-- `runtime_environment`:
-- `data_sources`:
-- `external_dependencies`:
+- Language/framework:
+- Runtime:
+- CI/CD:
+- Deployment target:
 
 ## Constraints
 
-- `security_or_privacy_constraints`:
-- `compatibility_constraints`:
-- `budget_or_cost_constraints`:
-- `deployment_constraints`:
+- Data:
+- Security:
+- Budget/time:
+- Compatibility:
 
-## AI Tooling Choices
+## Risks
 
-- `primary_harness`: Codex | Claude Code | OpenAI Agents SDK | Claude Agent SDK | other
-- `uses_mcp`: yes | no | planned
-- `uses_skills`: yes | no | planned
-- `uses_reference_tracking`: none | lightweight | research-heavy
+- 
 
-## Validation
+## Success definition
 
-- `check_command`:
-- `lint_command`:
-- `test_command`:
-- `smoke_command`:
+- 
 
-## Open Questions
+## Non-goals
 
-- `[NEEDS CLARIFICATION: add a concrete question here]`
+- 
 

@@ -1,50 +1,62 @@
-# MCP Connection Recipe
+# MCP connection recipe
 
-MCP is a standard way to connect AI hosts and clients to external tools and
-data through servers. This kit treats MCP as a connection boundary, not as a
-default project requirement.
+Official links: see `templates/links.md`.
 
-## When To Use
+MCP is a standard connection layer for external systems. In this kit, MCP is an
+optional boundary for tools and data, not a default project requirement.
 
-- The project needs repeated access to external systems.
-- Tool calls need a typed and inspectable boundary.
-- Multiple harnesses or clients should share the same tool server.
-- The tool has meaningful permissions or security risk.
+## When to use
 
-## When Not To Use
+- The project needs data, tools, or workflows beyond the local repository.
+- Multiple harnesses should share one tool boundary.
+- The external tool needs permissions, auth, or audit.
 
-- A simple local function or one-off HTTP request is enough.
-- The tool has no durable use beyond a single task.
-- You cannot define the permission boundary.
+## When not to use
 
-## Suggested Structure
+- One local function or one HTTP request is enough.
+- The permission boundary cannot be described.
+- The project has no repeated tool need.
+
+## Concepts
+
+- Host: the AI app or coding harness.
+- Client: the component connecting the host to a server.
+- Server: the process exposing tools, resources, or prompts.
+
+## Directory convention
 
 ```text
 mcp/
-  servers/
-    <server-name>/
-      README.md
-      config.example.json
-      env.example
-      tools.md
-      security.md
-  clients/
-    claude-code.md
-    codex.md
-    openai-agents-sdk.md
+  servers/<name>/server-config.md
+  clients/<host>/client-config.md
 ```
 
-## Security Checklist
+## Checklist
 
-- Document every exposed tool.
-- Prefer read-only tools first.
-- Use allowlists.
-- Store secrets in environment variables or a secret manager.
-- Review remote MCP servers before enabling them.
-- Do not expose shell, filesystem, or network tools broadly.
+- Define allowed tools.
+- Define secrets/auth boundary.
+- Limit filesystem and network scope.
+- Record consent or approval requirements.
+- Treat tool descriptions and external content as untrusted.
 
-Official references:
+## Example server-config.md
 
-- https://modelcontextprotocol.io/docs/learn/architecture
-- https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization
+```text
+# <server-name>
+
+purpose:
+tool allowlist:
+auth method:
+secret names or paths:
+filesystem boundary:
+network boundary:
+owner:
+review date:
+```
+
+## Common mistakes
+
+- Exposing broad shell or filesystem tools.
+- Committing credentials in MCP config.
+- Enabling remote servers without review.
 

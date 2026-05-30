@@ -1,38 +1,40 @@
-# Codex Workflow Recipe
+# Codex workflow recipe
 
-Use this recipe when Codex is the primary coding agent.
+Official links: see `templates/links.md`.
 
-## When To Use
+## When to use
 
-- Small or medium codebase work.
-- Refactors, tests, reviews, bug fixes, and local implementation.
-- Projects that need a durable instruction file but not a custom agent runtime.
+- Codex is the primary coding agent.
+- The project needs reusable project instructions, not a custom runtime.
+- Work is mostly code editing, review, refactoring, testing, or local validation.
 
-## Structure
+## When not to use
+
+- The application needs an embedded agent runtime.
+- The project needs product-level tool orchestration, tracing, or handoffs.
+
+## Minimal setup
 
 ```text
 AGENTS.md
 docs/PROJECT_PROFILE.md
 docs/HANDOFF.md
 docs/SECURITY.md
-docs/REFERENCES.md  # optional
+docs/REFERENCES.md
 ```
 
-## Practice
+## Checklist
 
-- Keep `AGENTS.md` short and project-specific.
-- Put success criteria in `PROJECT_PROFILE.md`.
-- Update `HANDOFF.md` at stopping points.
-- Link official docs or external examples in `REFERENCES.md`.
-- Do not add custom routing scripts until repeated work proves they help.
+- Fill `AGENTS.md`.
+- Fill `docs/PROJECT_PROFILE.md`.
+- Set one primary validation command.
+- Update `docs/HANDOFF.md` before stopping.
+- Generate extra Codex notes only when the project needs them.
 
-## Avoid
+## Common mistakes
 
-- Recreating an agent loop in local scripts.
-- Making every project carry audit ledgers or proposal queues.
-- Hiding project-specific rules in global user settings.
-
-Official reference:
-
-- https://developers.openai.com/codex/guides/agents-md
+- Duplicating long rules in multiple files.
+- Leaving stale generated adapters.
+- Putting secrets in `AGENTS.md`.
+- Adding a local workflow CLI before repeated work proves it helps.
 

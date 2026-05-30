@@ -1,16 +1,19 @@
-# Claude Agent SDK Recipe
+# Claude Agent SDK recipe
 
-Use this recipe when you want to build programmatic workflows around Claude
-Code-style tools, hooks, context management, and local automation.
+Official links: see `templates/links.md`.
 
-## When To Use
+## When to use
 
-- You need Claude Code behavior from an application or scripted workflow.
-- You need hooks for tool interception or audit.
-- You need project-specific plugins, skills, or MCP servers loaded
-  programmatically.
+- The project needs programmatic Claude Code-like agent behavior.
+- The workflow includes file, command, or code editing automation.
+- Hooks, permissions, sessions, or optional subagents need to be controlled in code.
 
-## Project Structure
+## When not to use
+
+- A normal Claude Code session and `CLAUDE.md` adapter are enough.
+- The project does not need programmatic control.
+
+## Minimal setup
 
 ```text
 AGENTS.md
@@ -21,26 +24,21 @@ docs/SECURITY.md
 src/claude_agent/
   options/
   hooks/
-  tools/
   tests/
 ```
 
-## Practice
+## Checklist
 
-- Use SDK hooks for policy enforcement, logging, and permission handling.
-- Keep hook behavior explicit and testable.
-- Treat subagents as isolated specialists with clear scope.
-- Keep secrets outside repository config.
+- Set `allowed_tools`.
+- Choose permission mode.
+- Decide whether sessions persist.
+- Add hooks only for explicit control or audit needs.
+- Add subagents only for bounded specialist work.
 
-## Avoid
+## Common mistakes
 
+- Making subagents default.
 - Using hooks as hidden business logic.
-- Spawning subagents without a bounded task and allowed tools.
 - Duplicating canonical project rules in SDK options.
-
-Official references:
-
-- https://code.claude.com/docs/en/agent-sdk/hooks
-- https://code.claude.com/docs/en/sub-agents
-- https://docs.claude.com/en/api/agent-sdk/plugins
+- Granting shell or file write access without a documented reason.
 

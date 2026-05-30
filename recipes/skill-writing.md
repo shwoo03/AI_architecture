@@ -1,66 +1,60 @@
-# Skill Writing Recipe
+# Skill writing recipe
 
-Use skills for repeated workflows. Do not create skills for one-off prompts.
+Official links: see `templates/links.md`.
 
-## Recommended Structure
+A skill is a small reusable workflow contract. Do not create skills for one-off
+tasks.
 
-```text
-skills/
-  <skill-name>/
-    skill.md
-    accept.md       # optional
-    deps.md         # optional
-    examples/       # optional
-```
+## When to use
 
-## Required Sections
+- A workflow repeats across projects or sessions.
+- Inputs, outputs, permissions, and verification can be described.
+- The skill reduces real duplication or operational risk.
 
-`skill.md` should include:
+## When not to use
 
-- Purpose and scope.
-- Activation condition.
-- Input contract.
-- Output contract.
-- Required tools and permissions.
-- Failure modes.
-- Verification.
-- Examples.
-- Anti-patterns.
+- The task is a one-off prompt.
+- The workflow has unclear activation conditions.
+- The skill would silently perform broad side effects.
 
-## Input Contract Example
+## Template
 
 ```text
-Input:
-- target_path: required path under repository root
-- mode: review | edit | generate
-- constraints: optional list of project constraints
+# <skill-name>
+
+## Purpose
+
+## Activation
+
+## Input contract
+
+## Output contract
+
+## Required tools / permissions
+
+## Failure modes
+
+## Verification
+
+## Examples
+
+## Anti-patterns
 ```
 
-## Output Contract Example
+## Checklist
 
-```text
-Output:
-- summary
-- changed_files
-- validation
-- blockers
-```
+- Purpose is one sentence.
+- Activation condition is specific.
+- Inputs and outputs are named.
+- Tool permissions are explicit.
+- Failure modes say whether retry is safe.
+- Verification has at least one acceptance check.
+- Examples include one good and one bad use.
 
-## Failure Modes
+## Common mistakes
 
-Classify failures as:
-
-- `needs_user_input`
-- `blocked_by_permission`
-- `dependency_missing`
-- `validation_failed`
-- `unsafe_to_continue`
-
-## Anti-Patterns
-
-- Skills that silently edit broad parts of the repo.
-- Skills that require undocumented secrets.
-- Skills that duplicate official SDK behavior.
-- Skills with vague activation conditions.
-- Skills that cannot be validated.
+- Using natural-language-only inputs for structured tasks.
+- Leaving side effects after failure.
+- Replacing official SDK behavior with a skill.
+- Creating a skill that cannot be validated.
 
