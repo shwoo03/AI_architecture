@@ -15,6 +15,9 @@ This repository is an AI project starter kit. It is not an agent runtime.
 - Prefer recipes, templates, profiles, and examples over new scripts.
 - Treat examples as first-class documentation.
 - When improving a recipe, add a small example if it prevents ambiguity.
+- Treat dogfood reports as evidence for improving templates, recipes, and examples.
+- Prefer fixing repeated dogfood issues over reacting to one-off project quirks.
+- Do not put secrets, private tokens, customer data, or proprietary source in dogfood reports.
 - Keep Python scaffold helpers optional and small.
 - New automation must justify why existing tools, official harness features, or Markdown templates are insufficient.
 - Do not create default-generated `.claude/skills`, `.claude/agents`, MCP servers, runtime logs, or proposal queues.

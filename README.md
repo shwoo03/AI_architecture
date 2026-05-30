@@ -78,6 +78,7 @@ examples/            Minimal example shapes.
   skills/open-source-adoption/
   openai-agents-sdk-app/
   claude-agent-sdk-app/
+dogfood/             Sanitized adoption reports, backlog, and repeated lessons.
 tools/scaffold/      Optional copy/generate helpers.
 ```
 
@@ -92,6 +93,15 @@ Recommended order:
 3. Copy the closest example.
 4. Adapt it to the project.
 5. Record decisions in `docs/REFERENCES.md`.
+
+## Dogfooding
+
+Apply the kit to real projects, then write a short sanitized report in
+`dogfood/reports/`.
+
+Use `dogfood/backlog.md` to triage actionable kit improvements. Promote repeated
+lessons to recipes, templates, examples, or README only after they repeat across
+projects.
 
 ## Minimum Project Surface
 
