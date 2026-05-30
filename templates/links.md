@@ -5,6 +5,13 @@ Last verified: 2026-05-30
 This file is the single place for official documentation links used by the kit.
 Canonical templates and recipes should reference this file instead of duplicating URLs.
 
+## Freshness policy
+
+- Review this file monthly or before major kit releases.
+- Prefer official docs over blog posts.
+- Update `Last verified` only after checking links.
+- When official docs change behavior, update the matching recipe or example.
+
 ## Codex
 
 - Codex AGENTS.md guide

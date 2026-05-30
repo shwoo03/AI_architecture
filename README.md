@@ -6,6 +6,9 @@ scaffold helpers. It is not an agent runtime.
 
 Official links are centralized in `templates/links.md`.
 
+Start with `START_HERE.md` if you are applying the kit to a project for the
+first time.
+
 ## Design Rules
 
 1. Runtime belongs to official SDKs and harnesses.
@@ -67,6 +70,8 @@ templates/
   links.md           Official documentation link registry.
   canonical/         Source templates shared by all harnesses.
   harness-adapters/  Short generated adapter templates.
+START_HERE.md        First-use guide for applying the kit.
+CHANGELOG.md         Release notes.
 recipes/             Practical setup guides and checklists.
   open-source-reuse.md
 references/
@@ -87,6 +92,7 @@ tools/scaffold/      Optional copy/generate helpers.
 ## Examples
 
 Use examples when you want a concrete pattern before applying a recipe.
+See `examples/README.md` for the index.
 
 Recommended order:
 
