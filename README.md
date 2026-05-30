@@ -74,6 +74,8 @@ START_HERE.md        First-use guide for applying the kit.
 CHANGELOG.md         Release notes.
 recipes/             Practical setup guides and checklists.
   open-source-reuse.md
+  hook-policy.md
+  plugin-packaging.md
 references/
   community-ai-systems.md  Non-official community/open-source AI systems catalog.
 profiles/            Project-shape checklists.
@@ -82,6 +84,8 @@ examples/            Minimal example shapes.
   reference-decisions/
   mcp-configs/
   claude-subagents/
+  hooks/
+  plugins/
   skills/open-source-adoption/
   openai-agents-sdk-app/
   claude-agent-sdk-app/
@@ -147,6 +151,8 @@ skills unless the project profile calls for them.
 - No default logs or ledgers.
 - No default MCP servers.
 - No default skills or subagents.
+- No default hooks.
+- No default plugins.
 - No dependency automation.
 
 ## Quick Start
@@ -169,6 +175,9 @@ python3 tools/scaffold/gen-harness-instructions.py --list-harnesses
 - Use Claude Agent SDK when you need programmatic Claude Code-like behavior.
 - Use MCP only when external tools/data need a reviewed tool boundary.
 - Use skills only for repeated workflows with clear contracts.
+- Use hooks only for reviewed lifecycle checks or guardrails.
+- Use plugins only when skills/hooks/agents/MCP need a reviewed reusable package.
+- Do not enable hooks or plugins by default.
 
 For details, start with the matching file in `profiles/`, then open only the
 recipes that profile names.

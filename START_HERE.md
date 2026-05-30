@@ -34,6 +34,8 @@ manually.
 - Claude Agent SDK app -> read `recipes/claude-agent-sdk.md`
 - MCP -> read `recipes/mcp-connection.md`
 - Skills -> read `recipes/skill-writing.md`
+- Hooks -> read `recipes/hook-policy.md`
+- Plugins -> read `recipes/plugin-packaging.md`
 - Community systems -> read `references/community-ai-systems.md`
 
 ## 5. Record adoption decisions
@@ -46,4 +48,3 @@ community systems, copied source, adapters, forks, or custom implementation.
 If the kit feels too heavy or incomplete, write a sanitized report in
 `dogfood/reports/` and add only actionable repeated issues to
 `dogfood/backlog.md`.
-

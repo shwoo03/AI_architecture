@@ -21,6 +21,7 @@ conventions.
 - Existing development docs.
 - Existing CI and test commands.
 - Existing Claude/Codex/Cursor/IDE instructions.
+- Existing hooks/plugins and generated extension configs.
 
 ## Replacement Policy
 
@@ -29,9 +30,12 @@ conventions.
 - Replace in small slices.
 - Keep rollback plan.
 - Record rejected candidates.
+- Watch for hidden hooks/plugins in legacy config.
+- Remove duplicates before adding packaged plugins.
 
 ## Avoid
 
 - Bulk moving files.
 - Adding a custom workflow CLI.
 - Replacing project-specific rules with generic starter kit rules.
+- Adding new hooks/plugins before understanding existing automation.

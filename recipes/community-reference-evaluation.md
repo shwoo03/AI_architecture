@@ -24,6 +24,8 @@ Use this recipe when considering:
 
 - agent harnesses
 - Claude/Codex workflow layers
+- plugin packs
+- hook packs
 - skill packs
 - MCP servers
 - subagent packs
@@ -72,6 +74,7 @@ For each candidate:
 
 - Requires broad shell/file/network access by default.
 - Installs hidden hooks or background jobs.
+- Hides shell/MCP behavior inside plugin-bundled hooks or settings.
 - Writes global config without clear uninstall.
 - Duplicates official SDK/harness behavior without clear value.
 - Encourages bypassing sandbox/approval by default.
@@ -101,4 +104,3 @@ Use:
 - Installing large workflow layers before trying official SDK features.
 - Copying prompt/skill packs without reviewing permissions.
 - Reintroducing agent-flow-like runtime behavior under a new name.
-

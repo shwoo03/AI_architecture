@@ -29,9 +29,11 @@ research/
 - Do not rank by stars alone.
 - Inspect code/API fit, release activity, issue quality, license, and integration cost.
 - End each reference with an adoption mode.
+- Evaluate community hook/plugin packs with `recipes/community-reference-evaluation.md`.
 
 ## Avoid
 
 - Link dumps with no reason.
 - Copying repository structures wholesale.
 - Turning research into a blocking workflow for simple implementation tasks.
+- Installing hook/plugin packs before review.

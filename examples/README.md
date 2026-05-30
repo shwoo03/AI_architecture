@@ -19,6 +19,14 @@ they are not copied into scaffolded projects by default.
 
 - `examples/claude-subagents/`
 
+## Hook examples
+
+- `examples/hooks/`
+
+## Plugin examples
+
+- `examples/plugins/`
+
 ## OpenAI Agents SDK app shape
 
 - `examples/openai-agents-sdk-app/`
@@ -35,4 +43,3 @@ they are not copied into scaffolded projects by default.
 
 - `examples/minimal-codex-project/`
 - `examples/mcp-enabled-tool/`
-

@@ -23,6 +23,8 @@ apps.
 - specialist ledgers
 - MCP servers
 - skills directory
+- hooks
+- plugins
 
 ## Recommended Harness
 
@@ -34,3 +36,5 @@ Use Codex or Claude Code directly. Keep the project instructions short.
 - For infrastructure-like features, run `recipes/open-source-reuse.md`.
 - Record only the selected/rejected decision in `docs/REFERENCES.md`.
 - Do not add heavy dependency gates by default.
+- Avoid hooks/plugins by default.
+- Use normal validation commands before lifecycle automation.

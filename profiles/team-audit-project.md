@@ -21,6 +21,8 @@ docs/VALIDATION.md
 - Record important architecture and security decisions.
 - Use lightweight reference entries for external ideas.
 - Add CI checks from the project stack, not from this kit.
+- Hooks/plugins require owner, review date, and rollback path.
+- Plugin/hook adoption should be recorded in `docs/REFERENCES.md`.
 
 ## Dependency Adoption Gate
 
@@ -38,4 +40,6 @@ Before adding a dependency:
 - `recipes/security-permissions.md`
 - `recipes/reference-lite.md`
 - `recipes/mcp-connection.md`
+- `recipes/hook-policy.md`
+- `recipes/plugin-packaging.md`
 - `recipes/open-source-reuse.md`

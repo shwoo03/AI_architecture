@@ -23,6 +23,18 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - https://developers.openai.com/api/docs/guides/agents
   - Use for: Codex-specific adapters and optional workflow notes.
 
+- Codex hooks
+  - https://developers.openai.com/codex/hooks
+  - Use for: optional lifecycle hook configuration, trust/review flow, and hook event behavior.
+
+- Codex plugins
+  - https://developers.openai.com/codex/plugins
+  - Use for: installing and managing Codex plugin packages.
+
+- Codex build plugins
+  - https://developers.openai.com/codex/plugins/build
+  - Use for: plugin packaging rules, `.codex-plugin/plugin.json`, bundled skills/hooks/MCP/app config.
+
 ## OpenAI
 
 - OpenAI Agents SDK guide
@@ -49,7 +61,11 @@ Canonical templates and recipes should reference this file instead of duplicatin
 
 - Claude Code hooks
   - https://code.claude.com/docs/en/hooks
-  - Use for: optional lifecycle interception and audit hooks.
+  - Use for: lifecycle hooks, event schemas, command/HTTP/prompt hooks, security guidance.
+
+- Claude Code plugins
+  - https://code.claude.com/docs/en/plugins
+  - Use for: plugin packaging, `.claude-plugin/plugin.json`, skills/agents/hooks/MCP bundling.
 
 - Claude Code MCP
   - https://code.claude.com/docs/en/mcp

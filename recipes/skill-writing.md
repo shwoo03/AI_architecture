@@ -69,6 +69,12 @@ Do not add `.claude/skills/` to generated projects by default.
   permission is justified.
 - Skills must not replace official SDK/runtime behavior.
 
+## Plugin packaging
+
+If multiple skills/hooks/agents/MCP configs need to be reused together, consider
+plugin packaging. Do not package a plugin just to avoid writing a clear recipe.
+See `recipes/plugin-packaging.md`.
+
 ## Reuse-first skills
 
 Use a skill when you repeatedly paste the same checklist or multi-step procedure.

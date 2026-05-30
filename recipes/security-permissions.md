@@ -53,12 +53,22 @@ For team/audit projects, consider GitHub Dependency Review, OSV-Scanner, OpenSSF
 - Limit filesystem and network scope.
 - Do not store tokens in the repo.
 
+## Hooks and plugins
+
+- Hooks run automatically and may execute commands.
+- Plugins may bundle hooks, MCP servers, agents, binaries, settings, or skills.
+- Review source, license, permissions, hooks, MCP, binaries, and rollback path.
+- Do not install plugins globally by default.
+- Do not create hidden automation through hooks.
+- Record hook/plugin adoption in `docs/REFERENCES.md`.
+
 ## Common mistakes
 
 - Hiding policy in hooks only.
 - Leaving generated adapter rules stale.
 - Adding dependencies without review.
 - Treating local development tokens as harmless.
+- Treating plugin packaging as a security review.
 
 ## Example-driven checks
 

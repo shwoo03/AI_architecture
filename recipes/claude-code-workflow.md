@@ -25,10 +25,12 @@ docs/SECURITY.md
 ## Checklist
 
 - Generate `CLAUDE.md` from `AGENTS.md`.
-- Enable hooks only if audit/control is needed.
+- Enable hooks only for explicit lifecycle checks, guardrails, or audit/control.
+- Use plugins only for packaging reviewed reusable skills/hooks/agents/MCP.
 - Define subagents only when scope, permissions, or context separation is needed.
 - Keep skills as reusable workflows, not one-off prompts.
 - Keep MCP config reviewed and secret-safe.
+- Do not include hooks or plugins in default project setup.
 
 ## Common mistakes
 
@@ -36,6 +38,8 @@ docs/SECURITY.md
 - Enabling too many tools.
 - Letting `CLAUDE.md` drift from `AGENTS.md`.
 - Making subagents the default for simple tasks.
+- Using plugins to hide hooks, MCP, shell permissions, or settings.
+- Adding hooks/plugins without owner, review date, and rollback path.
 
 ## Subagent decision rule
 
@@ -65,3 +69,13 @@ Use a skill only when:
 - verification is possible
 
 Do not use a skill for one-off prompts.
+
+## Hooks and plugins
+
+- Hooks are for explicit lifecycle checks only.
+- Plugins are for packaging reviewed reusable components.
+- Default project setup should not include hooks or plugins.
+- Read `recipes/hook-policy.md` before enabling hooks.
+- Read `recipes/plugin-packaging.md` before creating or adopting plugins.
+- Example hooks live in `examples/hooks/`.
+- Example plugin skeletons and checklists live in `examples/plugins/`.

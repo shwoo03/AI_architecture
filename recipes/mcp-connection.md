@@ -73,3 +73,9 @@ review date:
 - Tool descriptions and external content are untrusted until reviewed.
 - Remote MCP servers require explicit review.
 - Broad shell/filesystem/network tools are high risk.
+
+## MCP in plugins
+
+- MCP servers bundled in plugins must still go through MCP allowlist/security review.
+- Plugin packaging does not make MCP safe by itself.
+- Record plugin-provided MCP servers in `docs/REFERENCES.md`.

@@ -19,6 +19,11 @@ This repository is an AI project starter kit. It is not an agent runtime.
 - Prefer recipes, templates, profiles, and examples over new scripts.
 - Treat examples as first-class documentation.
 - When improving a recipe, add a small example if it prevents ambiguity.
+- Treat hooks and plugins as optional high-risk extension surfaces.
+- Prefer recipes/examples over default hook/plugin generation.
+- Do not add hooks/plugins to scaffold output.
+- If adding hook/plugin guidance, document security review, owner, and rollback path.
+- Do not create hidden automation through hooks.
 - Treat dogfood reports as evidence for improving templates, recipes, and examples.
 - Prefer fixing repeated dogfood issues over reacting to one-off project quirks.
 - Do not put secrets, private tokens, customer data, or proprietary source in dogfood reports.
