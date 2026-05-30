@@ -1,6 +1,0 @@
-{
-  "name": "ai-architecture-harness",
-  "version": "0.1.0",
-  "description": "Reusable AI agent harness skeleton with canonical skills, rules, ledgers, and verification gates.",
-  "entrypoint": "CLAUDE.md"
-}
