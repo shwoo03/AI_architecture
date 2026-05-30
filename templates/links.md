@@ -49,11 +49,39 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - https://platform.openai.com/docs/api-reference/responses
   - Use for: low-level API integration and stateful response workflows.
 
+- OpenAI conversation state
+  - https://developers.openai.com/api/docs/guides/conversation-state
+  - Use for: Responses API conversation state, Conversations API, previous_response_id, context window considerations.
+
+- OpenAI Agents SDK sessions
+  - https://openai.github.io/openai-agents-python/sessions/
+  - Use for: built-in session memory, SQLiteSession, RedisSession, session sharing, compaction session.
+
+- OpenAI evals
+  - https://developers.openai.com/api/docs/guides/evals
+  - Use for: model/application evaluation loop, datasets, eval runs, regression checks.
+
+- OpenAI compaction
+  - https://developers.openai.com/api/docs/guides/compaction
+  - Use for: context management and compaction concepts.
+
 ## Claude
 
 - Claude Agent SDK overview
   - https://code.claude.com/docs/en/agent-sdk/overview
   - Use for: Claude Code as a programmable agent runtime.
+
+- Claude Code memory
+  - https://code.claude.com/docs/en/memory
+  - Use for: CLAUDE.md, auto memory, /memory, compaction survival, rules organization.
+
+- Claude Code checkpointing
+  - https://code.claude.com/docs/en/checkpointing
+  - Use for: rewind, session safety, edit checkpoints.
+
+- Claude Code worktrees
+  - https://code.claude.com/docs/en/worktrees
+  - Use for: parallel sessions, worktree isolation, subagent isolation.
 
 - Claude Code subagents
   - https://code.claude.com/docs/en/sub-agents
@@ -70,6 +98,16 @@ Canonical templates and recipes should reference this file instead of duplicatin
 - Claude Code MCP
   - https://code.claude.com/docs/en/mcp
   - Use for: Claude-specific MCP setup.
+
+## Agent memory / context references
+
+- LangGraph memory overview
+  - https://docs.langchain.com/oss/python/concepts/memory
+  - Use for: short-term vs long-term memory, semantic/episodic/procedural memory concepts.
+
+- LlamaIndex agent memory
+  - https://developers.llamaindex.ai/python/framework/module_guides/deploying/agents/memory/
+  - Use for: short-term/long-term memory blocks, fact extraction memory, vector memory, token-based flushing.
 
 ## Claude skills
 

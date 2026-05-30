@@ -21,6 +21,9 @@ research/
 - Record adoption mode.
 - Create a decision note before copying code or adopting architecture.
 - Re-check fast-moving SDK docs before implementation.
+- Use `recipes/research-material-management.md`.
+- Keep source cards, briefs, syntheses, and applied change records.
+- Promote only repeated findings to templates/recipes/examples.
 
 ## Research Policy
 

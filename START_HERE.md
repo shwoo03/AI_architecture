@@ -36,6 +36,10 @@ manually.
 - Skills -> read `recipes/skill-writing.md`
 - Hooks -> read `recipes/hook-policy.md`
 - Plugins -> read `recipes/plugin-packaging.md`
+- Long-running projects -> read `recipes/session-continuity.md`
+- Papers/blogs/repo analysis -> read `recipes/research-material-management.md`
+- Agent runtime quality -> read `recipes/eval-feedback-loop.md`
+- Parallel sessions -> read `recipes/worktree-isolation.md`
 - Community systems -> read `references/community-ai-systems.md`
 
 ## 5. Record adoption decisions

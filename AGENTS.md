@@ -24,6 +24,11 @@ This repository is an AI project starter kit. It is not an agent runtime.
 - Do not add hooks/plugins to scaffold output.
 - If adding hook/plugin guidance, document security review, owner, and rollback path.
 - Do not create hidden automation through hooks.
+- Preserve session continuity through files, not chat memory.
+- Do not rely on conversation-only instructions for stable decisions.
+- Promote stable facts to canonical docs or optional `PROJECT_MEMORY`.
+- Put detailed paper/blog/repo analysis in research examples or project research docs.
+- Do not add default memory/research/eval/worktree automation.
 - Treat dogfood reports as evidence for improving templates, recipes, and examples.
 - Prefer fixing repeated dogfood issues over reacting to one-off project quirks.
 - Do not put secrets, private tokens, customer data, or proprietary source in dogfood reports.

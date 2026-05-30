@@ -75,6 +75,26 @@ If multiple skills/hooks/agents/MCP configs need to be reused together, consider
 plugin packaging. Do not package a plugin just to avoid writing a clear recipe.
 See `recipes/plugin-packaging.md`.
 
+## Command-like skills
+
+Claude Code custom commands are now effectively skill-like workflows. Prefer
+skills for repeatable commands because skill content loads only when used.
+
+Use command-like skills when:
+
+- you repeatedly paste the same procedure
+- the procedure has clear inputs/outputs
+- supporting files are useful
+- it should not live in `AGENTS.md` all the time
+
+Do not use command-like skills when:
+
+- a one-line shell alias is enough
+- the workflow has broad side effects
+- the project does not trust the skill source
+
+Example: `examples/skills/open-source-adoption/`
+
 ## Reuse-first skills
 
 Use a skill when you repeatedly paste the same checklist or multi-step procedure.

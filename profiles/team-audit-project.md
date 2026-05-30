@@ -23,6 +23,9 @@ docs/VALIDATION.md
 - Add CI checks from the project stack, not from this kit.
 - Hooks/plugins require owner, review date, and rollback path.
 - Plugin/hook adoption should be recorded in `docs/REFERENCES.md`.
+- Consider research material management for important dependency/security decisions.
+- Use `recipes/eval-feedback-loop.md` for repeated quality failures.
+- Keep sanitized evidence.
 
 ## Dependency Adoption Gate
 
@@ -42,4 +45,6 @@ Before adding a dependency:
 - `recipes/mcp-connection.md`
 - `recipes/hook-policy.md`
 - `recipes/plugin-packaging.md`
+- `recipes/research-material-management.md`
+- `recipes/eval-feedback-loop.md`
 - `recipes/open-source-reuse.md`

@@ -22,6 +22,7 @@ conventions.
 - Existing CI and test commands.
 - Existing Claude/Codex/Cursor/IDE instructions.
 - Existing hooks/plugins and generated extension configs.
+- Existing handoff, memory, or research notes.
 
 ## Replacement Policy
 
@@ -32,6 +33,8 @@ conventions.
 - Record rejected candidates.
 - Watch for hidden hooks/plugins in legacy config.
 - Remove duplicates before adding packaged plugins.
+- Use `recipes/session-continuity.md` to avoid rediscovering legacy constraints.
+- Use research material management when replacing custom internal code with open source.
 
 ## Avoid
 

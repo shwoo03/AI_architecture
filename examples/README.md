@@ -27,6 +27,22 @@ they are not copied into scaffolded projects by default.
 
 - `examples/plugins/`
 
+## Session continuity examples
+
+- `examples/session-continuity/`: new-session startup, handoff, and memory promotion.
+
+## Research material examples
+
+- `examples/research-materials/`: source cards, briefs, syntheses, and applied changes.
+
+## Eval feedback examples
+
+- `examples/eval-feedback/`: eval plans, trace reviews, and regression cases.
+
+## Worktree isolation examples
+
+- `examples/worktree-isolation/`: parallel session handoff and Claude worktree policy.
+
 ## OpenAI Agents SDK app shape
 
 - `examples/openai-agents-sdk-app/`

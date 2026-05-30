@@ -38,3 +38,5 @@ Use Codex or Claude Code directly. Keep the project instructions short.
 - Do not add heavy dependency gates by default.
 - Avoid hooks/plugins by default.
 - Use normal validation commands before lifecycle automation.
+- Use `docs/HANDOFF.md` only for continuity.
+- Do not add `docs/PROJECT_MEMORY.md`, `research/`, evals, or worktrees unless friction appears.

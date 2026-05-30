@@ -70,12 +70,17 @@ templates/
   links.md           Official documentation link registry.
   canonical/         Source templates shared by all harnesses.
   harness-adapters/  Short generated adapter templates.
+  optional/          Optional templates not copied by default.
 START_HERE.md        First-use guide for applying the kit.
 CHANGELOG.md         Release notes.
 recipes/             Practical setup guides and checklists.
   open-source-reuse.md
   hook-policy.md
   plugin-packaging.md
+  session-continuity.md
+  research-material-management.md
+  eval-feedback-loop.md
+  worktree-isolation.md
 references/
   community-ai-systems.md  Non-official community/open-source AI systems catalog.
 profiles/            Project-shape checklists.
@@ -86,6 +91,10 @@ examples/            Minimal example shapes.
   claude-subagents/
   hooks/
   plugins/
+  session-continuity/
+  research-materials/
+  eval-feedback/
+  worktree-isolation/
   skills/open-source-adoption/
   openai-agents-sdk-app/
   claude-agent-sdk-app/
@@ -127,6 +136,25 @@ and record the decision in `docs/REFERENCES.md`.
 Examples include ECC, Hermes Agent, Oh My Codex, and Paperclip. See the
 reference catalog for details.
 
+## Session Continuity
+
+Use `docs/HANDOFF.md` for current session state. Use optional
+`docs/PROJECT_MEMORY.md` only for stable facts that should survive many
+sessions. Use `research/` only for research-heavy projects.
+
+Do not build a custom memory system in this kit.
+
+## Research Materials
+
+Use `recipes/research-material-management.md` when papers, blogs, official docs,
+issues, or repos materially affect a decision.
+
+Research should flow:
+
+```text
+source -> brief -> synthesis -> applied change -> docs/REFERENCES.md or kit update
+```
+
 ## Minimum Project Surface
 
 For a small project, scaffold:
@@ -153,6 +181,10 @@ skills unless the project profile calls for them.
 - No default skills or subagents.
 - No default hooks.
 - No default plugins.
+- No default project memory file.
+- No default research archive.
+- No eval runtime.
+- No worktree automation.
 - No dependency automation.
 
 ## Quick Start
@@ -177,6 +209,9 @@ python3 tools/scaffold/gen-harness-instructions.py --list-harnesses
 - Use skills only for repeated workflows with clear contracts.
 - Use hooks only for reviewed lifecycle checks or guardrails.
 - Use plugins only when skills/hooks/agents/MCP need a reviewed reusable package.
+- Use session-continuity recipe for long-running projects.
+- Use eval-feedback-loop for agent runtime apps or repeated agent failure.
+- Use worktree-isolation for parallel sessions.
 - Do not enable hooks or plugins by default.
 
 For details, start with the matching file in `profiles/`, then open only the
