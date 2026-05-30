@@ -51,10 +51,20 @@ tasks.
 - Verification has at least one acceptance check.
 - Examples include one good and one bad use.
 
+## Reuse-first skills
+
+Use a skill when you repeatedly paste the same checklist or multi-step procedure.
+
+Recommended optional skill:
+
+- `open-source-adoption`
+- Purpose: force agents to evaluate official SDKs/open-source projects before custom infrastructure.
+
+A skill should be concise. Supporting files can hold candidate cards and decision matrices. Skills are optional and should not be enabled by default in every generated project.
+
 ## Common mistakes
 
 - Using natural-language-only inputs for structured tasks.
 - Leaving side effects after failure.
 - Replacing official SDK behavior with a skill.
 - Creating a skill that cannot be validated.
-

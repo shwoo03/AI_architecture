@@ -44,13 +44,15 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - https://code.claude.com/docs/en/hooks
   - Use for: optional lifecycle interception and audit hooks.
 
-- Claude Code skills
-  - https://code.claude.com/docs/en/skills
-  - Use for: optional reusable workflows.
-
 - Claude Code MCP
   - https://code.claude.com/docs/en/mcp
   - Use for: Claude-specific MCP setup.
+
+## Claude skills
+
+- Claude Code skills
+  - https://code.claude.com/docs/en/skills
+  - Use for: optional reusable procedure packaging.
 
 ## MCP
 
@@ -73,6 +75,30 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - https://developers.openai.com/api/docs/guides/agents
   - Use for: guardrails, evals, production checks.
 
+## Project templating
+
+- Copier
+  - https://copier.readthedocs.io/en/stable/
+  - Use for: replacing custom scaffold scripts if template generation/update logic grows.
+
+- Cookiecutter
+  - https://cookiecutter.readthedocs.io/en/stable/
+  - Use for: simple project template generation.
+
+## Open-source / dependency safety
+
+- GitHub Dependency Review
+  - https://docs.github.com/en/code-security/concepts/supply-chain-security/about-dependency-review
+  - Use for: PR dependency change review, vulnerability/license/age signals.
+
+- OpenSSF Scorecard
+  - https://securityscorecards.dev/
+  - Use for: open-source security posture signal.
+
+- OSV-Scanner
+  - https://google.github.io/osv-scanner/
+  - Use for: dependency vulnerability scanning.
+
 ## Reference management
 
 - Keep project-specific references in `docs/REFERENCES.md`.
@@ -80,5 +106,4 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - name
   - URL
   - why it was used
-  - adoption level: reference-only | concept-only | dependency | copied-source
-
+  - adoption level: reference-only | concept-only | direct-dependency | adapter | fork | vendored-source | rejected

@@ -31,3 +31,10 @@ src/agents/
 - Use Claude Agent SDK when you need Claude Code-style local automation or
   hooks in a programmatic workflow.
 
+## Runtime Policy
+
+- Do not build a custom agent runtime unless official SDKs are insufficient.
+- Prefer OpenAI Agents SDK or Claude Agent SDK for runtime loops.
+- Use MCP only when external tools/data need a standard interface.
+- Record tool allowlist and security boundary.
+- Put app-specific logic in the app, not in the starter kit.

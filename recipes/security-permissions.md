@@ -28,11 +28,27 @@ Always. Every project needs baseline security and permission rules.
 - Grant write, shell, network, deploy, and database permissions only when needed.
 - Document why broad permissions are required.
 
-## MCP and tools
+## Dependency safety
 
+Before adding a dependency:
+
+- Check license.
+- Check known vulnerabilities.
+- Check maintenance activity.
+- Check transitive dependency impact.
+- Record adoption mode in `docs/REFERENCES.md`.
+
+For team/audit projects, consider GitHub Dependency Review, OSV-Scanner, OpenSSF Scorecard, or equivalent tools.
+
+## Tool / MCP safety
+
+- Use allowlists.
+- Start read-only.
+- Require confirmation for destructive actions.
+- Treat tool descriptions and external content as untrusted.
 - Record enabled tools in project docs.
 - Limit filesystem and network scope.
-- Treat tool output and external content as untrusted.
+- Do not store tokens in the repo.
 
 ## Common mistakes
 
@@ -40,4 +56,3 @@ Always. Every project needs baseline security and permission rules.
 - Leaving generated adapter rules stale.
 - Adding dependencies without review.
 - Treating local development tokens as harmless.
-

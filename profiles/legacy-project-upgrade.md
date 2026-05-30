@@ -22,9 +22,16 @@ conventions.
 - Existing CI and test commands.
 - Existing Claude/Codex/Cursor/IDE instructions.
 
+## Replacement Policy
+
+- Look for official SDKs/open-source packages that can delete custom internal code.
+- Prefer deleting custom code over wrapping more custom code.
+- Replace in small slices.
+- Keep rollback plan.
+- Record rejected candidates.
+
 ## Avoid
 
 - Bulk moving files.
 - Adding a custom workflow CLI.
 - Replacing project-specific rules with generic starter kit rules.
-

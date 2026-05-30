@@ -15,6 +15,51 @@ Official links are centralized in `templates/links.md`.
 5. MCP, skills, hooks, subagents, SDKs, and reference workflows are optional.
 6. Small projects should stay small.
 
+## Reuse-First Philosophy
+
+AI Project Kit is designed to prevent agents from defaulting to "I will build
+everything from scratch."
+
+For non-trivial infrastructure, agents should:
+
+1. Check official SDKs first.
+2. Search maintained open-source projects.
+3. Evaluate real adoption options.
+4. Prefer direct dependency or thin adapter.
+5. Record license, security, and maintenance decisions.
+6. Implement custom code only after rejecting existing options.
+
+This kit is not a runtime. It provides rails:
+
+- templates
+- recipes
+- profiles
+- examples
+- optional scaffold helpers
+
+Runtime belongs to official SDKs/harnesses and project-specific code.
+
+## Tooling Policy
+
+This kit is usable without Python.
+
+The files under `tools/scaffold/` are optional convenience helpers for:
+
+- copying canonical templates into a target project
+- generating short harness adapter files from canonical instructions
+
+They are not an agent runtime and must not become one.
+
+Do not add new scaffold scripts unless the same result cannot be achieved with:
+
+- a Markdown template
+- a profile checklist
+- an existing project-template tool
+- an official SDK/harness feature
+
+If scaffold logic grows beyond simple copy/generate behavior, prefer adopting a
+standard template tool such as Copier or Cookiecutter.
+
 ## Layout
 
 ```text
@@ -23,8 +68,10 @@ templates/
   canonical/         Source templates shared by all harnesses.
   harness-adapters/  Short generated adapter templates.
 recipes/             Practical setup guides and checklists.
+  open-source-reuse.md
 profiles/            Project-shape checklists.
 examples/            Minimal example shapes.
+  skills/open-source-adoption/
 tools/scaffold/      Optional copy/generate helpers.
 ```
 
@@ -68,4 +115,3 @@ python3 tools/scaffold/gen-harness-instructions.py --list-harnesses
 
 For details, start with the matching file in `profiles/`, then open only the
 recipes that profile names.
-

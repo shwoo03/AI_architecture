@@ -28,3 +28,9 @@ apps.
 
 Use Codex or Claude Code directly. Keep the project instructions short.
 
+## Reuse Policy
+
+- Implement tiny helpers directly.
+- For infrastructure-like features, run `recipes/open-source-reuse.md`.
+- Record only the selected/rejected decision in `docs/REFERENCES.md`.
+- Do not add heavy dependency gates by default.
