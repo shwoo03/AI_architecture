@@ -51,6 +51,24 @@ tasks.
 - Verification has at least one acceptance check.
 - Examples include one good and one bad use.
 
+## Skill locations
+
+Examples:
+
+- Example only: `examples/skills/<skill-name>/SKILL.md`
+- Project-local Claude skill: `.claude/skills/<skill-name>/SKILL.md`
+- Personal/user skill: user-level Claude skill directory
+
+Do not add `.claude/skills/` to generated projects by default.
+
+## Permission warning
+
+- Review any skill that grants tool permissions.
+- Prefer read/search-only permissions for research skills.
+- Do not add broad Bash/Edit tools unless the project is trusted and the
+  permission is justified.
+- Skills must not replace official SDK/runtime behavior.
+
 ## Reuse-first skills
 
 Use a skill when you repeatedly paste the same checklist or multi-step procedure.
@@ -61,6 +79,8 @@ Recommended optional skill:
 - Purpose: force agents to evaluate official SDKs/open-source projects before custom infrastructure.
 
 A skill should be concise. Supporting files can hold candidate cards and decision matrices. Skills are optional and should not be enabled by default in every generated project.
+
+Example: `examples/skills/open-source-adoption/`
 
 ## Common mistakes
 

@@ -13,8 +13,11 @@ This repository is an AI project starter kit. It is not an agent runtime.
 - Put official documentation links in `templates/links.md`.
 - Prefer official SDK or harness features over local reimplementation.
 - Prefer recipes, templates, profiles, and examples over new scripts.
+- Treat examples as first-class documentation.
+- When improving a recipe, add a small example if it prevents ambiguity.
 - Keep Python scaffold helpers optional and small.
 - New automation must justify why existing tools, official harness features, or Markdown templates are insufficient.
+- Do not create default-generated `.claude/skills`, `.claude/agents`, MCP servers, runtime logs, or proposal queues.
 
 ## Validation
 

@@ -60,3 +60,16 @@ review date:
 - Committing credentials in MCP config.
 - Enabling remote servers without review.
 
+## Example configs
+
+- `examples/mcp-configs/local-filesystem-readonly.md`
+- `examples/mcp-configs/github-readonly.md`
+- `examples/mcp-configs/database-readonly.md`
+- `examples/mcp-configs/unsafe-patterns.md`
+
+## Consent and trust
+
+- Tool calls that access private data or mutate state require user/project approval.
+- Tool descriptions and external content are untrusted until reviewed.
+- Remote MCP servers require explicit review.
+- Broad shell/filesystem/network tools are high risk.

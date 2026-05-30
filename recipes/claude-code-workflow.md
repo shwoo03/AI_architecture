@@ -37,3 +37,31 @@ docs/SECURITY.md
 - Letting `CLAUDE.md` drift from `AGENTS.md`.
 - Making subagents the default for simple tasks.
 
+## Subagent decision rule
+
+Use a subagent only when at least one is true:
+
+- different tool permissions are needed
+- long context should be isolated
+- review/security/research role is independent
+- the role repeats across tasks
+
+Do not use a subagent when:
+
+- it is a single-file edit
+- the task is simple
+- the goal is just "think harder"
+- coordination cost exceeds benefit
+
+Example subagents live in `examples/claude-subagents/`.
+
+## Skills decision rule
+
+Use a skill only when:
+
+- a workflow repeats
+- activation is clear
+- inputs/outputs can be described
+- verification is possible
+
+Do not use a skill for one-off prompts.

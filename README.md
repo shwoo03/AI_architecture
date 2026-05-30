@@ -71,9 +71,27 @@ recipes/             Practical setup guides and checklists.
   open-source-reuse.md
 profiles/            Project-shape checklists.
 examples/            Minimal example shapes.
+  agents-md/
+  reference-decisions/
+  mcp-configs/
+  claude-subagents/
   skills/open-source-adoption/
+  openai-agents-sdk-app/
+  claude-agent-sdk-app/
 tools/scaffold/      Optional copy/generate helpers.
 ```
+
+## Examples
+
+Use examples when you want a concrete pattern before applying a recipe.
+
+Recommended order:
+
+1. Start with the matching profile.
+2. Read the recipe.
+3. Copy the closest example.
+4. Adapt it to the project.
+5. Record decisions in `docs/REFERENCES.md`.
 
 ## Minimum Project Surface
 
@@ -91,6 +109,15 @@ docs/PROFILE_CHECKLIST.md
 
 Do not add runtime ledgers, proposal queues, specialist ledgers, MCP servers, or
 skills unless the project profile calls for them.
+
+## What This Kit Intentionally Does Not Do
+
+- No runtime.
+- No `agent-flow.py`.
+- No default logs or ledgers.
+- No default MCP servers.
+- No default skills or subagents.
+- No dependency automation.
 
 ## Quick Start
 

@@ -27,6 +27,32 @@ src/claude_agent/
   tests/
 ```
 
+## SDK boundary
+
+- Use Claude Agent SDK for programmatic Claude Code-like behavior.
+- Use normal Claude Code plus generated `CLAUDE.md` for ordinary local coding.
+- Do not duplicate canonical project rules inside SDK options.
+- Keep permissions explicit and reviewed.
+
+## Minimal policy files
+
+Suggested shape:
+
+```text
+claude-agent/
+  options-policy.md
+  permission-policy.md
+  session-policy.md
+  hooks-policy.md
+  subagent-policy.md
+```
+
+- `options-policy.md`: allowed tools, model, working directory, environment, and output format.
+- `permission-policy.md`: read/write/shell/network boundaries and confirmation rules.
+- `session-policy.md`: persistence, retention, and what must not be stored.
+- `hooks-policy.md`: explicit audit/control hooks and test expectations.
+- `subagent-policy.md`: optional specialist roles and allowed tools.
+
 ## Checklist
 
 - Set `allowed_tools`.
@@ -42,3 +68,6 @@ src/claude_agent/
 - Duplicating canonical project rules in SDK options.
 - Granting shell or file write access without a documented reason.
 
+## Example
+
+See `examples/claude-agent-sdk-app/` for a documentation-only project shape.

@@ -40,6 +40,9 @@ Before adding a dependency:
 
 For team/audit projects, consider GitHub Dependency Review, OSV-Scanner, OpenSSF Scorecard, or equivalent tools.
 
+- Dependency adoption should have an upgrade/removal plan.
+- Copied source must have an owner and update plan.
+
 ## Tool / MCP safety
 
 - Use allowlists.
@@ -56,3 +59,16 @@ For team/audit projects, consider GitHub Dependency Review, OSV-Scanner, OpenSSF
 - Leaving generated adapter rules stale.
 - Adding dependencies without review.
 - Treating local development tokens as harmless.
+
+## Example-driven checks
+
+Use these examples when reviewing risky changes:
+
+- `examples/mcp-configs/unsafe-patterns.md`
+- `examples/reference-decisions/vendored-source.md`
+- `examples/reference-decisions/custom-implementation-justified.md`
+
+Additional checks:
+
+- Generated adapters should not carry secret values.
+- Handoff files should not include secrets or private tokens.
