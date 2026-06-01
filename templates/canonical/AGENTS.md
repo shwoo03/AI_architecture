@@ -40,4 +40,5 @@ This file is the canonical instruction source for coding agents in this project.
 ## References
 
 - Project references live in `docs/REFERENCES.md`.
-- Official docs live in `templates/links.md` in the source kit.
+- Official docs live in `docs/LINKS.md` in scaffolded projects.
+- In the source starter kit, update `templates/links.md` and regenerate/copy as needed.

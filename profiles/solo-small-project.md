@@ -9,10 +9,14 @@ apps.
 - `templates/canonical/PROJECT_PROFILE.md` -> `docs/PROJECT_PROFILE.md`
 - `templates/canonical/HANDOFF.md` -> `docs/HANDOFF.md`
 - `templates/canonical/SECURITY.md` -> `docs/SECURITY.md`
+- `templates/canonical/REFERENCES.md` -> `docs/REFERENCES.md`
+- `templates/links.md` -> `docs/LINKS.md`
+- `profiles/solo-small-project.md` -> `docs/PROFILE_CHECKLIST.md`
 
 ## Optional
 
-- `templates/canonical/REFERENCES.md` -> `docs/REFERENCES.md`
+- `templates/optional/PROJECT_MEMORY.md` -> `docs/PROJECT_MEMORY.md`
+- project-owned research, eval, MCP, hook, skill, plugin, subagent, or worktree docs when friction appears
 
 ## Do Not Add By Default
 
@@ -23,8 +27,13 @@ apps.
 - specialist ledgers
 - MCP servers
 - skills directory
+- subagents
 - hooks
 - plugins
+- evals
+- worktrees
+- `docs/PROJECT_MEMORY.md`
+- `research/`
 
 ## Recommended Harness
 

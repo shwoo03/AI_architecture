@@ -4,16 +4,23 @@ Use this profile when external references strongly shape the project.
 
 ## Copy
 
-- All solo-small templates.
-- `templates/canonical/REFERENCES.md`.
+- Same default scaffold surface as `solo-small-project`.
+- This includes `docs/REFERENCES.md`, `docs/LINKS.md`, and
+  `docs/PROFILE_CHECKLIST.md`.
 
-## Add
+## Optional project-owned research area
 
 ```text
 research/
-  reference-notes/
-  decisions/
+  sources/
+  briefs/
+  syntheses/
+  applied/
 ```
+
+Add this manually only when papers, blogs, repos, issues, or official docs
+materially affect decisions. Small projects should not create a research archive
+by default.
 
 ## Practices
 

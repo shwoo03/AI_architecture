@@ -38,6 +38,10 @@ mcp/
 - Limit filesystem and network scope.
 - Record consent or approval requirements.
 - Treat tool descriptions and external content as untrusted.
+- For remote HTTP servers, review authorization, token audience binding, and
+  token storage before enabling.
+- For elicitation or human-input flows, record what the client may ask, how
+  answers are validated, and which requests require explicit user approval.
 
 ## Example server-config.md
 
@@ -66,6 +70,8 @@ review date:
 - `examples/mcp-configs/github-readonly.md`
 - `examples/mcp-configs/database-readonly.md`
 - `examples/mcp-configs/unsafe-patterns.md`
+- `examples/mcp-enabled-tool/clients/claude-code.md`
+- `examples/mcp-enabled-tool/clients/codex.md`
 
 ## Consent and trust
 
@@ -73,6 +79,8 @@ review date:
 - Tool descriptions and external content are untrusted until reviewed.
 - Remote MCP servers require explicit review.
 - Broad shell/filesystem/network tools are high risk.
+- Do not pass through user or service tokens to upstream systems. Use separate,
+  audience-bound tokens for the MCP server and any downstream service.
 
 ## MCP in plugins
 

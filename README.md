@@ -77,6 +77,7 @@ recipes/             Practical setup guides and checklists.
   open-source-reuse.md
   hook-policy.md
   plugin-packaging.md
+  subagent-policy.md
   session-continuity.md
   research-material-management.md
   eval-feedback-loop.md
@@ -96,6 +97,7 @@ examples/            Minimal example shapes.
   eval-feedback/
   worktree-isolation/
   skills/open-source-adoption/
+  mcp-enabled-tool/
   openai-agents-sdk-app/
   claude-agent-sdk-app/
 dogfood/             Sanitized adoption reports, backlog, and repeated lessons.
@@ -200,6 +202,51 @@ Supported generated adapters:
 python3 tools/scaffold/gen-harness-instructions.py --list-harnesses
 ```
 
+## Release Validation
+
+Before releasing kit changes, validate the helper surface and the intentionally
+small scaffold output:
+
+```bash
+python3 -m py_compile tools/scaffold/*.py
+```
+
+```bash
+for profile in solo-small-project team-audit-project agent-runtime-app research-heavy-project legacy-project-upgrade; do
+  python3 tools/scaffold/init-project.py --target "/private/tmp/ai-project-kit-smoke-$profile" --profile "$profile" --force
+done
+```
+
+```bash
+for harness in claude codex openai mcp; do
+  python3 tools/scaffold/gen-harness-instructions.py --project /private/tmp/ai-project-kit-smoke-solo-small-project --harness "$harness" --force
+done
+```
+
+Check that the small-project scaffold still does not generate optional operating
+surfaces by default:
+
+```bash
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/.claude
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/.codex
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/docs/PROJECT_MEMORY.md
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/research
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/evals
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/runtime
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/mcp
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/hooks
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/skills
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/subagents
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/plugins
+test ! -e /private/tmp/ai-project-kit-smoke-solo-small-project/worktrees
+```
+
+Finish with:
+
+```bash
+git diff --check
+```
+
 ## How To Choose
 
 - Use Codex or Claude Code directly for small coding projects.
@@ -207,6 +254,7 @@ python3 tools/scaffold/gen-harness-instructions.py --list-harnesses
 - Use Claude Agent SDK when you need programmatic Claude Code-like behavior.
 - Use MCP only when external tools/data need a reviewed tool boundary.
 - Use skills only for repeated workflows with clear contracts.
+- Use subagents only for isolated context, permissions, or repeated specialist roles.
 - Use hooks only for reviewed lifecycle checks or guardrails.
 - Use plugins only when skills/hooks/agents/MCP need a reviewed reusable package.
 - Use session-continuity recipe for long-running projects.

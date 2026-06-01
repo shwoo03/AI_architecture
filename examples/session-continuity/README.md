@@ -11,3 +11,5 @@ These examples are not copied into scaffolded projects by default.
 - `compaction-handoff.md`: what to write before compaction or stopping.
 - `project-memory.md`: example stable memory file.
 - `memory-promotion-checklist.md`: where each kind of information belongs.
+- `filled-compaction-handoff-small-web-app.md`: short filled handoff example.
+- `filled-project-memory-sdk-app.md`: stable memory example, not an activity log.

@@ -35,9 +35,17 @@ Apply the kit to representative projects:
 3. Fill in `AGENTS.md`, `PROJECT_PROFILE`, `SECURITY`, and related docs.
 4. Do one real project task.
 5. Observe whether reuse-first behavior actually happened.
-6. Write a short report in `dogfood/reports/`.
+6. Write a short report in `dogfood/reports/` using
+   `dogfood/templates/adoption-report.md`.
 7. Add 1-3 actionable items to `dogfood/backlog.md` when warranted.
 8. Move repeated lessons to `dogfood/lessons.md`.
+
+When reporting, check whether the expected default surface stayed small. Note
+any unexpected generated files, any optional runtime/MCP/hook/skill/subagent/eval
+or worktree surface added manually, and whether the finding should become a
+template, recipe, example, profile, scaffold-helper, or official-link change.
+See `dogfood/reports/example-small-project-adoption-report.md` for a filled
+report example.
 
 ## Issue classes
 
@@ -58,4 +66,3 @@ Use these types when classifying findings:
 Promote lessons to recipes, templates, examples, or README only after they repeat
 across projects. Prefer fixing repeated issues over reacting to one-off project
 quirks.
-

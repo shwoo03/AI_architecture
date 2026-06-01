@@ -42,4 +42,12 @@ This repository is an AI project starter kit. It is not an agent runtime.
 python3 -m py_compile tools/scaffold/*.py
 python3 tools/scaffold/init-project.py --target /private/tmp/ai-project-kit-smoke --profile solo-small-project --force
 python3 tools/scaffold/gen-harness-instructions.py --project /private/tmp/ai-project-kit-smoke --harness claude
+python3 tools/scaffold/gen-harness-instructions.py --list-harnesses
+git diff --check
 ```
+
+Before release, also smoke-test every profile and harness adapter. Confirm the
+generated small-project surface does not include `.claude/`, `.codex/`,
+`docs/PROJECT_MEMORY.md`, `research/`, `evals/`, `runtime/`, MCP servers, hooks,
+skills, subagents, plugins, or worktree automation unless a project explicitly
+adds them after review.

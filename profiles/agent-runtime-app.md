@@ -4,10 +4,11 @@ Use this profile when the application itself includes an agent workflow.
 
 ## Copy
 
-- All solo-small templates.
-- `templates/canonical/REFERENCES.md`.
+- Same default scaffold surface as `solo-small-project`.
+- This includes `docs/REFERENCES.md`, `docs/LINKS.md`, and
+  `docs/PROFILE_CHECKLIST.md`.
 
-## Add
+## Optional project-owned runtime area
 
 ```text
 src/agents/
@@ -17,12 +18,16 @@ src/agents/
   evals/
 ```
 
+Add this manually only when the application itself embeds an agent runtime. Do
+not ask the starter kit scaffold to generate runtime code.
+
 ## Recommended Recipes
 
 - `recipes/openai-agents-sdk.md`
 - `recipes/claude-agent-sdk.md`
 - `recipes/mcp-connection.md`
 - `recipes/security-permissions.md`
+- `recipes/subagent-policy.md`
 - `recipes/hook-policy.md`
 - `recipes/plugin-packaging.md`
 - `recipes/session-continuity.md`
@@ -43,7 +48,7 @@ src/agents/
 - Hooks/plugins may assist validation or packaging, but must not become the runtime.
 - Use official SDK sessions/conversation state where runtime memory is needed.
 - Use `recipes/eval-feedback-loop.md` for behavior changes.
-- Record runtime memory design and tool boundaries.
+- Record runtime memory design, tool boundaries, and SDK adoption decisions in `docs/REFERENCES.md`.
 - Use MCP only when external tools/data need a standard interface.
 - Record tool allowlist and security boundary.
 - Put app-specific logic in the app, not in the starter kit.

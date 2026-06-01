@@ -58,6 +58,7 @@ Examples:
 - Example only: `examples/skills/<skill-name>/SKILL.md`
 - Project-local Claude skill: `.claude/skills/<skill-name>/SKILL.md`
 - Personal/user skill: user-level Claude skill directory
+- Codex/plugin skill: packaged through a reviewed Codex plugin when reusable across projects
 
 Do not add `.claude/skills/` to generated projects by default.
 
@@ -107,6 +108,11 @@ Recommended optional skill:
 A skill should be concise. Supporting files can hold candidate cards and decision matrices. Skills are optional and should not be enabled by default in every generated project.
 
 Example: `examples/skills/open-source-adoption/`
+
+See also:
+
+- `examples/skills/README.md`
+- `examples/skills/unsafe-skill-patterns.md`
 
 ## Common mistakes
 

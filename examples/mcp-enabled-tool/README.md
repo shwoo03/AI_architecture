@@ -15,5 +15,9 @@ mcp/
     codex.md
 ```
 
-See `recipes/mcp-connection.md`.
+Client examples:
 
+- `clients/claude-code.md`
+- `clients/codex.md`
+
+See `recipes/mcp-connection.md`.

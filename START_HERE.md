@@ -34,6 +34,7 @@ manually.
 - Claude Agent SDK app -> read `recipes/claude-agent-sdk.md`
 - MCP -> read `recipes/mcp-connection.md`
 - Skills -> read `recipes/skill-writing.md`
+- Subagents -> read `recipes/subagent-policy.md`
 - Hooks -> read `recipes/hook-policy.md`
 - Plugins -> read `recipes/plugin-packaging.md`
 - Long-running projects -> read `recipes/session-continuity.md`
@@ -52,3 +53,16 @@ community systems, copied source, adapters, forks, or custom implementation.
 If the kit feels too heavy or incomplete, write a sanitized report in
 `dogfood/reports/` and add only actionable repeated issues to
 `dogfood/backlog.md`.
+
+## 7. Validate kit changes
+
+When changing this starter kit itself, smoke-test every profile and harness
+adapter before release. Keep the default scaffold small: no runtime, MCP server,
+hooks, skills, subagents, eval runtime, project memory, research archive, or
+worktree automation should appear unless a project explicitly adds it later.
+
+```bash
+python3 -m py_compile tools/scaffold/*.py
+python3 tools/scaffold/gen-harness-instructions.py --list-harnesses
+git diff --check
+```

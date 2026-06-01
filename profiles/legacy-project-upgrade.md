@@ -13,6 +13,12 @@ conventions.
 - `docs/PROJECT_PROFILE.md`
 - `docs/HANDOFF.md`
 - `docs/SECURITY.md`
+- `docs/REFERENCES.md`
+- `docs/LINKS.md`
+- `docs/PROFILE_CHECKLIST.md`
+
+If any target file already exists, merge manually and preserve local conventions.
+The scaffold helper skips existing files unless `--force` is used.
 
 ## Merge Carefully
 
@@ -23,6 +29,7 @@ conventions.
 - Existing Claude/Codex/Cursor/IDE instructions.
 - Existing hooks/plugins and generated extension configs.
 - Existing handoff, memory, or research notes.
+- Existing `REFERENCES`, `LINKS`, and validation docs.
 
 ## Replacement Policy
 

@@ -1,10 +1,22 @@
 # Handoff
 
+## Session metadata
+
+- Date:
+- Branch:
+- Latest checked commit:
+- Goal:
+- Handoff stale? yes/no/unknown
+
 ## Current state
 
 -
 
 ## Next action
+
+-
+
+## Next smallest action
 
 -
 
@@ -15,8 +27,9 @@
 ## Evidence
 
 - commit:
-- validation:
 - changed files:
+- validation run:
+- validation result:
 
 ## Decisions made
 

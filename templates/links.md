@@ -1,6 +1,6 @@
 # Official link registry
 
-Last verified: 2026-05-30
+Last verified: 2026-06-01
 
 This file is the single place for official documentation links used by the kit.
 Canonical templates and recipes should reference this file instead of duplicating URLs.
@@ -18,10 +18,9 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - https://developers.openai.com/codex/guides/agents-md
   - Use for: canonical project instructions, instruction discovery, nested overrides.
 
-- Codex configuration, permissions, hooks, MCP, skills, and subagents
-  - Start from the Codex docs navigation:
-  - https://developers.openai.com/api/docs/guides/agents
-  - Use for: Codex-specific adapters and optional workflow notes.
+- Codex overview and use cases
+  - https://developers.openai.com/codex/
+  - Use for: Codex-specific workflow orientation before opening feature-specific docs.
 
 - Codex hooks
   - https://developers.openai.com/codex/hooks
@@ -44,6 +43,10 @@ Canonical templates and recipes should reference this file instead of duplicatin
 - OpenAI Agents SDK Python docs
   - https://openai.github.io/openai-agents-python/
   - Use for: Python SDK implementation examples.
+
+- OpenAI Agents SDK tracing
+  - https://openai.github.io/openai-agents-python/tracing/
+  - Use for: built-in traces/spans, sensitive data controls, and observability decisions.
 
 - OpenAI Responses API reference
   - https://platform.openai.com/docs/api-reference/responses
@@ -75,6 +78,10 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - https://code.claude.com/docs/en/memory
   - Use for: CLAUDE.md, auto memory, /memory, compaction survival, rules organization.
 
+- Claude Code extension overview
+  - https://code.claude.com/docs/en/features-overview
+  - Use for: choosing between CLAUDE.md, skills, subagents, hooks, MCP, and plugins.
+
 - Claude Code checkpointing
   - https://code.claude.com/docs/en/checkpointing
   - Use for: rewind, session safety, edit checkpoints.
@@ -105,9 +112,21 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - https://docs.langchain.com/oss/python/concepts/memory
   - Use for: short-term vs long-term memory, semantic/episodic/procedural memory concepts.
 
+- LangGraph persistence and memory
+  - https://docs.langchain.com/oss/python/langgraph/persistence
+  - Use for: checkpoints, thread state, stores, and runtime persistence concepts.
+
 - LlamaIndex agent memory
   - https://developers.llamaindex.ai/python/framework/module_guides/deploying/agents/memory/
   - Use for: short-term/long-term memory blocks, fact extraction memory, vector memory, token-based flushing.
+
+- Google ADK sessions, state, and memory
+  - https://adk.dev/sessions/
+  - Use for: session/state/memory separation in runtime agent applications.
+
+- CrewAI memory
+  - https://docs.crewai.com/en/concepts/memory
+  - Use for: community runtime memory concepts and adoption comparisons.
 
 ## Claude skills
 
@@ -122,14 +141,32 @@ Canonical templates and recipes should reference this file instead of duplicatin
   - Use for: high-level MCP explanation and architecture.
 
 - MCP specification
-  - https://modelcontextprotocol.io/specification/2025-06-18
+  - https://modelcontextprotocol.io/specification/2025-11-25
   - Use for: security/trust model, hosts/clients/servers, resources/prompts/tools.
+
+- MCP authorization
+  - https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization
+  - Use for: HTTP transport authorization, OAuth/resource handling, token handling, and remote server review.
+
+- MCP elicitation
+  - https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation
+  - Use for: client-mediated user input requests and human approval boundaries.
+
+## Agent interoperability
+
+- Google ADK multi-agent workflows
+  - https://adk.dev/workflows/
+  - Use for: runtime multi-agent workflow concepts and reference-only comparisons.
+
+- Google ADK with A2A
+  - https://adk.dev/a2a/
+  - Use for: agent-to-agent interoperability concepts and reference-only adoption decisions.
 
 ## Security
 
-- MCP specification security section
-  - https://modelcontextprotocol.io/specification/2025-06-18
-  - Use for: consent, data privacy, tool safety, sampling controls.
+- MCP security best practices
+  - https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices
+  - Use for: confused deputy, token passthrough, SSRF, session hijacking, and scope minimization.
 
 - OpenAI production and safety docs
   - Start from:

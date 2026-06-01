@@ -59,6 +59,17 @@ Do not use a subagent when:
 
 Example subagents live in `examples/claude-subagents/`.
 
+Before adding a project-local subagent, record:
+
+- purpose
+- owner
+- trigger or activation condition
+- allowed tools
+- context it may read
+- output summary expected by the main session
+- validation or review expectation
+- rollback path
+
 ## Skills decision rule
 
 Use a skill only when:

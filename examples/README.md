@@ -14,6 +14,7 @@ they are not copied into scaffolded projects by default.
 ## MCP config examples
 
 - `examples/mcp-configs/`
+- `examples/mcp-enabled-tool/`: reviewed MCP boundary shape with client notes.
 
 ## Claude subagent examples
 
@@ -54,6 +55,7 @@ they are not copied into scaffolded projects by default.
 ## Open-source adoption skill
 
 - `examples/skills/open-source-adoption/`
+- `examples/skills/`: skill index and unsafe patterns.
 
 ## Minimal project examples
 
